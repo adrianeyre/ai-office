@@ -1,0 +1,58 @@
+# The Design system Floor Template (PRD FR-100): a designer and a
+# front-end developer change the design system's repository (its design
+# tokens, styles and components); an accessibility reviewer reviews each
+# pull request, and visual QA runs the component tests, the visual
+# snapshots and the contrast check. The designer is the Role library's
+# built-in designer, as it has always been. The Floor works on the
+# repository only, never on a package registry or a live site (PRD §4).
+# The format is in docs/guide/floors-and-agents.md, under "Floor
+# Templates".
+name: Design system
+description: A design team that changes the design tokens, styles and components in the design system's repository, reviews each change for accessibility and checks how it looks.
+icon: palette
+theme: atelier
+roles:
+  - role: designer
+    count: 1
+  - role: front-end-developer
+    count: 1
+  - role: accessibility-reviewer
+    count: 1
+  - role: visual-qa
+    count: 1
+settings:
+  setupCommand: if [ -f package.json ]; then npm install; fi
+  testCommand: npm run test:components && npm run test:visual && npm run check:contrast
+  mergePolicy: send_to_me
+  roundCap: 3
+  requiredReviewers: [accessibility-reviewer]
+manager:
+  planningGuidance: |-
+    This Floor started from the Design system Floor Template. It works on the design system's repository only: its design tokens, styles, components, their stories and their docs. It never acts on a package registry or a live site. An issue that needs one (publishing a new release of the package, deploying its stories or its docs site, changing an app that uses it) is for the Owner: say so on the issue and ask the Owner with a Notice rather than planning it.
+
+    The work Roles:
+    - The designer changes how the components look and feel: the design tokens (colours, font sizes, spacing, radii and shadows), the styles and the icons.
+    - The front-end developer changes how the components work: their markup, behaviour, props, keyboard use, stories and tests.
+
+    The accessibility reviewer reviews every pull request, and visual QA checks what the accessibility reviewer approves: the component tests, the visual snapshots and the contrast of every pair of colours the design tokens define.
+
+    When an issue needs both work Roles, give the designer the first turn and the front-end developer the second: a new component, or a new variant of one, is the designer (its design tokens and styles), then the front-end developer (its markup, behaviour and tests). A change of colour or spacing alone is the designer's; a fix to how a component behaves is the front-end developer's alone. Give an issue only the Roles whose work it needs.
+
+    Plan issues that change the same design tokens or the same component one after another. A change that alters many visual snapshots at once (a new colour, a new font) is an issue on its own, so that its pull request shows only that.
+  firstIssue:
+    title: Set up the design system's checks
+    body: |-
+      Add these scripts to `package.json`, so that the Floor's check command runs each of them. Each exits with an error, naming the component or the file and the problem, when its check fails:
+
+      - `test:components`: the components' tests, rendering each one and checking its behaviour, such as with Vitest or Jest and Testing Library, with an accessibility check of each story, such as with `axe`.
+      - `test:visual`: a screenshot of every story in each of its states, compared with the baseline committed in the repository, such as with Playwright's `toHaveScreenshot` over the built stories, run in the same container image in the sandbox and in CI so that the screenshots match.
+      - `check:contrast`: every pair of text and background colours the design tokens define meets WCAG 2.2 AA contrast (4.5:1 for text, 3:1 for large text and controls), such as with a short Node script over the design tokens.
+
+      Say in the README how to run them, and how to update the visual baseline when a change means to alter it.
+
+      ## Acceptance criteria
+
+      - [ ] `npm run test:components`, `test:visual` and `check:contrast` each run and pass on the default branch
+      - [ ] Each fails, naming the component or the file, when its check finds a problem
+      - [ ] The visual baseline is committed, and the README says how to update it
+labels: []

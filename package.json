@@ -1,0 +1,62 @@
+{
+  "name": "ai-office",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI Office: a 3D office where AI agents work your GitHub issues, with a built-in load balancer for AI accounts.",
+  "type": "module",
+  "scripts": {
+    "sandcastle": "tsx .sandcastle/main.ts",
+    "dev": "pnpm db:up && pnpm db:schema && pnpm sandbox:ensure && pnpm --recursive --parallel dev",
+    "db:up": "docker compose -f docker-compose.dev.yml up --detach --wait",
+    "db:down": "docker compose -f docker-compose.dev.yml stop",
+    "db:reset": "docker compose -f docker-compose.dev.yml down --volumes && pnpm db:up && pnpm db:schema",
+    "build": "pnpm --recursive --if-present build",
+    "lint": "eslint . && prettier --check .",
+    "typecheck": "tsc && tsc -p site && pnpm --recursive typecheck",
+    "test": "vitest run",
+    "format": "prettier --write . && eslint --fix .",
+    "db:schema": "pnpm --filter @ai-office/db db:schema",
+    "e2e": "pnpm build && pnpm --filter @ai-office/e2e e2e",
+    "sandbox:build": "node docker/sandbox-build.ts",
+    "sandbox:ensure": "node docker/sandbox-build.ts --missing",
+    "screenshots": "pnpm build && pnpm --filter @ai-office/e2e screenshots",
+    "scenes": "pnpm --filter @ai-office/e2e scenes",
+    "site:build": "node site/build.ts"
+  },
+  "engines": {
+    "node": ">=26",
+    "pnpm": ">=12"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": ">=26",
+      "onFail": "error"
+    },
+    "packageManager": {
+      "name": "pnpm",
+      "version": ">=12",
+      "onFail": "error"
+    }
+  },
+  "devDependencies": {
+    "@ai-hero/sandcastle": "^0.12.0",
+    "@eslint/js": "^10.0.1",
+    "@semantic-release/changelog": "^7.0.0",
+    "@semantic-release/git": "^11.0.1",
+    "@types/node": "^26.6.5",
+    "ajv": "^8.20.0",
+    "conventional-changelog-conventionalcommits": "^9.3.1",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "prettier": "^3.9.10",
+    "semantic-release": "^25.0.9",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vite": "~8.3.4",
+    "vitest": "^5.0.3",
+    "yaml": "^2.9.1"
+  }
+}

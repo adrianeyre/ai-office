@@ -1,0 +1,13 @@
+{
+  "name": "ai-office-sandbox-opencode-tools",
+  "private": true,
+  "description": "What the opencode sandbox image installs from npm, at exact versions; package-lock.json records each package's SHA-512, which npm ci checks.",
+  "dependencies": {
+    "opencode-ai": "1.19.0",
+    "pnpm": "12.10.0"
+  },
+  "allowScripts": {
+    "opencode-ai@1.19.0": true,
+    "pnpm": false
+  }
+}

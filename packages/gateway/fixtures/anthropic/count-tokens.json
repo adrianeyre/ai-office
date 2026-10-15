@@ -1,0 +1,22 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/v1/messages/count_tokens",
+    "headers": {
+      "accept": "application/json",
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+      "user-agent": "claude-cli/2.1.0 (external, cli)"
+    },
+    "body": "{\"model\":\"claude-sonnet-5-5\",\"messages\":[{\"role\":\"user\",\"content\":\"How many tokens is this?\"}]}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "request-id": "req_011CWgatewayCountTokens01",
+      "anthropic-organization-id": "00000000-0000-4000-8000-000000000000"
+    },
+    "body": "{\"input_tokens\":15}"
+  }
+}

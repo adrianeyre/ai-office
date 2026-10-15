@@ -1,0 +1,48 @@
+# The Documentation Floor Template (PRD FR-100): a technical writer changes
+# the docs in the repository; a docs reviewer reviews each pull request, and
+# an example checker (in the QA Stage) runs the docs build, the link check
+# and every code example the change touches. The Floor works on the
+# repository only, never on the live docs site or a production API (PRD
+# §4). The format is in docs/guide/floors-and-agents.md, under "Floor
+# Templates".
+name: Documentation
+description: A docs team that writes and revises the guides, tutorials and reference in the repository, reviews each change and runs its examples.
+icon: book-open
+theme: library
+roles:
+  - role: technical-writer
+    count: 1
+  - role: docs-reviewer
+    count: 1
+  - role: example-checker
+    count: 1
+settings:
+  setupCommand: if [ -f package.json ]; then npm install; fi
+  testCommand: npm run docs:build && npm run check:links && npm run check:examples
+  mergePolicy: send_to_me
+  roundCap: 3
+  requiredReviewers: [docs-reviewer]
+manager:
+  planningGuidance: |-
+    This Floor started from the Documentation Floor Template. It works on the docs in its repository only: their pages, their code examples and the docs site's settings. It never acts on the live docs site or a production API. An issue that needs one (publishing the site, changing its hosting or search, calling a production API to find out how it behaves) is for the Owner: say so on the issue and ask the Owner with a Notice rather than planning it.
+
+    The technical writer writes and revises every page: guides, tutorials, how-tos, reference and their code examples. The docs reviewer reviews every pull request for accuracy, plain writing and the style guide, and the example checker checks what the docs reviewer approves: the docs build, the links, and every code example the change touches, run as a reader would run it.
+
+    Plan one issue for each page or small set of pages, so that each pull request can be read in one sitting. Plan a page that others link to before them, and a move or a rename of pages as an issue on its own, with its redirects. Where an issue asks for docs of something the repository does not show (a feature, an option, a limit), ask the Owner with a Notice for the facts rather than planning a guess.
+  firstIssue:
+    title: Set up the docs' checks
+    body: |-
+      Add these scripts to `package.json` (making one if the repository has none), so that the Floor's check command runs each of them. Each exits with an error, naming the file and the problem, when its check fails:
+
+      - `docs:build`: builds the docs site from its sources with its own generator, such as VitePress, Docusaurus or MkDocs, with warnings as errors, into a folder that is not committed.
+      - `check:links`: every link in the docs goes to a page, an anchor or a file that exists, such as with `lychee` or `linkinator` on the built site.
+      - `check:examples`: runs every code example the docs mark as runnable, with no network and no credentials, and compares what it prints with the output the page shows, such as with a short Node script over the Markdown.
+
+      Say in the README how to run them, and how a page marks an example as runnable.
+
+      ## Acceptance criteria
+
+      - [ ] `npm run docs:build`, `check:links` and `check:examples` each run and pass on the default branch
+      - [ ] Each fails, naming the file, when its check finds a problem
+      - [ ] The README says how to run them, and how to mark an example as runnable
+labels: []

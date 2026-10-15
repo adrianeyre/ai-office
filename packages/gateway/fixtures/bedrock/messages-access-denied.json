@@ -1,0 +1,22 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/anthropic/v1/messages",
+    "headers": {
+      "accept": "application/json",
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+      "user-agent": "claude-cli/2.1.0 (external, cli)"
+    },
+    "body": "{\"model\":\"anthropic.claude-opus-5-5\",\"max_tokens\":1024,\"messages\":[{\"role\":\"user\",\"content\":\"Summarise PR #14 in one line.\"}]}"
+  },
+  "response": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json",
+      "x-amzn-errortype": "AccessDeniedException:http://internal.amazon.com/coral/com.amazon.coral.service/",
+      "x-amzn-requestid": "5e2f6a1c-0b9d-4c3e-9f1a-bedrock00005"
+    },
+    "body": "{\"message\":\"User: arn:aws:iam::123456789012:user/ai-office is not authorized to perform: bedrock-mantle:CreateInference on resource: arn:aws:bedrock-mantle:us-east-1::model/anthropic.claude-opus-5-5\"}"
+  }
+}

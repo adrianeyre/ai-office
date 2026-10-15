@@ -1,0 +1,11 @@
+pnpm-lock.yaml
+
+# The Sandcastle harness configuration is not ours to reformat.
+.sandcastle/
+
+# Markdown is hand-wrapped prose, and `docs/` is the canon; neither is
+# rewritten by a formatter.
+*.md
+
+# Vendored as published, so it stays byte-identical with its source.
+docker/compose-spec.json

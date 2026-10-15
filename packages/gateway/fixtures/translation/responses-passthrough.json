@@ -1,0 +1,49 @@
+{
+  "description": "A Responses request to an OpenAI-format account: it passes through unchanged, and the usage is read from the Response.",
+  "account": "openai",
+  "request": {
+    "path": "/v1/responses",
+    "body": {
+      "model": "gpt-5.5",
+      "input": "Hello",
+      "store": false
+    }
+  },
+  "upstream": {
+    "response": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req_openaiResp01"
+      },
+      "body": "{\"id\": \"resp_01Pass\", \"object\": \"response\", \"created_at\": 1791500000, \"status\": \"completed\", \"model\": \"gpt-5.5\", \"output\": [{\"type\": \"message\", \"id\": \"msg_01Pass\", \"status\": \"completed\", \"role\": \"assistant\", \"content\": [{\"type\": \"output_text\", \"text\": \"Hi!\", \"annotations\": []}]}], \"usage\": {\"input_tokens\": 1500, \"input_tokens_details\": {\"cached_tokens\": 1024}, \"output_tokens\": 4, \"output_tokens_details\": {\"reasoning_tokens\": 0}, \"total_tokens\": 1504}}"
+    },
+    "request": {
+      "path": "/v1/responses",
+      "body": {
+        "model": "gpt-5.5",
+        "input": "Hello",
+        "store": false
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "x-request-id": "req_openaiResp01"
+    },
+    "raw": true
+  },
+  "record": {
+    "endpoint": "responses",
+    "model": "gpt-5.5",
+    "streamed": false,
+    "status": 200,
+    "inputTokens": 476,
+    "outputTokens": 4,
+    "cacheReadInputTokens": 1024,
+    "cacheCreationInputTokens": 0,
+    "upstreamRequestId": "req_openaiResp01"
+  }
+}

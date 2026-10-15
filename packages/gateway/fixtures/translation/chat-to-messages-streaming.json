@@ -1,0 +1,299 @@
+{
+  "description": "A streamed Chat Completions request with tools and include_usage, served from an Anthropic account's stream of text then a tool call.",
+  "account": "anthropic",
+  "request": {
+    "path": "/v1/chat/completions",
+    "body": {
+      "model": "claude-opus-5-5",
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      },
+      "messages": [
+        {
+          "role": "developer",
+          "content": "Be brief."
+        },
+        {
+          "role": "user",
+          "content": "Run the tests."
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "Bash",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "command": {
+                  "type": "string"
+                }
+              },
+              "required": ["command"]
+            }
+          }
+        }
+      ],
+      "tool_choice": {
+        "type": "function",
+        "function": {
+          "name": "Bash"
+        }
+      }
+    }
+  },
+  "upstream": {
+    "response": {
+      "status": 200,
+      "headers": {
+        "content-type": "text/event-stream; charset=utf-8",
+        "cache-control": "no-cache",
+        "request-id": "req_011CWtranslateChat02"
+      },
+      "body": "event: message_start\r\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_01ChatStream\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-opus-5-5\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":30,\"cache_creation_input_tokens\":1200,\"cache_read_input_tokens\":0,\"output_tokens\":1}}}\r\n\r\nevent: content_block_start\r\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\r\n\r\nevent: ping\r\ndata: {\"type\":\"ping\"}\r\n\r\nevent: content_block_delta\r\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Running \"}}\r\n\r\nevent: content_block_delta\r\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"them \\u2014 \\u2713\"}}\r\n\r\nevent: content_block_stop\r\ndata: {\"type\":\"content_block_stop\",\"index\":0}\r\n\r\nevent: content_block_start\r\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_01Test\",\"name\":\"Bash\",\"input\":{}}}\r\n\r\nevent: content_block_delta\r\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"command\\\": \"}}\r\n\r\nevent: content_block_delta\r\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"\\\"pnpm test\\\"}\"}}\r\n\r\nevent: content_block_stop\r\ndata: {\"type\":\"content_block_stop\",\"index\":1}\r\n\r\nevent: message_delta\r\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\",\"stop_sequence\":null},\"usage\":{\"output_tokens\":41}}\r\n\r\nevent: message_stop\r\ndata: {\"type\":\"message_stop\"}\r\n\r\n"
+    },
+    "request": {
+      "path": "/v1/messages",
+      "body": {
+        "model": "claude-opus-5-5",
+        "max_tokens": 32000,
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Run the tests."
+              }
+            ]
+          }
+        ],
+        "system": [
+          {
+            "type": "text",
+            "text": "Be brief."
+          }
+        ],
+        "tools": [
+          {
+            "name": "Bash",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "command": {
+                  "type": "string"
+                }
+              },
+              "required": ["command"]
+            }
+          }
+        ],
+        "tool_choice": {
+          "type": "tool",
+          "name": "Bash"
+        },
+        "stream": true
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/event-stream; charset=utf-8",
+      "x-request-id": "req_011CWtranslateChat02"
+    },
+    "events": [
+      {
+        "event": null,
+        "data": {
+          "id": "chatcmpl-msg_01ChatStream",
+          "object": "chat.completion.chunk",
+          "created": 1791547200,
+          "model": "claude-opus-5-5",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "role": "assistant",
+                "content": ""
+              },
+              "logprobs": null,
+              "finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "event": null,
+        "data": {
+          "id": "chatcmpl-msg_01ChatStream",
+          "object": "chat.completion.chunk",
+          "created": 1791547200,
+          "model": "claude-opus-5-5",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "Running "
+              },
+              "logprobs": null,
+              "finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "event": null,
+        "data": {
+          "id": "chatcmpl-msg_01ChatStream",
+          "object": "chat.completion.chunk",
+          "created": 1791547200,
+          "model": "claude-opus-5-5",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "them — ✓"
+              },
+              "logprobs": null,
+              "finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "event": null,
+        "data": {
+          "id": "chatcmpl-msg_01ChatStream",
+          "object": "chat.completion.chunk",
+          "created": 1791547200,
+          "model": "claude-opus-5-5",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "tool_calls": [
+                  {
+                    "index": 0,
+                    "id": "toolu_01Test",
+                    "type": "function",
+                    "function": {
+                      "name": "Bash",
+                      "arguments": ""
+                    }
+                  }
+                ]
+              },
+              "logprobs": null,
+              "finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "event": null,
+        "data": {
+          "id": "chatcmpl-msg_01ChatStream",
+          "object": "chat.completion.chunk",
+          "created": 1791547200,
+          "model": "claude-opus-5-5",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "tool_calls": [
+                  {
+                    "index": 0,
+                    "function": {
+                      "arguments": "{\"command\": "
+                    }
+                  }
+                ]
+              },
+              "logprobs": null,
+              "finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "event": null,
+        "data": {
+          "id": "chatcmpl-msg_01ChatStream",
+          "object": "chat.completion.chunk",
+          "created": 1791547200,
+          "model": "claude-opus-5-5",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "tool_calls": [
+                  {
+                    "index": 0,
+                    "function": {
+                      "arguments": "\"pnpm test\"}"
+                    }
+                  }
+                ]
+              },
+              "logprobs": null,
+              "finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "event": null,
+        "data": {
+          "id": "chatcmpl-msg_01ChatStream",
+          "object": "chat.completion.chunk",
+          "created": 1791547200,
+          "model": "claude-opus-5-5",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {},
+              "logprobs": null,
+              "finish_reason": "tool_calls"
+            }
+          ]
+        }
+      },
+      {
+        "event": null,
+        "data": {
+          "id": "chatcmpl-msg_01ChatStream",
+          "object": "chat.completion.chunk",
+          "created": 1791547200,
+          "model": "claude-opus-5-5",
+          "choices": [],
+          "usage": {
+            "prompt_tokens": 1230,
+            "completion_tokens": 41,
+            "total_tokens": 1271,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            }
+          }
+        }
+      },
+      {
+        "event": null,
+        "data": "[DONE]"
+      }
+    ]
+  },
+  "record": {
+    "endpoint": "chat_completions",
+    "model": "claude-opus-5-5",
+    "streamed": true,
+    "status": 200,
+    "inputTokens": 30,
+    "outputTokens": 41,
+    "cacheReadInputTokens": 0,
+    "cacheCreationInputTokens": 1200,
+    "upstreamRequestId": "req_011CWtranslateChat02"
+  }
+}

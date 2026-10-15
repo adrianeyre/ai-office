@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/systemone",
+    "headers": {
+      "accept": "application/json",
+      "content-type": "application/json",
+      "user-agent": "ai-office"
+    },
+    "body": "{\"model\":\"typesafe/jev-1.13\",\"state\":{\"issue\":\"#14 Add a basket\",\"body\":\"Shoppers can put products in a basket and see its total.\\n\\n## Acceptance criteria\\n\\n- [ ] An Add to basket button on each product page\"},\"questions\":{\"clear\":{\"type\":\"noul\",\"instructions\":\"The issue is clear enough to work.\",\"criteria\":{\"true\":\"It says what to build and how to tell it is done.\",\"false\":\"It leaves out what to build or how to tell it is done.\"}},\"priority\":{\"type\":\"choice\",\"instructions\":\"How soon should this issue be worked?\",\"criteria\":{\"high\":\"Urgent: broken or blocking work.\",\"normal\":\"Ordinary work.\",\"low\":\"Can wait.\"}}}}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"id\":\"gen-dec-1791547200-openrouter1\",\"model\":\"typesafe/jev-1.13-20260917\",\"provider\":\"TypeSafe\",\"answers\":{\"clear\":{\"type\":\"noul\",\"noul\":0.94},\"priority\":{\"type\":\"choice\",\"choice\":\"normal\",\"confidence\":0.71,\"probabilities\":{\"high\":0.12,\"normal\":0.81,\"low\":0.07}}},\"usage\":{\"input_tokens\":412,\"output_tokens\":38,\"cost\":1.73e-05}}"
+  }
+}

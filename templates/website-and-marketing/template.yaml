@@ -1,0 +1,57 @@
+# The Website & marketing Floor Template (PRD FR-100): a web developer, a
+# copywriter and an SEO specialist change the website's repository; a
+# conversion reviewer reviews each pull request. It has no QA Agent: the
+# work Roles run the build, links and Lighthouse checks before they finish.
+# The Floor works on the repository only, never on live stores, ad
+# platforms or customer email (PRD §4). The format is in
+# docs/guide/floors-and-agents.md, under "Floor Templates".
+name: Website & marketing
+description: A web team that changes the website's pages, copy and search listings in its repository, and reviews each change for visitors who should act on it.
+icon: megaphone
+theme: studio
+roles:
+  - role: web-developer
+    count: 1
+  - role: copywriter
+    count: 1
+  - role: seo-specialist
+    count: 1
+  - role: conversion-reviewer
+    count: 1
+settings:
+  setupCommand: if [ -f package.json ]; then npm install; fi
+  testCommand: npm run build && npm run check:links && npm run check:lighthouse
+  mergePolicy: send_to_me
+  roundCap: 3
+  requiredReviewers: [conversion-reviewer]
+manager:
+  planningGuidance: |-
+    This Floor started from the Website & marketing Floor Template. It works on the website's repository only: its pages, components, copy and search listings. It never acts on a live store, an ad platform or customer email. An issue that needs one (starting an ad campaign, sending an email to subscribers, changing a hosted form or analytics tool) is for the Owner: say so on the issue and ask the Owner with a Notice rather than planning it. Copy for an ad or an email can still be written as a file in the repository, for the Owner to use.
+
+    The work Roles:
+    - The web developer changes the site's code: pages, layouts, components, styles, scripts and its build.
+    - The copywriter writes the words: page copy, headlines and calls to action.
+    - The SEO specialist improves how pages show in search results: titles, meta descriptions, headings, links, structured data, redirects and the sitemap.
+
+    The conversion reviewer reviews every pull request. The Floor has no QA Agent, so each work Role runs the site's checks (the build, links and Lighthouse) before it finishes, and the repository's CI should run them too.
+
+    When an issue needs more than one work Role, give it their turns in this order: the web developer first, who builds the page; then the copywriter, who writes it; then the SEO specialist, who makes it easy to find. A new landing page is all three. A change of wording alone is the copywriter's. Give an issue only the Roles whose work it needs.
+
+    If the repository uses pnpm or yarn rather than npm, suggest that the Owner changes the Floor's setup and check commands to match.
+  firstIssue:
+    title: Set up the site's checks
+    body: |-
+      Make sure `package.json` has these scripts, so that the Floor's check command runs each of them. Each exits with an error, naming the page and the problem, when its check fails:
+
+      - `build`: builds the site, as its README says.
+      - `check:links`: every link on the built site goes to a page or a file that exists, such as with `linkinator` or `lychee`.
+      - `check:lighthouse`: Lighthouse CI (`@lhci/cli autorun`) on the built site's main pages, failing below agreed scores for performance, accessibility, best practices and SEO.
+
+      Say in the README how to run them.
+
+      ## Acceptance criteria
+
+      - [ ] `npm run build`, `check:links` and `check:lighthouse` each run and pass on the default branch
+      - [ ] Each fails, naming the page, when its check finds a problem
+      - [ ] The README says how to run them, and which scores Lighthouse expects
+labels: []

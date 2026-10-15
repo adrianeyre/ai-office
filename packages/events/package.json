@@ -1,0 +1,26 @@
+{
+  "name": "@ai-office/events",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Typed event schema and bus.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts",
+    "./stream": "./src/stream.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ai-office/db": "workspace:*",
+    "@ai-office/shared": "workspace:*",
+    "drizzle-orm": "~0.45.4",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "vitest": "^5.0.3"
+  }
+}

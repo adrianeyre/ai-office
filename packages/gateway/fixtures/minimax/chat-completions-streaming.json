@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "headers": {
+      "accept": "text/event-stream",
+      "content-type": "application/json",
+      "user-agent": "opencode/1.2.0"
+    },
+    "body": "{\"model\":\"MiniMax-M2.7\",\"messages\":[{\"role\":\"user\",\"content\":\"Name one risk.\"}],\"stream\":true,\"stream_options\":{\"include_usage\":true}}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/event-stream"
+    },
+    "body": "data: {\"id\":\"05b81ba27b4ed1a9f2d3a1b6c0e4d7f9\",\"object\":\"chat.completion.chunk\",\"created\":1791547200,\"model\":\"MiniMax-M2.7\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Flaky\",\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"05b81ba27b4ed1a9f2d3a1b6c0e4d7f9\",\"object\":\"chat.completion.chunk\",\"created\":1791547200,\"model\":\"MiniMax-M2.7\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" tests.\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"05b81ba27b4ed1a9f2d3a1b6c0e4d7f9\",\"object\":\"chat.completion.chunk\",\"created\":1791547200,\"model\":\"MiniMax-M2.7\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: {\"id\":\"05b81ba27b4ed1a9f2d3a1b6c0e4d7f9\",\"object\":\"chat.completion.chunk\",\"created\":1791547200,\"model\":\"MiniMax-M2.7\",\"choices\":[],\"usage\":{\"total_tokens\":21,\"total_characters\":0,\"prompt_tokens\":17,\"completion_tokens\":4,\"prompt_tokens_details\":{\"cached_tokens\":0}}}\n\ndata: [DONE]\n\n"
+  }
+}

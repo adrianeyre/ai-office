@@ -1,0 +1,5 @@
+#!/bin/sh
+# docker/pen-test/stand-up: see docs/pen-testing/stack.md. The work is in
+# stack.ts, which needs Node 26 and the Docker CLI, nothing installed.
+set -eu
+exec node "$(dirname "$0")/stack.ts" stand-up "$@"

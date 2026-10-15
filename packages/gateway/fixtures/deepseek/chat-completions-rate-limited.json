@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/chat/completions",
+    "headers": {
+      "accept": "application/json",
+      "content-type": "application/json",
+      "user-agent": "opencode/1.2.0"
+    },
+    "body": "{\"model\":\"deepseek-v4-pro\",\"messages\":[{\"role\":\"user\",\"content\":\"Summarise PR #14 in one line.\"}]}"
+  },
+  "response": {
+    "status": 429,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"error\":{\"message\":\"Rate Limit Reached\",\"type\":\"rate_limit_error\",\"param\":null,\"code\":\"rate_limit_reached\"}}"
+  }
+}

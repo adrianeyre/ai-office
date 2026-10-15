@@ -1,0 +1,25 @@
+# The Development Floor Template (PRD FR-100), the default: a Manager, a
+# coder, a reviewer and a QA Agent, with the settings every Floor had
+# before Floor Templates. The format is in
+# docs/guide/floors-and-agents.md, under "Floor Templates".
+name: Development
+description: A software team that changes the code, reviews each pull request and tests it.
+icon: code
+theme: office
+roles:
+  - role: coder
+    count: 1
+  - role: reviewer
+    count: 1
+  - role: qa
+    count: 1
+settings:
+  setupCommand: ""
+  testCommand: ""
+  mergePolicy: send_to_me
+  roundCap: 3
+  requiredReviewers: [reviewer]
+manager:
+  planningGuidance: ""
+  firstIssue: null
+labels: []

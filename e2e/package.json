@@ -1,0 +1,28 @@
+{
+  "name": "@ai-office/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Playwright end-to-end tests: the built app against Postgres.",
+  "type": "module",
+  "scripts": {
+    "e2e": "playwright test",
+    "typecheck": "tsc && tsc -p server",
+    "screenshots": "playwright test --config playwright.screenshots.config.ts",
+    "scenes": "playwright test --config playwright.scenes.config.ts"
+  },
+  "devDependencies": {
+    "@ai-office/communications": "workspace:*",
+    "@ai-office/db": "workspace:*",
+    "@ai-office/events": "workspace:*",
+    "@ai-office/github": "workspace:*",
+    "@ai-office/server": "workspace:*",
+    "@ai-office/shared": "workspace:*",
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.64.0",
+    "@testcontainers/postgresql": "^12.2.0",
+    "@types/node": "^26.6.5",
+    "@types/pg": "^8.23.1",
+    "pg": "^8.23.1",
+    "testcontainers": "^12.2.0"
+  }
+}

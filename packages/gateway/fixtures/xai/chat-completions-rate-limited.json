@@ -1,0 +1,26 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "headers": {
+      "accept": "application/json",
+      "content-type": "application/json",
+      "user-agent": "opencode/0.15.2"
+    },
+    "body": "{\"model\":\"grok-4\",\"messages\":[{\"role\":\"system\",\"content\":\"You review pull requests.\"},{\"role\":\"user\",\"content\":\"Is this diff safe to merge?\"}],\"max_tokens\":256}"
+  },
+  "response": {
+    "status": 429,
+    "headers": {
+      "content-type": "application/json",
+      "x-request-id": "xai-req-0003-limited",
+      "x-ratelimit-limit-requests": "480",
+      "x-ratelimit-remaining-requests": "0",
+      "x-ratelimit-reset-requests": "45s",
+      "x-ratelimit-limit-tokens": "2000000",
+      "x-ratelimit-remaining-tokens": "1200000",
+      "x-ratelimit-reset-tokens": "2s"
+    },
+    "body": "{\"code\":\"Some resource has been exhausted\",\"error\":\"Your team has reached its requests per minute limit for grok-4. Please slow down.\"}"
+  }
+}

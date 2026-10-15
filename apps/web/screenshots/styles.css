@@ -1,0 +1,15 @@
+/* The app's styles, for the scenes' HTML labels (main.tsx). Vite's root is
+   screenshots/, so Tailwind is told where the components using its classes
+   are. */
+@import "../src/styles.css";
+@source "../src";
+
+/* One font for the labels on every machine, as the Avatars have fixed
+   seeds: the app's font stacks name fonts one Linux has and another lacks
+   (Playwright's dependencies bring Liberation Mono to CI, and this
+   sandbox falls back to DejaVu), and a label's text is part of its
+   picture. DejaVu comes with Debian and Ubuntu alike. */
+:root {
+  --font-mono: "DejaVu Sans Mono", monospace;
+  --font-sans: "DejaVu Sans", sans-serif;
+}

@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/v1/models",
+    "headers": {
+      "accept": "application/json"
+    },
+    "body": ""
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"object\":\"list\",\"data\":[{\"id\":\"qwen3-coder:30b\",\"object\":\"model\",\"created\":1791547200,\"owned_by\":\"library\"},{\"id\":\"gpt-oss:20b\",\"object\":\"model\",\"created\":1791547200,\"owned_by\":\"library\"},{\"id\":\"llama3.3:70b\",\"object\":\"model\",\"created\":1791547200,\"owned_by\":\"library\"}]}"
+  }
+}

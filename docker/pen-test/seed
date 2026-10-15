@@ -1,0 +1,7 @@
+#!/bin/sh
+# docker/pen-test/seed: see docs/pen-testing/stack.md. Seeds the pen-test
+# stack's database and the throwaway target repository (Enablement E2, #188).
+# Needs the stack's DATABASE_URL, ENCRYPTION_KEY and the GitHub App's
+# settings; `stand-up` runs it in the app's image with all of them set.
+set -eu
+exec node "$(dirname "$0")/seed-cli.ts" "$@"

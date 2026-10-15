@@ -1,0 +1,14 @@
+packages:
+  - apps/*
+  - packages/*
+  - e2e
+
+# tsx depends on esbuild, whose postinstall fetches its platform binary.
+# Testcontainers pulls in ssh2 (and its optional cpu-features), whose install
+# scripts only build optional native speed-ups, and protobufjs, whose
+# postinstall only checks versions; none of them is needed, so they stay off.
+allowBuilds:
+  esbuild: true
+  cpu-features: false
+  protobufjs: false
+  ssh2: false

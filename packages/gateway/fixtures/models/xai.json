@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/v1/models",
+    "headers": {
+      "accept": "application/json"
+    },
+    "body": ""
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"object\":\"list\",\"data\":[{\"id\":\"grok-4\",\"object\":\"model\",\"created\":1752019200,\"owned_by\":\"xai\"},{\"id\":\"grok-code-fast-1\",\"object\":\"model\",\"created\":1756166400,\"owned_by\":\"xai\"},{\"id\":\"grok-4-fast-reasoning\",\"object\":\"model\",\"created\":1758240000,\"owned_by\":\"xai\"}]}"
+  }
+}

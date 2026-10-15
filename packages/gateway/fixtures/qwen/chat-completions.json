@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "headers": {
+      "accept": "application/json",
+      "content-type": "application/json",
+      "user-agent": "opencode/1.2.0"
+    },
+    "body": "{\"model\":\"qwen3-coder-plus\",\"messages\":[{\"role\":\"user\",\"content\":\"Summarise PR #14 in one line.\"}]}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"id\":\"chatcmpl-6a1e7b0c\",\"object\":\"chat.completion\",\"created\":1791547200,\"model\":\"qwen3-coder-plus\",\"system_fingerprint\":null,\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Adds retries and a circuit breaker to the AI Gateway.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":1200,\"completion_tokens\":48,\"total_tokens\":1248,\"prompt_tokens_details\":{\"cached_tokens\":1024}}}"
+  }
+}

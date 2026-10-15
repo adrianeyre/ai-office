@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "headers": {
+      "accept": "application/json",
+      "content-type": "application/json",
+      "user-agent": "opencode/1.2.0"
+    },
+    "body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":\"Summarise PR #14 in one line.\"}]}"
+  },
+  "response": {
+    "status": 429,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"error\":{\"message\":\"you've reached your hourly usage limit, please upgrade to continue\",\"type\":\"api_error\",\"param\":null,\"code\":null}}"
+  }
+}

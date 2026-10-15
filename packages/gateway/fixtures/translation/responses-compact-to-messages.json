@@ -1,0 +1,165 @@
+{
+  "description": "A compaction (POST /v1/responses/compact) served from an Anthropic account: the model is asked for a summary, and the answer keeps the user's messages and adds the summary.",
+  "account": "anthropic",
+  "request": {
+    "path": "/v1/responses/compact",
+    "body": {
+      "model": "claude-opus-5-5",
+      "instructions": "You are Codex, a coding agent.",
+      "input": [
+        {
+          "type": "message",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Fix the failing test."
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "Fixed add()."
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Now add a test for subtract()."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "upstream": {
+    "response": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "request-id": "req_011CWtranslateCompact01"
+      },
+      "body": "{\"id\": \"msg_01Compact\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"claude-opus-5-5\", \"content\": [{\"type\": \"text\", \"text\": \"Task: fix tests. Done: add() fixed in src/add.ts. Next: a test for subtract().\"}], \"stop_reason\": \"end_turn\", \"stop_sequence\": null, \"usage\": {\"input_tokens\": 4000, \"cache_creation_input_tokens\": 0, \"cache_read_input_tokens\": 0, \"output_tokens\": 90}}"
+    },
+    "request": {
+      "path": "/v1/messages",
+      "body": {
+        "model": "claude-opus-5-5",
+        "max_tokens": 32000,
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Fix the failing test."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "Fixed add()."
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Now add a test for subtract()."
+              },
+              {
+                "type": "text",
+                "text": "Your context is about to be compacted. Write a summary of the conversation so far for yourself to carry on from, in place of everything before this message: the task, what has been done, what is in progress, the next steps, the decisions made and why, and the files touched. Write only the summary."
+              }
+            ]
+          }
+        ],
+        "system": [
+          {
+            "type": "text",
+            "text": "You are Codex, a coding agent."
+          }
+        ]
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-request-id": "req_011CWtranslateCompact01"
+    },
+    "body": {
+      "id": "cmp_msg_01Compact",
+      "object": "response.compaction",
+      "created_at": 1791547200,
+      "output": [
+        {
+          "type": "message",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Fix the failing test."
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Now add a test for subtract()."
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "Summary of the conversation so far:\n\nTask: fix tests. Done: add() fixed in src/add.ts. Next: a test for subtract()."
+            }
+          ]
+        }
+      ],
+      "usage": {
+        "input_tokens": 4000,
+        "input_tokens_details": {
+          "cached_tokens": 0
+        },
+        "output_tokens": 90,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 4090
+      }
+    }
+  },
+  "record": {
+    "endpoint": "responses_compact",
+    "model": "claude-opus-5-5",
+    "streamed": false,
+    "status": 200,
+    "inputTokens": 4000,
+    "outputTokens": 90,
+    "cacheReadInputTokens": 0,
+    "cacheCreationInputTokens": 0,
+    "upstreamRequestId": "req_011CWtranslateCompact01"
+  }
+}

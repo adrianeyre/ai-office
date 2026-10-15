@@ -1,0 +1,27 @@
+{
+  "name": "@ai-office/orchestrator",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pipeline, Manager, Batches, Review Loop, caps, Notices.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ai-hero/sandcastle": "^0.12.0",
+    "@ai-office/db": "workspace:*",
+    "@ai-office/events": "workspace:*",
+    "@ai-office/github": "workspace:*",
+    "@ai-office/shared": "workspace:*",
+    "drizzle-orm": "~0.45.4",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "vitest": "^5.0.3"
+  }
+}

@@ -1,0 +1,23 @@
+# The Blank Floor Template (PRD FR-100): a Manager only. The Owner adds
+# Agents in any Role from the Role library in the Floor admin. The format
+# is in docs/guide/floors-and-agents.md, under "Floor Templates".
+name: Blank
+description: Only a Manager, for a Floor whose team you put together yourself.
+icon: square
+theme: office
+roles: []
+settings:
+  setupCommand: ""
+  testCommand: ""
+  mergePolicy: send_to_me
+  roundCap: 3
+  requiredReviewers: []
+manager:
+  planningGuidance: >-
+    This Floor started from the Blank Floor Template, so it has no Agents
+    but you until the Owner adds them in the Floor admin. Before planning
+    work, check that the Floor has an Agent in a Role for each Stage the
+    work needs, and if it has none, tell the Owner which Roles from the
+    Role library to add.
+  firstIssue: null
+labels: []

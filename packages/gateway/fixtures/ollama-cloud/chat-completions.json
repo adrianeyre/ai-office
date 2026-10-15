@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "headers": {
+      "accept": "application/json",
+      "content-type": "application/json",
+      "user-agent": "opencode/1.2.0"
+    },
+    "body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":\"Summarise PR #14 in one line.\"}]}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"id\":\"chatcmpl-981\",\"object\":\"chat.completion\",\"created\":1791547200,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Adds retries and a circuit breaker to the AI Gateway.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":72,\"completion_tokens\":18,\"total_tokens\":90}}"
+  }
+}

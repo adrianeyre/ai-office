@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en-GB" dir="ltr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Office</title>
+    <meta
+      name="description"
+      content="AI Office is a self-hosted 3D office where AI agents work your GitHub issues, with a built-in load balancer for your AI accounts and token caps per office, floor and agent."
+    />
+    <meta name="application-name" content="AI Office" />
+    <meta name="apple-mobile-web-app-title" content="AI Office" />
+    <meta
+      name="robots"
+      content="index, follow, max-image-preview:large, max-snippet:-1"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f9fafd" />
+    <meta name="format-detection" content="telephone=no" />
+    <!-- Absolute URLs: the server fills in the address AI Office is reached
+         at (PUBLIC_URL), which link previews and search engines need. -->
+    <link rel="canonical" href="__AI_OFFICE_PAGE_URL__" />
+
+    <!-- Icons: SVG where supported, ICO for the rest, PNG for home screens. -->
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" type="image/svg+xml" href="/src/brand/icon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Link previews: Open Graph (Slack, LinkedIn, Facebook, Teams, iMessage). -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="AI Office" />
+    <meta property="og:locale" content="en_GB" />
+    <meta property="og:url" content="__AI_OFFICE_PAGE_URL__" />
+    <meta
+      property="og:title"
+      content="AI Office — AI agents that work your GitHub issues"
+    />
+    <meta
+      property="og:description"
+      content="A self-hosted 3D office where AI agents work your GitHub issues, with a built-in load balancer for your AI accounts and token caps."
+    />
+    <meta property="og:image" content="__AI_OFFICE_ORIGIN__/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="The AI Office logo, three stacked office floors with lit windows, beside the words: AI agents work your GitHub issues in a 3D office."
+    />
+    <!-- Link previews: X (Twitter) and others that read its tags. -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="AI Office — AI agents that work your GitHub issues"
+    />
+    <meta
+      name="twitter:description"
+      content="A self-hosted 3D office where AI agents work your GitHub issues, with a built-in load balancer for your AI accounts and token caps."
+    />
+    <meta name="twitter:image" content="__AI_OFFICE_ORIGIN__/og-image.png" />
+    <meta
+      name="twitter:image:alt"
+      content="The AI Office logo, three stacked office floors with lit windows, beside the words: AI agents work your GitHub issues in a 3D office."
+    />
+
+    <!-- Structured data for search engines. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "AI Office",
+        "description": "A self-hosted 3D office where AI agents work your GitHub issues, with a built-in load balancer for your AI accounts and token caps per office, floor and agent.",
+        "url": "__AI_OFFICE_ORIGIN__/",
+        "image": "__AI_OFFICE_ORIGIN__/og-image.png",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Linux, macOS, Windows (Docker)",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "GBP" }
+      }
+    </script>
+    <!-- The Admin page's appearance (appearance.ts), shown before the first
+         paint so a dark page never flashes white. -->
+    <script>
+      try {
+        var stored =
+          JSON.parse(localStorage.getItem("ai-office:appearance") || "{}")
+            .state || {};
+        var mode = stored.mode || "system";
+        var dark =
+          mode === "dark" ||
+          (mode === "system" &&
+            matchMedia("(prefers-color-scheme: dark)").matches);
+        var root = document.documentElement;
+        root.classList.toggle("dark", dark);
+        var theme = stored.theme || "indigo";
+        if (/^(indigo|ocean|emerald|rose|amber)$/.test(theme)) {
+          root.dataset.theme = theme;
+        }
+        document
+          .querySelector('meta[name="theme-color"]')
+          .setAttribute("content", dark ? "#0a0c13" : "#f9fafd");
+      } catch (error) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      <h1>AI Office</h1>
+      <p>
+        AI Office is a self-hosted 3D office where AI agents work your GitHub
+        issues. It needs JavaScript: please turn it on to sign in.
+      </p>
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

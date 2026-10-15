@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "headers": {
+      "accept": "application/json",
+      "content-type": "application/json",
+      "user-agent": "opencode/1.2.0"
+    },
+    "body": "{\"model\":\"MiniMax-M3\",\"messages\":[{\"role\":\"user\",\"content\":\"Summarise PR #14 in one line.\"}]}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"id\":\"05b81ba27b4ed1a9f2d3a1b6c0e4d7f8\",\"object\":\"chat.completion\",\"created\":1791547200,\"model\":\"MiniMax-M3\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Adds retries and a circuit breaker to the AI Gateway.\",\"name\":\"MiniMax AI\",\"audio_content\":\"\"},\"finish_reason\":\"stop\"}],\"usage\":{\"total_tokens\":662,\"total_characters\":0,\"prompt_tokens\":650,\"completion_tokens\":12,\"prompt_tokens_details\":{\"cached_tokens\":512}},\"input_sensitive\":false,\"output_sensitive\":false,\"base_resp\":{\"status_code\":0,\"status_msg\":\"\"}}"
+  }
+}

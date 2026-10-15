@@ -1,0 +1,20 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "headers": {
+      "accept": "text/event-stream",
+      "content-type": "application/json",
+      "user-agent": "opencode/0.15.2"
+    },
+    "body": "{\"model\":\"grok-4\",\"messages\":[{\"role\":\"user\",\"content\":\"Summarise the Batch.\"}],\"stream\":true,\"stream_options\":{\"include_usage\":true}}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/event-stream",
+      "x-request-id": "xai-req-0002-stream"
+    },
+    "body": "data: {\"id\":\"chunk-1\",\"object\":\"chat.completion.chunk\",\"created\":1791547200,\"model\":\"grok-4\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"Three\"},\"finish_reason\":null}],\"system_fingerprint\":\"fp_grok4\"}\n\ndata: {\"id\":\"chunk-1\",\"object\":\"chat.completion.chunk\",\"created\":1791547200,\"model\":\"grok-4\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" issues merged.\"},\"finish_reason\":null}],\"system_fingerprint\":\"fp_grok4\"}\n\ndata: {\"id\":\"chunk-1\",\"object\":\"chat.completion.chunk\",\"created\":1791547200,\"model\":\"grok-4\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"system_fingerprint\":\"fp_grok4\"}\n\ndata: {\"id\":\"chunk-1\",\"object\":\"chat.completion.chunk\",\"created\":1791547200,\"model\":\"grok-4\",\"choices\":[],\"usage\":{\"prompt_tokens\":14,\"completion_tokens\":4,\"total_tokens\":18,\"prompt_tokens_details\":{\"cached_tokens\":0}},\"system_fingerprint\":\"fp_grok4\"}\n\ndata: [DONE]\n\n"
+  }
+}

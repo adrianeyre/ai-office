@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Bundled by Vite, so imports resolve the way a bundler does.
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    // Nothing is emitted by tsc here, and Vite resolves `@/…` imports with
+    // their `.ts` extensions, so there is nothing to rewrite.
+    "rewriteRelativeImportExtensions": false,
+    // `node` is for vite.config.ts only; the app itself runs in the browser.
+    "types": ["node", "vite/client"],
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": [
+    "src",
+    "scripts",
+    "screenshots",
+    "vite.config.ts",
+    "vite.config.test.ts",
+    "vite.screenshots.config.ts",
+    "tailwind.config.ts"
+  ]
+}

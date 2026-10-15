@@ -1,0 +1,20 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/v1/responses",
+    "headers": {
+      "accept": "application/json",
+      "content-type": "application/json",
+      "user-agent": "opencode/0.15.2"
+    },
+    "body": "{\"model\":\"grok-4\",\"input\":\"Name the failing test.\",\"store\":false}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "x-request-id": "xai-req-0004-responses"
+    },
+    "body": "{\"id\":\"resp_0c5d9a1e6f2b\",\"object\":\"response\",\"created_at\":1791547200,\"status\":\"completed\",\"model\":\"grok-4\",\"output\":[{\"type\":\"message\",\"id\":\"msg_0c5d9a1e\",\"status\":\"completed\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"test/merge.test.ts\",\"annotations\":[]}]}],\"usage\":{\"input_tokens\":21,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":7,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":28},\"store\":false}"
+  }
+}

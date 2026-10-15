@@ -1,0 +1,29 @@
+{
+  "name": "@ai-office/db",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Drizzle schema, as one plain SQL schema (Postgres).",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing/postgres.ts",
+    "./testing/docker": "./src/testing/docker.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run",
+    "db:schema": "node --env-file-if-exists=../../.env src/apply-schema-cli.ts",
+    "db:generate": "node src/generate-schema.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "~0.45.4",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@testcontainers/postgresql": "^12.2.0",
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "^0.31.11",
+    "testcontainers": "^12.2.0",
+    "vitest": "^5.0.3"
+  }
+}

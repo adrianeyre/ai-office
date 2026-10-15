@@ -1,0 +1,20 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/v1/projects/ai-office-test/locations/global/publishers/anthropic/models/claude-opus-5-5:rawPredict",
+    "headers": {
+      "accept": "application/json",
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+      "user-agent": "claude-cli/2.1.0 (external, cli)"
+    },
+    "body": "{\"max_tokens\":1024,\"messages\":[{\"role\":\"user\",\"content\":\"Summarise PR #14 in one line.\"}],\"anthropic_version\":\"vertex-2023-10-16\"}"
+  },
+  "response": {
+    "status": 529,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}"
+  }
+}

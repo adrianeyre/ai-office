@@ -1,0 +1,317 @@
+{
+  "description": "A Responses request as Codex sends one (store: false, the whole conversation, Claude's earlier thinking carried back in a reasoning item, a function call and its output, a custom tool), served whole from an Anthropic account that thinks, writes and calls the custom tool.",
+  "account": "anthropic",
+  "request": {
+    "path": "/v1/responses",
+    "body": {
+      "model": "claude-opus-5-5",
+      "instructions": "You are Codex, a coding agent.",
+      "input": [
+        {
+          "type": "message",
+          "role": "developer",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Sandbox: workspace-write."
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": "Fix the failing test."
+            }
+          ]
+        },
+        {
+          "type": "reasoning",
+          "id": "rs_01Earlier_0",
+          "summary": [
+            {
+              "type": "summary_text",
+              "text": "The tests live in src/; run them first."
+            }
+          ],
+          "encrypted_content": "aio-claude-thinking:eyJ0eXBlIjoidGhpbmtpbmciLCJ0aGlua2luZyI6IlRoZSB0ZXN0cyBsaXZlIGluIHNyYy87IHJ1biB0aGVtIGZpcnN0LiIsInNpZ25hdHVyZSI6IkVxUUJDa2dJQlJBQkdBSWlRR2F0ZXdheVNpZ25hdHVyZTAxIn0"
+        },
+        {
+          "type": "function_call",
+          "id": "fc_01Earlier_1",
+          "call_id": "toolu_01Run",
+          "name": "exec_command",
+          "arguments": "{\"cmd\":\"pnpm test\"}"
+        },
+        {
+          "type": "function_call_output",
+          "call_id": "toolu_01Run",
+          "output": "1 failed: add() returns 3 for 1 + 1"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "name": "exec_command",
+          "description": "Run a command.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "cmd": {
+                "type": "string"
+              }
+            },
+            "required": ["cmd"]
+          },
+          "strict": false
+        },
+        {
+          "type": "custom",
+          "name": "apply_patch",
+          "description": "Edit files with a patch.",
+          "format": {
+            "type": "grammar",
+            "syntax": "lark",
+            "definition": "start: \"*** Begin Patch\" ..."
+          }
+        }
+      ],
+      "tool_choice": "auto",
+      "parallel_tool_calls": false,
+      "reasoning": {
+        "effort": "medium",
+        "summary": "auto"
+      },
+      "store": false,
+      "stream": false,
+      "include": ["reasoning.encrypted_content"],
+      "prompt_cache_key": "session-1"
+    }
+  },
+  "upstream": {
+    "response": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "request-id": "req_011CWtranslateResp01"
+      },
+      "body": "{\"id\": \"msg_01RespTools\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"claude-opus-5-5\", \"content\": [{\"type\": \"thinking\", \"thinking\": \"add() uses a - b.\", \"signature\": \"EqQBsigResp01\"}, {\"type\": \"text\", \"text\": \"The bug is in add().\"}, {\"type\": \"tool_use\", \"id\": \"toolu_01Patch\", \"name\": \"apply_patch\", \"input\": {\"input\": \"*** Begin Patch\\n*** Update File: src/add.ts\\n-  return a - b;\\n+  return a + b;\\n*** End Patch\"}}], \"stop_reason\": \"tool_use\", \"stop_sequence\": null, \"usage\": {\"input_tokens\": 900, \"cache_creation_input_tokens\": 0, \"cache_read_input_tokens\": 30000, \"output_tokens\": 210}}"
+    },
+    "request": {
+      "path": "/v1/messages",
+      "body": {
+        "model": "claude-opus-5-5",
+        "max_tokens": 32000,
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Fix the failing test."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "The tests live in src/; run them first.",
+                "signature": "EqQBCkgIBRABGAIiQGatewaySignature01"
+              },
+              {
+                "type": "tool_use",
+                "id": "toolu_01Run",
+                "name": "exec_command",
+                "input": {
+                  "cmd": "pnpm test"
+                }
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "tool_result",
+                "tool_use_id": "toolu_01Run",
+                "content": "1 failed: add() returns 3 for 1 + 1"
+              }
+            ]
+          }
+        ],
+        "system": [
+          {
+            "type": "text",
+            "text": "You are Codex, a coding agent."
+          },
+          {
+            "type": "text",
+            "text": "Sandbox: workspace-write."
+          }
+        ],
+        "tools": [
+          {
+            "name": "exec_command",
+            "description": "Run a command.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "cmd": {
+                  "type": "string"
+                }
+              },
+              "required": ["cmd"]
+            }
+          },
+          {
+            "name": "apply_patch",
+            "description": "Edit files with a patch.\n\nThe input must follow this lark grammar:\nstart: \"*** Begin Patch\" ...",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "input": {
+                  "type": "string",
+                  "description": "The tool's input, as free text."
+                }
+              },
+              "required": ["input"]
+            }
+          }
+        ],
+        "tool_choice": {
+          "type": "auto",
+          "disable_parallel_tool_use": true
+        },
+        "thinking": {
+          "type": "adaptive",
+          "display": "summarized"
+        },
+        "output_config": {
+          "effort": "medium"
+        }
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-request-id": "req_011CWtranslateResp01"
+    },
+    "body": {
+      "id": "resp_msg_01RespTools",
+      "object": "response",
+      "created_at": 1791547200,
+      "status": "completed",
+      "incomplete_details": null,
+      "error": null,
+      "model": "claude-opus-5-5",
+      "output": [
+        {
+          "type": "reasoning",
+          "id": "rs_01RespTools_0",
+          "summary": [
+            {
+              "type": "summary_text",
+              "text": "add() uses a - b."
+            }
+          ],
+          "encrypted_content": "aio-claude-thinking:eyJ0eXBlIjoidGhpbmtpbmciLCJ0aGlua2luZyI6ImFkZCgpIHVzZXMgYSAtIGIuIiwic2lnbmF0dXJlIjoiRXFRQnNpZ1Jlc3AwMSJ9"
+        },
+        {
+          "type": "message",
+          "id": "msg_01RespTools_1",
+          "status": "completed",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "The bug is in add().",
+              "annotations": []
+            }
+          ]
+        },
+        {
+          "type": "custom_tool_call",
+          "id": "ctc_01RespTools_2",
+          "status": "completed",
+          "call_id": "toolu_01Patch",
+          "name": "apply_patch",
+          "input": "*** Begin Patch\n*** Update File: src/add.ts\n-  return a - b;\n+  return a + b;\n*** End Patch"
+        }
+      ],
+      "previous_response_id": null,
+      "instructions": "You are Codex, a coding agent.",
+      "max_output_tokens": null,
+      "metadata": {},
+      "parallel_tool_calls": false,
+      "reasoning": {
+        "effort": "medium",
+        "summary": "auto"
+      },
+      "store": false,
+      "temperature": null,
+      "text": {
+        "format": {
+          "type": "text"
+        }
+      },
+      "tool_choice": "auto",
+      "tools": [
+        {
+          "type": "function",
+          "name": "exec_command",
+          "description": "Run a command.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "cmd": {
+                "type": "string"
+              }
+            },
+            "required": ["cmd"]
+          },
+          "strict": false
+        },
+        {
+          "type": "custom",
+          "name": "apply_patch",
+          "description": "Edit files with a patch.",
+          "format": {
+            "type": "grammar",
+            "syntax": "lark",
+            "definition": "start: \"*** Begin Patch\" ..."
+          }
+        }
+      ],
+      "top_p": null,
+      "truncation": "disabled",
+      "usage": {
+        "input_tokens": 30900,
+        "input_tokens_details": {
+          "cached_tokens": 30000
+        },
+        "output_tokens": 210,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 31110
+      }
+    }
+  },
+  "record": {
+    "endpoint": "responses",
+    "model": "claude-opus-5-5",
+    "streamed": false,
+    "status": 200,
+    "inputTokens": 900,
+    "outputTokens": 210,
+    "cacheReadInputTokens": 30000,
+    "cacheCreationInputTokens": 0,
+    "upstreamRequestId": "req_011CWtranslateResp01"
+  }
+}

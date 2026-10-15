@@ -1,0 +1,13 @@
+# Only the sources the image builds from; everything else stays out of the
+# build context, above all local secrets.
+**/node_modules
+**/dist
+**/coverage
+**/*.tsbuildinfo
+.git
+.github
+.sandcastle
+.pnpm-store
+.env
+.env.*
+docs

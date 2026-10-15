@@ -1,0 +1,80 @@
+# Builds the project website (site/) and publishes it to GitHub Pages, at the
+# custom domain in site/build.ts. `pnpm site:build` assembles it in
+# site/dist/, copying in the screenshots from docs/images/ and the logo and
+# icons from apps/web, so they are never kept twice in Git. Runs when
+# anything it uses changes on main, or by hand. Node comes from the pin in
+# the root package.json, as in ci.yml.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "docs/images/**"
+      - "apps/web/src/brand/**"
+      - "apps/web/public/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+# Read-only for every job; only `deploy` is given the Pages scopes, so the
+# build never holds a token that can publish the site (I1-7).
+permissions:
+  contents: read
+
+# One deployment at a time; a newer run waits rather than cancelling one
+# that is publishing.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the website
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      # Configure Pages reads the site's settings; it writes nothing.
+      pages: read
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Reads `devEngines.runtime` from package.json. The build script is
+      # TypeScript, which Node runs directly, and it has no dependencies, so
+      # neither pnpm nor an install is needed: this is `pnpm site:build`.
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
+
+      - name: Configure Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Build
+        run: node site/build.ts
+
+      - name: Upload
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site/dist/
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    # Publishing the artifact needs both, and only this job has them.
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

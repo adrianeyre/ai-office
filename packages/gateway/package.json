@@ -1,0 +1,30 @@
+{
+  "name": "@ai-office/gateway",
+  "version": "0.0.0",
+  "private": true,
+  "description": "AI Gateway.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run",
+    "record": "node src/record/main.ts"
+  },
+  "dependencies": {
+    "@ai-office/db": "workspace:*",
+    "@ai-office/events": "workspace:*",
+    "@ai-office/shared": "workspace:*",
+    "drizzle-orm": "~0.45.4",
+    "fastify": "^5.12.5",
+    "undici": "^8.11.2",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "pino": "^10.4.0",
+    "vitest": "^5.0.3"
+  }
+}

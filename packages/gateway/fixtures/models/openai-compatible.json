@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/openai/v1/models",
+    "headers": {
+      "accept": "application/json"
+    },
+    "body": ""
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"object\":\"list\",\"data\":[{\"id\":\"llama-3.3-70b-versatile\",\"object\":\"model\",\"created\":1791547200,\"owned_by\":\"Meta\",\"context_window\":131072},{\"id\":\"openai/gpt-oss-120b\",\"object\":\"model\",\"created\":1791547200,\"owned_by\":\"OpenAI\",\"context_window\":131072}]}"
+  }
+}

@@ -1,0 +1,47 @@
+# Caddy in front of AI Office, for the `tls` compose profile (PRD §7):
+#
+#   docker compose --profile tls up --build --detach --wait
+#
+# Caddy serves AI_OFFICE_DOMAIN over HTTPS with a certificate it obtains
+# and renews itself (Let's Encrypt, over port 80 or 443; from Tailscale for
+# a *.ts.net name; its own local CA for localhost), redirects HTTP to
+# HTTPS, and proxies every request to the app's one port: the web app, its
+# /api and the AI Gateway's /v1 paths, which every tool reaches with a
+# Gateway Key (ANTHROPIC_BASE_URL=https://<domain>). Responses are flushed
+# as they arrive, so live streams and the Gateway's server-sent events
+# stream, and request bodies pass unbuffered. The Gateway's own port, 3047,
+# is the sandboxes' alone and never proxied. Certificates are kept in the
+# `caddy-data` volume, so a restart does not ask for new ones. See
+# docs/processes/deploying-to-ec2.md.
+#
+# Caddy sets X-Forwarded-For to the client's address (it trusts no proxy
+# before it), and sends PROXY_SECRET in X-AI-Office-Proxy: the app believes
+# X-Forwarded-For only from a request that carries it, so nothing that
+# reaches the app's port directly, such as a sandbox, can choose its own.
+# The app takes the proof off every request, the AI Gateway's /v1 too, so
+# it reaches no route, log, request history or AI Provider.
+#
+# Every answer carries the security headers (A1-6): HSTS, as this site is
+# only served over HTTPS, a Content-Security-Policy that no other site may
+# frame, X-Frame-Options, nosniff and a Referrer-Policy. The app sends its
+# own, which are kept (a page's policy allows its inline scripts by hash;
+# an attachment's is stricter): `?` sets each only where the answer has
+# none, as on Caddy's own answers when the app is down. The Gateway's /v1
+# answers carry the app's too.
+
+{$AI_OFFICE_DOMAIN} {
+	reverse_proxy app:3045 {
+		header_up X-AI-Office-Proxy {env.PROXY_SECRET}
+		flush_interval -1
+	}
+
+	header ?Strict-Transport-Security "max-age=31536000"
+	header ?Content-Security-Policy "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+	header ?X-Frame-Options "DENY"
+	header ?X-Content-Type-Options "nosniff"
+	header ?Referrer-Policy "same-origin"
+
+	log {
+		output stdout
+	}
+}

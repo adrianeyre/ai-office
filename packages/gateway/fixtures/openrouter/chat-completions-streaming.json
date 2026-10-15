@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/chat/completions",
+    "headers": {
+      "accept": "text/event-stream",
+      "content-type": "application/json",
+      "user-agent": "opencode/1.2.0"
+    },
+    "body": "{\"model\":\"anthropic/claude-haiku-4.5\",\"messages\":[{\"role\":\"user\",\"content\":\"Name one risk.\"}],\"stream\":true,\"stream_options\":{\"include_usage\":true}}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/event-stream"
+    },
+    "body": "data: {\"id\":\"gen-1791547200-openrouter2\",\"object\":\"chat.completion.chunk\",\"created\":1791547200,\"model\":\"anthropic/claude-haiku-4.5\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Flaky\",\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1791547200-openrouter2\",\"object\":\"chat.completion.chunk\",\"created\":1791547200,\"model\":\"anthropic/claude-haiku-4.5\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" tests.\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1791547200-openrouter2\",\"object\":\"chat.completion.chunk\",\"created\":1791547200,\"model\":\"anthropic/claude-haiku-4.5\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: {\"id\":\"gen-1791547200-openrouter2\",\"object\":\"chat.completion.chunk\",\"created\":1791547200,\"model\":\"anthropic/claude-haiku-4.5\",\"choices\":[],\"usage\":{\"prompt_tokens\":40,\"completion_tokens\":3,\"total_tokens\":43,\"cost\":5.5e-05,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":32},\"completion_tokens_details\":{\"reasoning_tokens\":0}}}\n\ndata: [DONE]\n\n"
+  }
+}

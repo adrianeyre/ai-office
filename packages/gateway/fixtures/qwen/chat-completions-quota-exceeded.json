@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "headers": {
+      "accept": "application/json",
+      "content-type": "application/json",
+      "user-agent": "opencode/1.2.0"
+    },
+    "body": "{\"model\":\"qwen3-coder-plus\",\"messages\":[{\"role\":\"user\",\"content\":\"Summarise PR #14 in one line.\"}]}"
+  },
+  "response": {
+    "status": 429,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"error\":{\"message\":\"Free allocated quota exceeded.\",\"type\":\"insufficient_quota\",\"param\":null,\"code\":\"insufficient_quota\"},\"request_id\":\"8f0d7c1e-1b2a-4c3d-9e8f-0a1b2c3d4e5f\"}"
+  }
+}

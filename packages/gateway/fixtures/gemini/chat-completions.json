@@ -1,0 +1,20 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/v1beta/openai/chat/completions",
+    "headers": {
+      "accept": "application/json",
+      "content-type": "application/json",
+      "user-agent": "opencode/0.15.2"
+    },
+    "body": "{\"model\":\"gemini-2.5-pro\",\"messages\":[{\"role\":\"system\",\"content\":\"You write release notes.\"},{\"role\":\"user\",\"content\":\"Summarise PR #14 in one line.\"}]}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "server": "scaffolding on HTTPServer2"
+    },
+    "body": "{\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"content\":\"Adds retries and a circuit breaker to the AI Gateway.\",\"role\":\"assistant\"}}],\"created\":1791547200,\"id\":\"gemini-chatcmpl-0001\",\"model\":\"gemini-2.5-pro\",\"object\":\"chat.completion\",\"usage\":{\"completion_tokens\":11,\"prompt_tokens\":24,\"total_tokens\":35}}"
+  }
+}

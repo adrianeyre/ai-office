@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/responses",
+    "headers": {
+      "accept": "application/json",
+      "content-type": "application/json",
+      "user-agent": "opencode/1.2.0"
+    },
+    "body": "{\"model\":\"openai/gpt-5.5\",\"input\":\"Name one risk.\",\"store\":false}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"id\":\"gen-1791547200-openrouter3\",\"object\":\"response\",\"created_at\":1791547200,\"status\":\"completed\",\"model\":\"openai/gpt-5.5\",\"output\":[{\"type\":\"message\",\"id\":\"msg_gen-1791547200-openrouter3\",\"status\":\"completed\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"Flaky tests.\",\"annotations\":[]}]}],\"usage\":{\"input_tokens\":12,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":4,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":16,\"cost\":5.5e-05}}"
+  }
+}

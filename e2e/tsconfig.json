@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["es2024", "dom"],
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["playwright-report", "test-results", "server"]
+}

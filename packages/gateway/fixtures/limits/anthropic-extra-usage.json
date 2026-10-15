@@ -1,0 +1,32 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/v1/messages",
+    "headers": {
+      "accept": "application/json",
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+      "user-agent": "claude-cli/2.1.0 (external, cli)"
+    },
+    "body": "{\"model\":\"claude-sonnet-5-5\",\"max_tokens\":1024,\"messages\":[{\"role\":\"user\",\"content\":\"Explain the failing test.\"}]}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "request-id": "req_011CWgatewayExtraUsage01",
+      "anthropic-ratelimit-unified-status": "rejected",
+      "anthropic-ratelimit-unified-reset": "1791554400",
+      "anthropic-ratelimit-unified-overage-status": "allowed",
+      "anthropic-ratelimit-unified-overage-reset": "1793491200",
+      "anthropic-ratelimit-unified-5h-status": "rejected",
+      "anthropic-ratelimit-unified-5h-utilization": "1.0",
+      "anthropic-ratelimit-unified-5h-reset": "1791554400",
+      "anthropic-ratelimit-unified-7d-status": "allowed",
+      "anthropic-ratelimit-unified-7d-utilization": "0.512",
+      "anthropic-ratelimit-unified-7d-reset": "1791795600",
+      "anthropic-ratelimit-unified-representative-claim": "five_hour"
+    },
+    "body": "{\"id\":\"msg_01XgatewayExtraUsage\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-sonnet-5-5\",\"content\":[{\"type\":\"text\",\"text\":\"The test expects the old error text.\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":370,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":11}}"
+  }
+}

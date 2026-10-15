@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/v1/models",
+    "headers": {
+      "accept": "application/json"
+    },
+    "body": ""
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"object\":\"list\",\"data\":[{\"id\":\"kimi-k3\",\"object\":\"model\",\"created\":1786579200,\"owned_by\":\"moonshot\",\"context_length\":1048576,\"supports_image_in\":true,\"supports_video_in\":true,\"supports_reasoning\":true},{\"id\":\"kimi-k2.7-code\",\"object\":\"model\",\"created\":1780000000,\"owned_by\":\"moonshot\",\"context_length\":262144,\"supports_image_in\":false,\"supports_video_in\":false,\"supports_reasoning\":true}]}"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/v1beta/openai/models",
+    "headers": {
+      "accept": "application/json"
+    },
+    "body": ""
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"object\":\"list\",\"data\":[{\"id\":\"models/gemini-2.5-pro\",\"object\":\"model\",\"owned_by\":\"google\"},{\"id\":\"models/gemini-2.5-flash\",\"object\":\"model\",\"owned_by\":\"google\"},{\"id\":\"models/text-embedding-004\",\"object\":\"model\",\"owned_by\":\"google\"}]}"
+  }
+}

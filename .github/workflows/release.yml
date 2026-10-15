@@ -1,0 +1,97 @@
+# A release on every merge to main: semantic-release reads the Conventional
+# Commits since the last tag and picks the next version and its notes; then
+# CHANGELOG.md and the root package.json (the version the footer shows) are
+# updated, committed back with `[skip ci]`, tagged and published as a GitHub
+# release. Nothing is published to npm; every package is private.
+#
+# Two jobs, so no dependency code ever runs beside a write token (I1-6):
+# `release` installs the dependencies and runs semantic-release, in dry-run,
+# with a read-only token it never uses (release/plan.ts, configured in
+# .releaserc.json); `publish`, the only job that can write, installs nothing
+# and runs only release/publish.ts, which imports nothing but Node's own
+# modules and checks what `release` hands it before using any of it. Node
+# and pnpm come from the pins in the root package.json, never from versions
+# written here.
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# One release at a time, never cancelled half-way through a tag and commit.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Plan the release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      git-head: ${{ steps.plan.outputs.git-head }}
+      notes: ${{ steps.plan.outputs.notes }}
+    steps:
+      # The whole history and its tags, which semantic-release reads to find
+      # the last release. The token is not kept in git's config.
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          cache: true
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # No GITHUB_TOKEN in its environment: it pushes nothing.
+      - name: Plan
+        id: plan
+        run: node release/plan.ts
+
+  publish:
+    name: Publish the release
+    needs: release
+    if: ${{ needs.release.outputs.version != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      # Pushes the release commit and tag, and creates the GitHub release.
+      contents: write
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Node only, to run the script: nothing is installed.
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
+
+      # What `release` planned reaches the script through its environment,
+      # never through the command, and is checked before it is used.
+      - name: Publish
+        run: node release/publish.ts
+        env:
+          RELEASE_VERSION: ${{ needs.release.outputs.version }}
+          RELEASE_GIT_HEAD: ${{ needs.release.outputs.git-head }}
+          RELEASE_NOTES: ${{ needs.release.outputs.notes }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

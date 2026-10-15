@@ -1,0 +1,697 @@
+@import "tailwindcss";
+
+/* The Office's colour palette, as `office-*` colours (tailwind.config.ts). */
+@config "../tailwind.config.ts";
+
+/* shadcn/ui theme tokens. The neutrals are ink, not grey: each carries a
+   trace of the logo's indigo (hue 275), so every theme's surfaces belong
+   to the brand. Components read them through the Tailwind colours
+   declared in @theme below. */
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.985 0.004 275);
+  --foreground: oklch(0.2 0.03 275);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.03 275);
+  /* Menus and autocomplete lists, over everything else. */
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.03 275);
+  --primary: oklch(0.24 0.03 275);
+  --primary-foreground: oklch(0.985 0.003 275);
+  --secondary: oklch(0.955 0.009 275);
+  --secondary-foreground: oklch(0.24 0.03 275);
+  --muted: oklch(0.962 0.007 275);
+  /* Darker than shadcn's 0.556, so muted text keeps 4.5:1 on the muted
+     surfaces too (WCAG 1.4.3). */
+  --muted-foreground: oklch(0.5 0.025 275);
+  --accent: oklch(0.955 0.01 275);
+  --accent-foreground: oklch(0.24 0.03 275);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.912 0.009 275);
+  /* Form fields' borders: 3:1 against white, so a field can be seen
+     (WCAG 1.4.11). */
+  --input: oklch(0.62 0.015 275);
+  --ring: oklch(0.7 0.02 275);
+  /* The keyboard focus outline: 7.9:1 on white, with a white halo for dark
+     surfaces (WCAG 2.4.7, 1.4.11). */
+  --focus-ring: #4338ca;
+  --focus-halo: #ffffff;
+  /* The accessibility statement's conformance box. */
+  --success: #15803d;
+  --success-soft: #f0fdf4;
+  /* Badges and callouts (components/ui/badge.tsx): a soft fill with dark
+     ink in light mode, a deep fill with light ink in dark, each at least
+     4.5:1 (theme-contrast.test.ts). */
+  --tone-neutral: oklch(0.95 0.008 275);
+  --tone-neutral-foreground: oklch(0.32 0.025 275);
+  --tone-info: #e0f2fe;
+  --tone-info-foreground: #075985;
+  --tone-success: #dcfce7;
+  --tone-success-foreground: #166534;
+  --tone-warning: #fef3c7;
+  --tone-warning-foreground: #92400e;
+  --tone-danger: #fee2e2;
+  --tone-danger-foreground: #991b1b;
+  --tone-violet: #ede9fe;
+  --tone-violet-foreground: #5b21b6;
+  --tone-indigo: #e0e7ff;
+  --tone-indigo-foreground: #3730a3;
+  color-scheme: light;
+}
+
+.dark {
+  --background: oklch(0.155 0.015 275);
+  --foreground: oklch(0.97 0.005 275);
+  --card: oklch(0.205 0.02 275);
+  --card-foreground: oklch(0.97 0.005 275);
+  --popover: oklch(0.225 0.02 275);
+  --popover-foreground: oklch(0.97 0.005 275);
+  --primary: oklch(0.93 0.008 275);
+  --primary-foreground: oklch(0.2 0.02 275);
+  --secondary: oklch(0.27 0.02 275);
+  --secondary-foreground: oklch(0.97 0.005 275);
+  --muted: oklch(0.265 0.02 275);
+  --muted-foreground: oklch(0.72 0.02 275);
+  --accent: oklch(0.27 0.02 275);
+  --accent-foreground: oklch(0.97 0.005 275);
+  --destructive: oklch(0.704 0.191 22.216);
+  /* Dark mode's red is light, so text on it is dark. */
+  --destructive-foreground: oklch(0.145 0 0);
+  /* Opaque and lighter than shadcn's 10% white (1.3:1 on a card), so a
+     card's or a table's edge can be seen: 1.7:1 on a card, 1.8:1 on the
+     page. */
+  --border: oklch(0.34 0.02 275);
+  /* Opaque, unlike shadcn's 15% white, so it keeps 3:1 (WCAG 1.4.11). */
+  --input: oklch(0.6 0.02 275);
+  --ring: oklch(0.56 0.02 275);
+  --focus-ring: #a5b4fc;
+  --focus-halo: #0a0c13;
+  --success: #4ade80;
+  --success-soft: #052e16;
+  --tone-neutral: oklch(0.3 0.016 275);
+  --tone-neutral-foreground: oklch(0.92 0.008 275);
+  --tone-info: #0c3a57;
+  --tone-info-foreground: #bae6fd;
+  --tone-success: #0b3a22;
+  --tone-success-foreground: #bbf7d0;
+  --tone-warning: #4a2a06;
+  --tone-warning-foreground: #fde68a;
+  --tone-danger: #4c1414;
+  --tone-danger-foreground: #fecaca;
+  --tone-violet: #33195e;
+  --tone-violet-foreground: #ddd6fe;
+  --tone-indigo: #272463;
+  --tone-indigo-foreground: #c7d2fe;
+  color-scheme: dark;
+}
+
+/* ---------- Themes (appearance.ts) ----------
+   Each sets the accent colours over the light tokens, then the dark ones;
+   Neutral is the tokens above. theme-contrast.test.ts holds every one to
+   WCAG 2.2 AA in both modes: keep them in hex, and add a theme there too. */
+
+:root[data-theme="indigo"] {
+  --primary: #4338ca;
+  --primary-foreground: #ffffff;
+  --accent: #eef2ff;
+  --accent-foreground: #312e81;
+  --focus-ring: #4338ca;
+}
+
+:root.dark[data-theme="indigo"] {
+  --primary: #a5b4fc;
+  --primary-foreground: #1e1b4b;
+  --accent: #312e81;
+  --accent-foreground: #e0e7ff;
+  --focus-ring: #a5b4fc;
+}
+
+:root[data-theme="ocean"] {
+  --primary: #0369a1;
+  --primary-foreground: #ffffff;
+  --accent: #e0f2fe;
+  --accent-foreground: #0c4a6e;
+  --focus-ring: #0369a1;
+}
+
+:root.dark[data-theme="ocean"] {
+  --primary: #7dd3fc;
+  --primary-foreground: #082f49;
+  --accent: #0c4a6e;
+  --accent-foreground: #e0f2fe;
+  --focus-ring: #7dd3fc;
+}
+
+:root[data-theme="emerald"] {
+  --primary: #047857;
+  --primary-foreground: #ffffff;
+  --accent: #d1fae5;
+  --accent-foreground: #064e3b;
+  --focus-ring: #047857;
+}
+
+:root.dark[data-theme="emerald"] {
+  --primary: #6ee7b7;
+  --primary-foreground: #022c22;
+  --accent: #064e3b;
+  --accent-foreground: #d1fae5;
+  --focus-ring: #6ee7b7;
+}
+
+:root[data-theme="rose"] {
+  --primary: #be123c;
+  --primary-foreground: #ffffff;
+  --accent: #ffe4e6;
+  --accent-foreground: #881337;
+  --focus-ring: #be123c;
+}
+
+:root.dark[data-theme="rose"] {
+  --primary: #fda4af;
+  --primary-foreground: #4c0519;
+  --accent: #881337;
+  --accent-foreground: #ffe4e6;
+  --focus-ring: #fda4af;
+}
+
+:root[data-theme="amber"] {
+  --primary: #b45309;
+  --primary-foreground: #ffffff;
+  --accent: #fef3c7;
+  --accent-foreground: #78350f;
+  --focus-ring: #b45309;
+}
+
+:root.dark[data-theme="amber"] {
+  --primary: #fcd34d;
+  --primary-foreground: #451a03;
+  --accent: #78350f;
+  --accent-foreground: #fef3c7;
+  --focus-ring: #fcd34d;
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-tone-neutral: var(--tone-neutral);
+  --color-tone-neutral-foreground: var(--tone-neutral-foreground);
+  --color-tone-info: var(--tone-info);
+  --color-tone-info-foreground: var(--tone-info-foreground);
+  --color-tone-success: var(--tone-success);
+  --color-tone-success-foreground: var(--tone-success-foreground);
+  --color-tone-warning: var(--tone-warning);
+  --color-tone-warning-foreground: var(--tone-warning-foreground);
+  --color-tone-danger: var(--tone-danger);
+  --color-tone-danger-foreground: var(--tone-danger-foreground);
+  --color-tone-violet: var(--tone-violet);
+  --color-tone-violet-foreground: var(--tone-violet-foreground);
+  --color-tone-indigo: var(--tone-indigo);
+  --color-tone-indigo-foreground: var(--tone-indigo-foreground);
+}
+
+/* Type and elevation. Inter for the interface and JetBrains Mono for code,
+   ids and figures, both served by AI Office itself (main.tsx imports them:
+   the policy allows no other site's fonts). The shadows are tinted with the
+   ink, so a card lifts off the page rather than greying it. */
+@theme {
+  --font-sans:
+    "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji";
+  --font-mono:
+    "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", monospace;
+  --shadow-xs: 0 1px 2px 0 rgb(24 24 56 / 0.06);
+  --shadow-sm:
+    0 1px 2px 0 rgb(24 24 56 / 0.05), 0 1px 3px 0 rgb(24 24 56 / 0.07);
+  --shadow-md:
+    0 2px 4px -1px rgb(24 24 56 / 0.06), 0 6px 14px -4px rgb(24 24 56 / 0.1);
+  --shadow-lg:
+    0 4px 8px -2px rgb(24 24 56 / 0.06), 0 16px 32px -8px rgb(24 24 56 / 0.14);
+  --shadow-xl:
+    0 8px 16px -4px rgb(24 24 56 / 0.08), 0 28px 56px -12px rgb(24 24 56 / 0.22);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+    /* Inter's open digits and single-storey a, easier to tell apart in
+       ids, counts and tokens. */
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    text-rendering: optimizeLegibility;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 22%, transparent);
+  }
+  code,
+  kbd,
+  samp,
+  pre {
+    font-feature-settings: normal;
+  }
+  /* A select's options are drawn in the browser's own list, which does
+     not take the select's transparent background: without their own
+     colours, dark mode's light text lands on a white list. */
+  option,
+  optgroup {
+    @apply bg-background text-foreground;
+  }
+  option:disabled {
+    @apply text-muted-foreground;
+  }
+  /* Tailwind 4 leaves buttons with the arrow; whatever can be clicked shows
+     the hand. In the base layer, so a utility (cursor-grab) still wins. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  select:not(:disabled),
+  summary,
+  input:is(
+      [type="checkbox"],
+      [type="radio"],
+      [type="file"],
+      [type="range"]
+    ):not(:disabled),
+  input[type="file"]::file-selector-button {
+    cursor: pointer;
+  }
+}
+
+/* Chart tokens for the analytics dashboards (PRD FR-43). Series take the
+   categorical slots in this order, never cycled; status colours are kept
+   for status and always come with an icon and a label. Both modes were
+   validated against the card surface (white; oklch(0.205 0 0) in dark)
+   for colour-vision deficiency and contrast; slots 3 and 4 are under 3:1
+   on white, so every chart has a visible legend and a table view. */
+.viz {
+  --viz-surface: var(--card);
+  --viz-series-1: #2a78d6;
+  --viz-series-2: #eb6834;
+  --viz-series-3: #1baf7a;
+  --viz-series-4: #eda100;
+  --viz-track: #cde2fb;
+  --viz-grid: #e1e0d9;
+  --viz-axis: #c3c2b7;
+  --viz-ink-muted: #6b6a66;
+  --viz-status-warning: #fab219;
+  --viz-status-critical: #d03b3b;
+}
+
+.dark .viz {
+  --viz-series-1: #3987e5;
+  --viz-series-2: #d95926;
+  --viz-series-3: #199e70;
+  --viz-series-4: #c98500;
+  --viz-track: #184f95;
+  --viz-grid: #2c2c2a;
+  /* 2.4:1 on the dark card, up from #383835's 1.5:1. */
+  --viz-axis: #55554f;
+  --viz-ink-muted: #a3a29b;
+}
+
+/* ---------- Accessibility (WCAG 2.2 AA) ----------
+   Unlayered, so these win over the Tailwind utilities (`outline-none`,
+   focus rings) that would otherwise hide or fade the focus indicator. */
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--focus-halo);
+}
+
+/* A checkbox or radio a fingertip can find; its label widens the target.
+   Unlayered, over their `size-4`; the Avatar Editor's swatches are drawn
+   their own way. */
+@media (pointer: coarse) {
+  input:is([type="checkbox"], [type="radio"]):not(.appearance-none) {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+}
+
+/* `<main>` takes focus from the skip link, but is not a control. */
+main:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Sticky bars, the footer among them, must never hide what has focus
+   (WCAG 2.4.11). */
+html {
+  scroll-padding-top: 4rem;
+  scroll-padding-bottom: calc(var(--site-footer-height, 3rem) + 1rem);
+}
+
+/* The page behind an open dialog stays put. */
+html:has(dialog[open]) {
+  overflow: hidden;
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Windows Contrast Themes: keep the focus outline in the system's colour. */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline-color: Highlight;
+    box-shadow: none;
+  }
+}
+
+/* ---------- Dialog bodies: the policies' text ---------- */
+
+.dialog-body h3 {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.dialog-body p + p {
+  margin-top: 0.5rem;
+}
+
+.dialog-body ul {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+
+.dialog-body li + li {
+  margin-top: 0.5rem;
+}
+
+.dialog-body a {
+  color: var(--focus-ring);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.dialog-body code {
+  font-size: 0.8125rem;
+}
+
+/* The version check's update commands. */
+.dialog-body .version-check-commands {
+  margin: 0.5rem 0;
+  overflow-x: auto;
+  border-radius: 0.375rem;
+  background: var(--muted);
+  padding: 0.75rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.policy-updated {
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+}
+
+.status-box {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--success);
+  border-radius: var(--radius);
+  background: var(--success-soft);
+}
+
+.status-box svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--success);
+}
+
+/* A wide table scrolls sideways inside the dialog body, which scrolls too. */
+.table-scroll {
+  margin-top: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 4px);
+}
+
+.table-scroll table {
+  width: 100%;
+  min-width: 40rem;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.table-scroll caption {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  color: var(--muted-foreground);
+}
+
+.table-scroll th,
+.table-scroll td {
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table-scroll thead th {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ---------- A Skill's Markdown, rendered (FR-73) ---------- */
+
+.skill-markdown > :first-child {
+  margin-top: 0;
+}
+
+.skill-markdown :is(h3, h4, h5, h6) {
+  margin: 1.25rem 0 0.5rem;
+  font-weight: 600;
+}
+
+.skill-markdown h3 {
+  font-size: 1.125rem;
+}
+
+.skill-markdown h4 {
+  font-size: 1rem;
+}
+
+.skill-markdown :is(h5, h6) {
+  font-size: 0.875rem;
+}
+
+.skill-markdown :is(p, ul, ol, pre, table, blockquote) {
+  margin: 0.5rem 0;
+}
+
+.skill-markdown ul {
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+
+.skill-markdown ol {
+  padding-left: 1.25rem;
+  list-style: decimal;
+}
+
+.skill-markdown li + li {
+  margin-top: 0.25rem;
+}
+
+.skill-markdown a {
+  color: var(--focus-ring);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.skill-markdown code {
+  border-radius: 0.25rem;
+  background: var(--muted);
+  padding: 0.05rem 0.3rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.8125rem;
+}
+
+.skill-markdown pre {
+  overflow-x: auto;
+  border-radius: 0.375rem;
+  background: var(--muted);
+  padding: 0.75rem;
+}
+
+.skill-markdown pre code {
+  background: none;
+  padding: 0;
+}
+
+.skill-markdown blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.skill-markdown table {
+  border-collapse: collapse;
+}
+
+.skill-markdown :is(th, td) {
+  border: 1px solid var(--border);
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+}
+
+/* An Agent's Context Usage bar empties at a Fresh Start
+   (scene/above-head.tsx), from where its fill was. */
+@keyframes fresh-start-drain {
+  from {
+    width: var(--fresh-start-from);
+  }
+  to {
+    width: 0;
+  }
+}
+
+/* The widgets around one dropped into place shake (widget-grid.tsx). Two
+   names for one animation, so a second drop restarts it. */
+@keyframes widget-shake {
+  0%,
+  100% {
+    translate: 0 0;
+    rotate: 0deg;
+  }
+  20% {
+    translate: -3px 0;
+    rotate: -0.6deg;
+  }
+  40% {
+    translate: 3px 0;
+    rotate: 0.6deg;
+  }
+  60% {
+    translate: -2px 0;
+    rotate: -0.3deg;
+  }
+  80% {
+    translate: 2px 0;
+    rotate: 0.3deg;
+  }
+}
+
+@keyframes widget-shake-again {
+  0%,
+  100% {
+    translate: 0 0;
+    rotate: 0deg;
+  }
+  20% {
+    translate: -3px 0;
+    rotate: -0.6deg;
+  }
+  40% {
+    translate: 3px 0;
+    rotate: 0.6deg;
+  }
+  60% {
+    translate: -2px 0;
+    rotate: -0.3deg;
+  }
+  80% {
+    translate: 2px 0;
+    rotate: 0.3deg;
+  }
+}
+
+[data-shaking="even"] {
+  animation: widget-shake 450ms ease-in-out;
+}
+
+[data-shaking="odd"] {
+  animation: widget-shake-again 450ms ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-shaking] {
+    animation: none;
+  }
+}
+
+/* A chat's reply being waited for (chat-pending-reply.tsx): three dots
+   that rise in turn, and a bar that sweeps along the message box. */
+@keyframes typing-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+[data-typing-dot] {
+  animation: typing-dot 1.2s ease-in-out infinite;
+}
+
+@keyframes waiting-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+[data-waiting-sweep] {
+  animation: waiting-sweep 1.4s ease-in-out infinite;
+}

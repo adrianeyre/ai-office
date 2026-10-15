@@ -1,0 +1,271 @@
+# The pen-test stack (docs/pen-testing/stack.md): AI Office as the red team
+# probes it, separate from the Owner's real Office and from
+# docker-compose.yml's defaults. It has its own project name, Postgres and
+# volume, its own secrets, GitHub App, sandbox work directory and sandboxes
+# network, and a stub upstream in place of every AI Provider.
+#
+# Never run it by hand: `docker/pen-test/stand-up` generates its secrets,
+# checks them against the real stack's, adds its AI Accounts and starts it,
+# and `docker/pen-test/teardown` removes it with its volume and its sandbox
+# work directory. Both read docker/pen-test/.env (git-ignored), whose
+# variables `.env.example` beside this file names. Every variable is
+# PEN_TEST_-prefixed, so none of the real stack's is ever read here.
+#
+# The app is published on 127.0.0.1:3145 unless PEN_TEST_BIND_ADDRESS and
+# PEN_TEST_PORT say otherwise. Nothing else is published. Images are pinned
+# by digest, as in docker-compose.yml.
+name: ai-office-pen-test
+
+services:
+  postgres:
+    image: postgres:18.6-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    environment:
+      POSTGRES_DB: ai_office
+      POSTGRES_USER: ai_office
+      POSTGRES_PASSWORD: ${PEN_TEST_POSTGRES_PASSWORD:?run docker/pen-test/stand-up}
+      PGPORT: "3048"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "--username=ai_office", "--dbname=ai_office"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # Answers like an AI Provider and logs every request it receives,
+  # headers included: `docker compose ... logs stub-upstream`. Only the app
+  # reaches it; sandboxes reach models through the AI Gateway.
+  stub-upstream:
+    image: node:26.10.0-slim@sha256:930557a230abacbc3f4fd9b8648abf8f4bee1e17cb72195dcdfb2f709bc85b33
+    user: node
+    command: ["node", "/stub/stub-upstream.ts"]
+    environment:
+      STUB_UPSTREAM_PORT: "3050"
+    volumes:
+      - ./stub-upstream.ts:/stub/stub-upstream.ts:ro
+    read_only: true
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - --eval
+        - "fetch('http://127.0.0.1:3050/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - default
+    restart: unless-stopped
+
+  # Adds the stack's AI Accounts, every one pointing at the stub upstream
+  # with a canary credential (stub-accounts.ts), after the schema is applied
+  # and before the app starts. `stand-up` runs it once; it is in the `setup`
+  # profile so nothing else starts it.
+  ai-accounts:
+    image: ai-office:pen-test
+    pull_policy: never
+    profiles:
+      - setup
+    depends_on:
+      postgres:
+        condition: service_healthy
+      stub-upstream:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://ai_office:${PEN_TEST_POSTGRES_PASSWORD:?run docker/pen-test/stand-up}@postgres:3048/ai_office
+      ENCRYPTION_KEY: ${PEN_TEST_ENCRYPTION_KEY:?run docker/pen-test/stand-up}
+      STUB_UPSTREAM_URL: http://stub-upstream:3050
+    volumes:
+      - ./add-ai-accounts.ts:/app/docker/pen-test/add-ai-accounts.ts:ro
+      - ./stub-accounts.ts:/app/docker/pen-test/stub-accounts.ts:ro
+    command:
+      - sh
+      - -c
+      - node packages/db/src/apply-schema-cli.ts && node docker/pen-test/add-ai-accounts.ts
+    networks:
+      - default
+
+  # Seeds the fixtures the red team probes (seed-cli.ts, Enablement E2, #188):
+  # the Floors, the Agents in every Stage, the unattended-merge Floor, the AI
+  # Accounts at the stub, and the hostile-content corpus (its Skill, Floor
+  # Template and memory proposal in the database, and its issues and files in
+  # the throwaway target repository). It writes the fixture ID listing for the
+  # credentials package (E4, #190) to the sandbox work directory, which is at
+  # the same path on the host. `stand-up` runs it once, after the app is up;
+  # it is in the `setup` profile so nothing else starts it.
+  seed:
+    image: ai-office:pen-test
+    pull_policy: never
+    profiles:
+      - setup
+    # The user who ran stand-up, so the fixture listing it writes is theirs.
+    user: ${PEN_TEST_UID:-1000}:${PEN_TEST_GID:-1000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      stub-upstream:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://ai_office:${PEN_TEST_POSTGRES_PASSWORD:?run docker/pen-test/stand-up}@postgres:3048/ai_office
+      ENCRYPTION_KEY: ${PEN_TEST_ENCRYPTION_KEY:?run docker/pen-test/stand-up}
+      STUB_UPSTREAM_URL: http://stub-upstream:3050
+      GITHUB_APP_ID: ${PEN_TEST_GITHUB_APP_ID:?set PEN_TEST_GITHUB_APP_ID in docker/pen-test/.env}
+      GITHUB_APP_PRIVATE_KEY: ${PEN_TEST_GITHUB_APP_PRIVATE_KEY:?set PEN_TEST_GITHUB_APP_PRIVATE_KEY in docker/pen-test/.env}
+      TARGET_REPOSITORY: ${PEN_TEST_TARGET_REPOSITORY:?set PEN_TEST_TARGET_REPOSITORY in docker/pen-test/.env}
+      FIXTURES_FILE: ${PEN_TEST_SANDBOX_WORK_DIR:?run docker/pen-test/stand-up}/pen-test-fixtures.json
+    volumes:
+      - ./corpus.ts:/app/docker/pen-test/corpus.ts:ro
+      - ./seed.ts:/app/docker/pen-test/seed.ts:ro
+      - ./seed-stores.ts:/app/docker/pen-test/seed-stores.ts:ro
+      - ./generate-target.ts:/app/docker/pen-test/generate-target.ts:ro
+      - ./fixtures.ts:/app/docker/pen-test/fixtures.ts:ro
+      - ./seed-cli.ts:/app/docker/pen-test/seed-cli.ts:ro
+      - ./stub-accounts.ts:/app/docker/pen-test/stub-accounts.ts:ro
+      # The fixture listing is written here, at the same path on the host.
+      - ${PEN_TEST_SANDBOX_WORK_DIR:?run docker/pen-test/stand-up}:${PEN_TEST_SANDBOX_WORK_DIR:?run docker/pen-test/stand-up}
+    command:
+      - node
+      - docker/pen-test/seed-cli.ts
+    networks:
+      - default
+
+  # Mints and revokes the credentials package (credentials-cli.ts,
+  # Enablement E4, #190): `docker/pen-test/credentials mint` and
+  # `... revoke` run it. It writes the package, 0600, to the credentials
+  # directory, which only this service mounts: never the app, so never a
+  # sandbox. It reads the fixture ID listing the seed wrote, from the
+  # sandbox work directory, read-only. It is never given ENCRYPTION_KEY,
+  # SESSION_SECRET or the GitHub App's settings.
+  credentials:
+    image: ai-office:pen-test
+    pull_policy: never
+    profiles:
+      - setup
+    # The user who ran stand-up, so the package it writes is theirs alone.
+    user: ${PEN_TEST_UID:-1000}:${PEN_TEST_GID:-1000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint:
+      - node
+      - docker/pen-test/credentials-cli.ts
+    command:
+      - mint
+    environment:
+      DATABASE_URL: postgres://ai_office:${PEN_TEST_POSTGRES_PASSWORD:?run docker/pen-test/stand-up}@postgres:3048/ai_office
+      PUBLIC_URL: ${PEN_TEST_PUBLIC_URL:-}
+      PACKAGE_FILE: /credentials/credentials-package.json
+      FIXTURES_FILE: /work/pen-test-fixtures.json
+    volumes:
+      - ./credentials.ts:/app/docker/pen-test/credentials.ts:ro
+      - ./credentials-cli.ts:/app/docker/pen-test/credentials-cli.ts:ro
+      - ${PEN_TEST_CREDENTIALS_DIR:?run docker/pen-test/stand-up}:/credentials
+      - ${PEN_TEST_SANDBOX_WORK_DIR:?run docker/pen-test/stand-up}:/work:ro
+    networks:
+      - default
+
+  app:
+    build: ../..
+    # Its own tag, so the Owner's `ai-office:local` is never replaced.
+    image: ai-office:pen-test
+    init: true
+    # The user who ran stand-up, who owns the sandbox work directory.
+    user: ${PEN_TEST_UID:-1000}:${PEN_TEST_GID:-1000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      stub-upstream:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://ai_office:${PEN_TEST_POSTGRES_PASSWORD:?run docker/pen-test/stand-up}@postgres:3048/ai_office
+      SESSION_SECRET: ${PEN_TEST_SESSION_SECRET:?run docker/pen-test/stand-up}
+      ENCRYPTION_KEY: ${PEN_TEST_ENCRYPTION_KEY:?run docker/pen-test/stand-up}
+      HOST: 0.0.0.0
+      PORT: "3045"
+      # As the real stack has it: where the port below is published.
+      PUBLISHED_ADDRESS: ${PEN_TEST_BIND_ADDRESS:-127.0.0.1}
+      PUBLIC_URL: ${PEN_TEST_PUBLIC_URL:-}
+      TRUST_PROXY: ${PEN_TEST_TRUST_PROXY:-}
+      PROXY_SECRET: ${PEN_TEST_PROXY_SECRET:-}
+      GATEWAY_HOST: 0.0.0.0
+      GATEWAY_PORT: "3047"
+      # As the real stack has it, but never published: the pen-test stack
+      # has no subscription to sign in to, and 127.0.0.1:1455 is the real
+      # stack's.
+      OAUTH_CALLBACK_HOST: 0.0.0.0
+      # Every AI Account is the stub upstream, on the stack's own network,
+      # which the Owner allows as they would their own Ollama (ADR 0007).
+      # Nothing else internal is: the I1 probes' targets stay refused.
+      ALLOWED_INTERNAL_HOSTS: stub-upstream
+      # The GitHub App is in the database: the seed adds it (ADR 0011).
+      SANDBOX_GATEWAY_URL: http://sandbox-relay:3047
+      SANDBOX_NETWORK: ai-office-pen-test-sandboxes
+      SANDBOX_WORK_DIR: ${PEN_TEST_SANDBOX_WORK_DIR:?run docker/pen-test/stand-up}
+    ports:
+      - ${PEN_TEST_BIND_ADDRESS:-127.0.0.1}:${PEN_TEST_PORT:-3145}:3045
+    expose:
+      - "3047"
+    # As in the real stack, not on the sandboxes' network: they reach the
+    # AI Gateway through the sandbox relay, and nothing else of the app.
+    networks:
+      - default
+    volumes:
+      # The host's Docker socket, for the sandboxes, as in the real stack.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Sandbox clones are bind-mounted by the host's Docker, so the work
+      # directory is at the same path inside and out.
+      - ${PEN_TEST_SANDBOX_WORK_DIR:?run docker/pen-test/stand-up}:${PEN_TEST_SANDBOX_WORK_DIR:?run docker/pen-test/stand-up}
+    group_add:
+      - ${PEN_TEST_DOCKER_GID:-0}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - --eval
+        - "fetch('http://127.0.0.1:3045/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # As the real stack's (docker-compose.yml): the sandboxes' only way to
+  # the AI Gateway and, to the hosts PEN_TEST_SANDBOX_EGRESS_HOSTS names,
+  # the internet. Its log is every connection a sandbox asked for:
+  # `docker compose ... logs sandbox-relay`.
+  sandbox-relay:
+    image: node:26.10.0-slim@sha256:930557a230abacbc3f4fd9b8648abf8f4bee1e17cb72195dcdfb2f709bc85b33
+    user: node
+    command: ["node", "/relay/relay.ts"]
+    environment:
+      RELAY_GATEWAY: app:3047
+      SANDBOX_EGRESS_HOSTS: ${PEN_TEST_SANDBOX_EGRESS_HOSTS:-}
+    volumes:
+      - ../sandbox-relay/relay.ts:/relay/relay.ts:ro
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - default
+      - sandboxes
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+    name: ai-office-pen-test-postgres-data
+
+networks:
+  # The pen-test stack's sandbox relay's network, never the real stack's
+  # ai-office-sandboxes. As in the real stack, each sandbox has a network of
+  # its own that the relay joins, where the AI Gateway is
+  # sandbox-relay:3047. Internal, as the real stack's: no route out but
+  # through the sandbox relay; and inter-container traffic off.
+  sandboxes:
+    name: ai-office-pen-test-sandboxes
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "false"

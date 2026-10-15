@@ -1,0 +1,67 @@
+{
+  "description": "A streamed Chat Completions request to an OpenAI-format account: it passes through unchanged both ways, and the usage is read from the last chunk.",
+  "account": "openai",
+  "request": {
+    "path": "/v1/chat/completions",
+    "body": {
+      "model": "gpt-5.5",
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hello"
+        }
+      ],
+      "temperature": 0.2
+    }
+  },
+  "upstream": {
+    "response": {
+      "status": 200,
+      "headers": {
+        "content-type": "text/event-stream",
+        "x-request-id": "req_openaiChat03"
+      },
+      "body": "data: {\"id\":\"chatcmpl-01Pass\",\"object\":\"chat.completion.chunk\",\"created\":1791500000,\"model\":\"gpt-5.5\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"Hi!\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-01Pass\",\"object\":\"chat.completion.chunk\",\"created\":1791500000,\"model\":\"gpt-5.5\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: {\"id\":\"chatcmpl-01Pass\",\"object\":\"chat.completion.chunk\",\"created\":1791500000,\"model\":\"gpt-5.5\",\"choices\":[],\"usage\":{\"prompt_tokens\":9,\"completion_tokens\":2,\"total_tokens\":11,\"prompt_tokens_details\":{\"cached_tokens\":0}}}\n\ndata: [DONE]\n\n"
+    },
+    "request": {
+      "path": "/v1/chat/completions",
+      "body": {
+        "model": "gpt-5.5",
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        },
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hello"
+          }
+        ],
+        "temperature": 0.2
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/event-stream",
+      "x-request-id": "req_openaiChat03"
+    },
+    "raw": true
+  },
+  "record": {
+    "endpoint": "chat_completions",
+    "model": "gpt-5.5",
+    "streamed": true,
+    "status": 200,
+    "inputTokens": 9,
+    "outputTokens": 2,
+    "cacheReadInputTokens": 0,
+    "cacheCreationInputTokens": 0,
+    "upstreamRequestId": "req_openaiChat03"
+  }
+}

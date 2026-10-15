@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/chat/completions",
+    "headers": {
+      "accept": "application/json",
+      "content-type": "application/json",
+      "user-agent": "opencode/1.2.0"
+    },
+    "body": "{\"model\":\"deepseek-v4-pro\",\"messages\":[{\"role\":\"user\",\"content\":\"Summarise PR #14 in one line.\"}]}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"id\":\"deepseek-1791547200-1\",\"object\":\"chat.completion\",\"created\":1791547200,\"model\":\"deepseek-v4-pro\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Adds retries and a circuit breaker to the AI Gateway.\",\"reasoning_content\":\"The diff adds a retry loop and a breaker.\"},\"finish_reason\":\"stop\",\"logprobs\":null}],\"usage\":{\"prompt_tokens\":1500,\"completion_tokens\":120,\"total_tokens\":1620,\"prompt_tokens_details\":{\"cached_tokens\":1024},\"completion_tokens_details\":{\"reasoning_tokens\":80},\"prompt_cache_hit_tokens\":1024,\"prompt_cache_miss_tokens\":476},\"system_fingerprint\":\"fp_v4pro_0813\"}"
+  }
+}

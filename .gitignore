@@ -1,0 +1,36 @@
+# Dependencies, and a pnpm store made inside the workspace.
+node_modules
+.pnpm-store/
+
+# Local environment and secrets. `.env.example` files are committed on purpose.
+.env
+.env.*
+!.env.example
+
+# Build output.
+dist/
+build/
+*.tsbuildinfo
+coverage/
+
+# Playwright's results, traces and report.
+test-results/
+playwright-report/
+
+# Logs.
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Local data volumes (Postgres and similar) when run outside named volumes.
+/data/
+
+# Editor and OS files.
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# A local compose override, such as the tls profile's Tailscale socket
+# (docs/processes/deploying-to-ec2.md).
+docker-compose.override.yml

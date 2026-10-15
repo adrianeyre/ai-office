@@ -1,0 +1,194 @@
+{
+  "currency": "USD",
+  "unit": "per million tokens",
+  "updated": "2026-10-10",
+  "source": "The AI Providers' own published prices for their APIs, in US dollars. Claude: Anthropic's first-party API prices (platform.claude.com pricing); cache writes are the five-minute rate, 1.25 times input. DeepSeek: api-docs.deepseek.com/quick_start/pricing, at its peak-hour prices (off-peak is half); cache writes are not charged apart, so are priced as input. Z.ai: docs.z.ai/guides/overview/pricing; cache storage is free for now, so cache writes are priced as input. Minimax: platform.minimax.io/docs/guides/pricing-paygo, pay-as-you-go, at the standard tier and MiniMax-M3's price for prompts up to 512K tokens; its OpenAI-format API, which the Gateway uses, charges no cache writes apart, so they are priced as input. Kimi: platform.kimi.ai/docs/pricing/chat; kimi-k3's cache writes at the five-minute rate, the others' priced as input. OpenRouter publishes its prices through its Models list, so they are not here, except Jev's (typesafe/jev-1.13, the Decision Model), which that list leaves out: $0.042 per million input tokens and nothing for output, as OpenRouter's and TypeSafe's Jev pages give it; it has no prompt cache, so cache writes are priced as input and cache reads, which never happen, at nothing.",
+  "models": {
+    "claude-fable-5-1": {
+      "input": 10,
+      "output": 50,
+      "cacheWrite": 12.5,
+      "cacheRead": 0.25
+    },
+    "claude-fable-5": {
+      "input": 10,
+      "output": 50,
+      "cacheWrite": 12.5,
+      "cacheRead": 1
+    },
+    "claude-opus-5-5": {
+      "input": 4,
+      "output": 20,
+      "cacheWrite": 5,
+      "cacheRead": 0.2
+    },
+    "claude-opus-5": {
+      "input": 5,
+      "output": 25,
+      "cacheWrite": 6.25,
+      "cacheRead": 0.5
+    },
+    "claude-opus-4-8": {
+      "input": 5,
+      "output": 25,
+      "cacheWrite": 6.25,
+      "cacheRead": 0.5
+    },
+    "claude-opus-4-7": {
+      "input": 5,
+      "output": 25,
+      "cacheWrite": 6.25,
+      "cacheRead": 0.5
+    },
+    "claude-opus-4-6": {
+      "input": 5,
+      "output": 25,
+      "cacheWrite": 6.25,
+      "cacheRead": 0.5
+    },
+    "claude-sonnet-5-5": {
+      "input": 2,
+      "output": 10,
+      "cacheWrite": 2.5,
+      "cacheRead": 0.2
+    },
+    "claude-sonnet-5": {
+      "input": 2,
+      "output": 10,
+      "cacheWrite": 2.5,
+      "cacheRead": 0.2
+    },
+    "claude-sonnet-4-6": {
+      "input": 3,
+      "output": 15,
+      "cacheWrite": 3.75,
+      "cacheRead": 0.3
+    },
+    "claude-haiku-5-5": {
+      "input": 0.1,
+      "output": 0.5,
+      "cacheWrite": 0.125,
+      "cacheRead": 0.01
+    },
+    "claude-haiku-4-5": {
+      "input": 1,
+      "output": 5,
+      "cacheWrite": 1.25,
+      "cacheRead": 0.1
+    },
+    "deepseek-flash": {
+      "input": 0.3,
+      "output": 1.2,
+      "cacheWrite": 0.3,
+      "cacheRead": 0.006
+    },
+    "deepseek-v4-flash": {
+      "input": 0.3,
+      "output": 1.2,
+      "cacheWrite": 0.3,
+      "cacheRead": 0.006
+    },
+    "deepseek-v4-pro": {
+      "input": 1.32,
+      "output": 3.96,
+      "cacheWrite": 1.32,
+      "cacheRead": 0.044
+    },
+    "glm-5.3": {
+      "input": 1.4,
+      "output": 4.4,
+      "cacheWrite": 1.4,
+      "cacheRead": 0.26
+    },
+    "glm-5.2": {
+      "input": 1.4,
+      "output": 4.4,
+      "cacheWrite": 1.4,
+      "cacheRead": 0.26
+    },
+    "glm-5.3-flashx": {
+      "input": 0.37,
+      "output": 1.25,
+      "cacheWrite": 0.37,
+      "cacheRead": 0.075
+    },
+    "glm-5.3-flash": {
+      "input": 0.15,
+      "output": 0.5,
+      "cacheWrite": 0.15,
+      "cacheRead": 0.03
+    },
+    "glm-5.1": {
+      "input": 1.4,
+      "output": 4.4,
+      "cacheWrite": 1.4,
+      "cacheRead": 0.26
+    },
+    "glm-5": {
+      "input": 1,
+      "output": 3.2,
+      "cacheWrite": 1,
+      "cacheRead": 0.2
+    },
+    "glm-4.7": {
+      "input": 0.6,
+      "output": 2.2,
+      "cacheWrite": 0.6,
+      "cacheRead": 0.11
+    },
+    "glm-4.6": {
+      "input": 0.6,
+      "output": 2.2,
+      "cacheWrite": 0.6,
+      "cacheRead": 0.11
+    },
+    "MiniMax-M3": {
+      "input": 0.3,
+      "output": 1.2,
+      "cacheWrite": 0.3,
+      "cacheRead": 0.06
+    },
+    "MiniMax-M2.7": {
+      "input": 0.3,
+      "output": 1.2,
+      "cacheWrite": 0.3,
+      "cacheRead": 0.06
+    },
+    "MiniMax-M2.7-highspeed": {
+      "input": 0.6,
+      "output": 2.4,
+      "cacheWrite": 0.6,
+      "cacheRead": 0.06
+    },
+    "kimi-k3": {
+      "input": 3,
+      "output": 15,
+      "cacheWrite": 3,
+      "cacheRead": 0.3
+    },
+    "kimi-k2.7-code": {
+      "input": 0.95,
+      "output": 4,
+      "cacheWrite": 0.95,
+      "cacheRead": 0.19
+    },
+    "kimi-k2.7-code-highspeed": {
+      "input": 1.9,
+      "output": 8,
+      "cacheWrite": 1.9,
+      "cacheRead": 0.38
+    },
+    "kimi-k2.6": {
+      "input": 0.95,
+      "output": 4,
+      "cacheWrite": 0.95,
+      "cacheRead": 0.16
+    },
+    "typesafe/jev-1.13": {
+      "input": 0.042,
+      "output": 0,
+      "cacheWrite": 0.042,
+      "cacheRead": 0
+    }
+  }
+}

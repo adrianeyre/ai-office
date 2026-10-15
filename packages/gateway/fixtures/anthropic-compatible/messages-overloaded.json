@@ -1,0 +1,20 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/anthropic/v1/messages",
+    "headers": {
+      "accept": "application/json",
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+      "user-agent": "claude-cli/2.1.0 (external, cli)"
+    },
+    "body": "{\"model\":\"glm-4.6\",\"max_tokens\":256,\"messages\":[{\"role\":\"user\",\"content\":\"Summarise PR #14 in one line.\"}]}"
+  },
+  "response": {
+    "status": 529,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}"
+  }
+}

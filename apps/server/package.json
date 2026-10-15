@@ -1,0 +1,38 @@
+{
+  "name": "@ai-office/server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Fastify: auth, API, event stream, webhooks, static web.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "node --env-file-if-exists=../../.env --watch src/main.ts",
+    "start": "node src/main.ts",
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ai-office/communications": "workspace:*",
+    "@ai-office/db": "workspace:*",
+    "@ai-office/events": "workspace:*",
+    "@ai-office/gateway": "workspace:*",
+    "@ai-office/github": "workspace:*",
+    "@ai-office/orchestrator": "workspace:*",
+    "@ai-office/shared": "workspace:*",
+    "@fastify/proxy-addr": "^5.1.1",
+    "@fastify/static": "^10.1.6",
+    "@node-rs/argon2": "^2.2.2",
+    "drizzle-orm": "~0.45.4",
+    "fastify": "^5.12.5",
+    "otplib": "^13.5.0",
+    "pino": "^10.4.0",
+    "qrcode": "^1.5.4",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/qrcode": "^1.5.6",
+    "vitest": "^5.0.3"
+  }
+}

@@ -1,0 +1,224 @@
+{
+  "description": "A streamed Messages request served from an OpenAI-format account's stream of text then a tool call, with usage in its last chunk.",
+  "account": "openai",
+  "request": {
+    "path": "/v1/messages",
+    "headers": {
+      "anthropic-version": "2023-06-01"
+    },
+    "body": {
+      "model": "gpt-5.5",
+      "max_tokens": 4096,
+      "stream": true,
+      "messages": [
+        {
+          "role": "user",
+          "content": "Run the tests."
+        }
+      ],
+      "tools": [
+        {
+          "name": "Bash",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "command": {
+                "type": "string"
+              }
+            },
+            "required": ["command"]
+          }
+        }
+      ]
+    }
+  },
+  "upstream": {
+    "response": {
+      "status": 200,
+      "headers": {
+        "content-type": "text/event-stream",
+        "x-request-id": "req_openaiChat02"
+      },
+      "body": "data: {\"id\":\"chatcmpl-01Stream\",\"object\":\"chat.completion.chunk\",\"created\":1791500000,\"model\":\"gpt-5.5\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-01Stream\",\"object\":\"chat.completion.chunk\",\"created\":1791500000,\"model\":\"gpt-5.5\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Running \"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-01Stream\",\"object\":\"chat.completion.chunk\",\"created\":1791500000,\"model\":\"gpt-5.5\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"them.\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-01Stream\",\"object\":\"chat.completion.chunk\",\"created\":1791500000,\"model\":\"gpt-5.5\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_01Test\",\"type\":\"function\",\"function\":{\"name\":\"Bash\",\"arguments\":\"\"}}]},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-01Stream\",\"object\":\"chat.completion.chunk\",\"created\":1791500000,\"model\":\"gpt-5.5\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"command\\\":\"}}]},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-01Stream\",\"object\":\"chat.completion.chunk\",\"created\":1791500000,\"model\":\"gpt-5.5\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\"pnpm test\\\"}\"}}]},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-01Stream\",\"object\":\"chat.completion.chunk\",\"created\":1791500000,\"model\":\"gpt-5.5\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\ndata: {\"id\":\"chatcmpl-01Stream\",\"object\":\"chat.completion.chunk\",\"created\":1791500000,\"model\":\"gpt-5.5\",\"choices\":[],\"usage\":{\"prompt_tokens\":40,\"completion_tokens\":18,\"total_tokens\":58,\"prompt_tokens_details\":{\"cached_tokens\":0}}}\n\ndata: [DONE]\n\n"
+    },
+    "request": {
+      "path": "/v1/chat/completions",
+      "body": {
+        "model": "gpt-5.5",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Run the tests."
+          }
+        ],
+        "max_completion_tokens": 4096,
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "Bash",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string"
+                  }
+                },
+                "required": ["command"]
+              }
+            }
+          }
+        ],
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        }
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/event-stream; charset=utf-8",
+      "x-request-id": "req_openaiChat02"
+    },
+    "events": [
+      {
+        "event": "message_start",
+        "data": {
+          "type": "message_start",
+          "message": {
+            "id": "msg_chatcmpl-01Stream",
+            "type": "message",
+            "role": "assistant",
+            "model": "gpt-5.5",
+            "content": [],
+            "stop_reason": null,
+            "stop_sequence": null,
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0,
+              "cache_read_input_tokens": 0,
+              "cache_creation_input_tokens": 0
+            }
+          }
+        }
+      },
+      {
+        "event": "content_block_start",
+        "data": {
+          "type": "content_block_start",
+          "index": 0,
+          "content_block": {
+            "type": "text",
+            "text": ""
+          }
+        }
+      },
+      {
+        "event": "content_block_delta",
+        "data": {
+          "type": "content_block_delta",
+          "index": 0,
+          "delta": {
+            "type": "text_delta",
+            "text": "Running "
+          }
+        }
+      },
+      {
+        "event": "content_block_delta",
+        "data": {
+          "type": "content_block_delta",
+          "index": 0,
+          "delta": {
+            "type": "text_delta",
+            "text": "them."
+          }
+        }
+      },
+      {
+        "event": "content_block_stop",
+        "data": {
+          "type": "content_block_stop",
+          "index": 0
+        }
+      },
+      {
+        "event": "content_block_start",
+        "data": {
+          "type": "content_block_start",
+          "index": 1,
+          "content_block": {
+            "type": "tool_use",
+            "id": "call_01Test",
+            "name": "Bash",
+            "input": {}
+          }
+        }
+      },
+      {
+        "event": "content_block_delta",
+        "data": {
+          "type": "content_block_delta",
+          "index": 1,
+          "delta": {
+            "type": "input_json_delta",
+            "partial_json": "{\"command\":"
+          }
+        }
+      },
+      {
+        "event": "content_block_delta",
+        "data": {
+          "type": "content_block_delta",
+          "index": 1,
+          "delta": {
+            "type": "input_json_delta",
+            "partial_json": "\"pnpm test\"}"
+          }
+        }
+      },
+      {
+        "event": "content_block_stop",
+        "data": {
+          "type": "content_block_stop",
+          "index": 1
+        }
+      },
+      {
+        "event": "message_delta",
+        "data": {
+          "type": "message_delta",
+          "delta": {
+            "stop_reason": "tool_use",
+            "stop_sequence": null
+          },
+          "usage": {
+            "input_tokens": 40,
+            "output_tokens": 18,
+            "cache_read_input_tokens": 0,
+            "cache_creation_input_tokens": 0
+          }
+        }
+      },
+      {
+        "event": "message_stop",
+        "data": {
+          "type": "message_stop"
+        }
+      }
+    ]
+  },
+  "record": {
+    "endpoint": "messages",
+    "model": "gpt-5.5",
+    "streamed": true,
+    "status": 200,
+    "inputTokens": 40,
+    "outputTokens": 18,
+    "cacheReadInputTokens": 0,
+    "cacheCreationInputTokens": 0,
+    "upstreamRequestId": "req_openaiChat02"
+  }
+}

@@ -1,0 +1,47 @@
+# The Mobile app Floor Template (PRD FR-100): a mobile developer changes
+# the app's repository; the Role library's built-in reviewer reviews each
+# pull request, and device-test QA runs the unit and simulator tests. The
+# Floor works on the repository only, never on the app stores or a
+# beta-testing service (PRD §4). The format is in
+# docs/guide/floors-and-agents.md, under "Floor Templates".
+name: Mobile app
+description: A mobile team that changes the app's screens and code in its repository, reviews each pull request and tests it on simulators.
+icon: smartphone
+theme: device-lab
+roles:
+  - role: mobile-developer
+    count: 1
+  - role: reviewer
+    count: 1
+  - role: device-test-qa
+    count: 1
+settings:
+  setupCommand: if [ -f package.json ]; then npm install; fi
+  testCommand: npm run test:unit && npm run test:simulator
+  mergePolicy: send_to_me
+  roundCap: 3
+  requiredReviewers: [reviewer]
+manager:
+  planningGuidance: |-
+    This Floor started from the Mobile app Floor Template. It works on the app's repository only: its screens, navigation, state, platform code and tests. It never acts on the app stores or a beta-testing service: nothing here signs a build for release, uploads one or sends one to testers. An issue that needs one (sending a release for review, changing the store listing, inviting testers, sending a push to the app's devices) is for the Owner: say so on the issue and ask the Owner with a Notice rather than planning it. The words of a store listing or release notes can still be written as a file in the repository, for the Owner to use.
+
+    The mobile developer changes the app. The reviewer reviews every pull request, and device-test QA checks what the reviewer approves: the unit tests, the simulator tests, and the change itself on a small and a large screen, in light and dark mode.
+
+    Plan issues that change the same screen, the same navigation or the same native module one after another. A change that needs a new permission (the camera, location, contacts) or a new native dependency is an issue on its own, so that the Owner sees it before it reaches a release. Where an issue's design is not in the repository or the issue (a screen's layout, its words), ask the Owner with a Notice rather than planning a guess.
+  firstIssue:
+    title: Set up the app's checks
+    body: |-
+      Add these scripts to `package.json` (making one if the repository has none), so that the Floor's check command runs each of them. Each exits with an error, naming the test and the file, when a test fails:
+
+      - `test:unit`: the app's unit and component tests, with no device, such as Jest with React Native Testing Library, or the platform's own (`./gradlew testDebugUnitTest`, `flutter test`).
+      - `test:simulator`: end-to-end tests of the app's main flows on a simulator or an emulator, such as with Maestro or Detox, on a debug build that is never signed for release. Where no simulator or emulator can start (a Linux sandbox has no iOS simulator), it says so and exits with an error, so that the check never passes without running.
+
+      Say in the README how to run them, and which simulators and emulators the simulator tests run on.
+
+      ## Acceptance criteria
+
+      - [ ] `npm run test:unit` and `test:simulator` each run and pass on the default branch, on a machine with a simulator or an emulator
+      - [ ] Each fails, naming the test, when a test fails
+      - [ ] `test:simulator` fails, saying so, where no simulator or emulator can start
+      - [ ] The README says how to run them
+labels: []

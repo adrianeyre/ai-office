@@ -1,0 +1,51 @@
+# The Data & analytics Floor Template (PRD FR-100): an analytics engineer
+# changes the dbt models in the repository; a data reviewer reviews each
+# pull request, and data-quality QA runs dbt's tests and the SQL lint. Every
+# dbt command runs against the `ci` target, a local DuckDB file built from
+# the repository's sample data, never the production warehouse or a live
+# dashboard (PRD §4). The format is in docs/guide/floors-and-agents.md,
+# under "Floor Templates".
+name: Data & analytics
+description: A data team that changes the dbt models, tests and docs in the repository, reviews each change's logic and checks its data on sample data.
+icon: chart-column
+theme: observatory
+roles:
+  - role: analytics-engineer
+    count: 1
+  - role: data-reviewer
+    count: 1
+  - role: data-quality-qa
+    count: 1
+settings:
+  setupCommand: if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+  testCommand: dbt deps && dbt seed --target ci && dbt run --target ci && dbt test --target ci && sqlfluff lint models
+  mergePolicy: send_to_me
+  roundCap: 3
+  requiredReviewers: [data-reviewer]
+manager:
+  planningGuidance: |-
+    This Floor started from the Data & analytics Floor Template. It works on the repository only: its dbt models, their tests, sources, seeds and docs. It never acts on the production warehouse or a live dashboard: every dbt command on this Floor runs against the `ci` target, a local DuckDB file built from the repository's sample data. An issue that needs the production warehouse or a live dashboard (running the models in production, backfilling a table, changing who can read it, changing a chart in the dashboard tool) is for the Owner: say so on the issue and ask the Owner with a Notice rather than planning it.
+
+    The analytics engineer changes the models, their tests and their docs. The data reviewer reviews every pull request for the logic of each model (its grain, joins, filters and what each column means), and data-quality QA checks what the data reviewer approves: dbt's tests and the SQL lint on the sample data, and the change's results row by row.
+
+    Plan one issue for each model or small set of models, and plan issues that change the same model, or a model and those built from it, one after another. Where an issue asks for a metric whose definition is not in the repository or the issue, ask the Owner with a Notice for the definition rather than planning a guess. Where the sample data has no rows that would show a change, plan adding them to the seeds first.
+  firstIssue:
+    title: Set up the data checks on sample data
+    body: |-
+      Make the Floor's check command run in a new sandbox with no warehouse credentials, against sample data in the repository. It runs `dbt deps`, `dbt seed --target ci`, `dbt run --target ci`, `dbt test --target ci` and `sqlfluff lint models`, one after another. For that, add:
+
+      - A `ci` target in a `profiles.yml` committed at the top of the repository, using `dbt-duckdb` and a local file such as `ci.duckdb` (in `.gitignore`), with no credentials.
+      - A seed (`seeds/*.csv`) standing in for each source table, with a few made-up rows each, and each source pointed at its seed when the target is `ci`.
+      - A `requirements.txt` that pins `dbt-duckdb`, `sqlfluff` and `sqlfluff-templater-dbt`, which the Floor's setup command installs.
+      - A `.sqlfluff` with the models' dialect and rules, and the dbt templater.
+      - On every model, a test of its grain (`unique` and `not_null` on the column that identifies a row), and a `relationships` test on each column the models join on.
+
+      Say in the README how to run the checks, and how to add sample rows.
+
+      ## Acceptance criteria
+
+      - [ ] The check command runs and passes on the default branch, with no warehouse credentials
+      - [ ] `dbt test --target ci` fails, naming the model and the test, when a test finds a problem
+      - [ ] `sqlfluff lint models` fails, naming the file and the line, for SQL that breaks the rules
+      - [ ] The README says how to run the checks, and how to add sample rows
+labels: []

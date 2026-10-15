@@ -1,0 +1,20 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/anthropic/v1/messages",
+    "headers": {
+      "accept": "application/json",
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+      "user-agent": "claude-cli/2.1.0 (external, cli)"
+    },
+    "body": "{\"model\":\"glm-4.6\",\"max_tokens\":256,\"messages\":[{\"role\":\"user\",\"content\":\"Summarise PR #14 in one line.\"}]}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"id\":\"msg_0a1b2c3d\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"glm-4.6\",\"content\":[{\"type\":\"text\",\"text\":\"Adds retries and a circuit breaker to the AI Gateway.\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":512,\"output_tokens\":40,\"cache_read_input_tokens\":1536,\"cache_creation_input_tokens\":128}}"
+  }
+}

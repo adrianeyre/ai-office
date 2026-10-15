@@ -1,0 +1,28 @@
+{
+  "name": "@ai-office/communications",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Communications Agent, Connections, outbound queue.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts",
+    "./testing/mailpit": "./src/mailpit.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ai-office/db": "workspace:*",
+    "@ai-office/events": "workspace:*",
+    "@ai-office/shared": "workspace:*",
+    "drizzle-orm": "~0.45.4",
+    "nodemailer": "^10.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "testcontainers": "^12.2.0",
+    "vitest": "^5.0.3"
+  }
+}

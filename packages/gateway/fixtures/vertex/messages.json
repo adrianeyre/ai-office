@@ -1,0 +1,21 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/v1/projects/ai-office-test/locations/global/publishers/anthropic/models/claude-opus-5-5:rawPredict",
+    "headers": {
+      "accept": "application/json",
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+      "user-agent": "claude-cli/2.1.0 (external, cli)"
+    },
+    "body": "{\"max_tokens\":1024,\"messages\":[{\"role\":\"user\",\"content\":\"Summarise PR #14 in one line.\"}],\"anthropic_version\":\"vertex-2023-10-16\"}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "x-vertex-ai-llm-request-type": "shared"
+    },
+    "body": "{\"id\":\"msg_vrtx_01GatewayVertex\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-opus-5-5\",\"content\":[{\"type\":\"text\",\"text\":\"Adds retries and a circuit breaker to the AI Gateway.\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":24,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":11}}"
+  }
+}

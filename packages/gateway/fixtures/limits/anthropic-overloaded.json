@@ -1,0 +1,22 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/v1/messages",
+    "headers": {
+      "accept": "application/json",
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+      "user-agent": "claude-cli/2.1.0 (external, cli)"
+    },
+    "body": "{\"model\":\"claude-sonnet-5-5\",\"max_tokens\":1024,\"messages\":[{\"role\":\"user\",\"content\":\"Explain the failing test.\"}]}"
+  },
+  "response": {
+    "status": 529,
+    "headers": {
+      "content-type": "application/json",
+      "request-id": "req_011CWgatewayLimit529001",
+      "x-should-retry": "true"
+    },
+    "body": "{\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"},\"request_id\":\"req_011CWgatewayLimit529001\"}"
+  }
+}

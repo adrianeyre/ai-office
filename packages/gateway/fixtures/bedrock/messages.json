@@ -1,0 +1,21 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/anthropic/v1/messages",
+    "headers": {
+      "accept": "application/json",
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+      "user-agent": "claude-cli/2.1.0 (external, cli)"
+    },
+    "body": "{\"model\":\"anthropic.claude-opus-5-5\",\"max_tokens\":1024,\"messages\":[{\"role\":\"user\",\"content\":\"Summarise PR #14 in one line.\"}]}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "x-amzn-requestid": "5e2f6a1c-0b9d-4c3e-9f1a-bedrock00001"
+    },
+    "body": "{\"id\":\"msg_bdrk_01GatewayBedrock\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"anthropic.claude-opus-5-5\",\"content\":[{\"type\":\"text\",\"text\":\"Adds retries and a circuit breaker to the AI Gateway.\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":24,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":11}}"
+  }
+}

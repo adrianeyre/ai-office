@@ -1,0 +1,61 @@
+# The Online store Floor Template (PRD FR-100, §5 scenario 11): a
+# merchandiser, a copywriter and a storefront developer change the store's
+# repository (its product data, copy and theme); a brand reviewer reviews
+# each pull request and store QA checks it. The Floor works on the
+# repository only, never on the live store, ad platforms or customer email
+# (PRD §4). The format is in docs/guide/floors-and-agents.md, under
+# "Floor Templates".
+name: Online store
+description: A store team that changes the product data, copy and theme in the store's repository, reviews each change for the brand and checks it.
+icon: shopping-bag
+theme: stockroom
+roles:
+  - role: merchandiser
+    count: 1
+  - role: copywriter
+    count: 1
+  - role: storefront-developer
+    count: 1
+  - role: brand-reviewer
+    count: 1
+  - role: store-qa
+    count: 1
+settings:
+  setupCommand: if [ -f package.json ]; then npm install; fi
+  testCommand: npm run check:theme && npm run check:links && npm run check:prices && npm run check:images && npm run check:accessibility
+  mergePolicy: send_to_me
+  roundCap: 3
+  requiredReviewers: [brand-reviewer]
+manager:
+  planningGuidance: |-
+    This Floor started from the Online store Floor Template. It works on the store's repository only: its product data, its copy and its theme. It never acts on the live store, an ad platform or customer email. An issue that needs one (publishing the theme, changing a price in the live store, sending a sale email, starting an ad) is for the Owner: say so on the issue and ask the Owner with a Notice rather than planning it. Copy for an ad or an email can still be written as a file in the repository, for the Owner to use.
+
+    The work Roles:
+    - The merchandiser changes the product data: products, variants, prices, stock, collections and their images.
+    - The copywriter writes the words: product descriptions, page copy, headlines and calls to action.
+    - The storefront developer changes the theme: its templates, sections, styles and scripts.
+
+    The brand reviewer reviews every pull request, and store QA runs the store's checks (theme check, links, prices, images and accessibility) on what the brand reviewer approves.
+
+    When an issue needs more than one work Role, give it their turns in this order: the merchandiser first, so the products exist; then the copywriter, who describes them; then the storefront developer, who shows them. A new product range is the merchandiser, then the copywriter. A new section of the theme with its own words is the storefront developer, then the copywriter. Give an issue only the Roles whose work it needs.
+
+    Plan issues that change the same products or the same theme files one after another. Plan a change of price only when the issue gives the price.
+  firstIssue:
+    title: Set up the store's checks
+    body: |-
+      Add these scripts to `package.json` (making one if the repository has none), so that the Floor's check command runs each of them. Each exits with an error, naming the file and the problem, when its check fails:
+
+      - `check:theme`: the theme platform's own linter, such as Shopify's Theme Check (`shopify theme check`).
+      - `check:links`: every link in the theme and the product data goes to a page or a file that exists.
+      - `check:prices`: every product and variant has a price above zero in the store's currency, and a compare-at price, where it has one, above its price.
+      - `check:images`: every product image is a file in the repository, has alt text, and is no larger than the theme shows it.
+      - `check:accessibility`: an accessibility check of the theme's main pages, such as axe or pa11y on a local preview.
+
+      Say in the README how to run them.
+
+      ## Acceptance criteria
+
+      - [ ] `npm run check:theme`, `check:links`, `check:prices`, `check:images` and `check:accessibility` each run and pass on the default branch
+      - [ ] Each fails, naming the file, when its check finds a problem
+      - [ ] The README says how to run them
+labels: []

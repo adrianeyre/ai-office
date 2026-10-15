@@ -1,0 +1,9 @@
+{
+  // The end-to-end tests' server runs AI Office's own (Node) code, so it
+  // is checked without the browser's types that the tests themselves use.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["**/*.ts", "../support/control.ts"]
+}

@@ -1,0 +1,56 @@
+# The Content & blog Floor Template (PRD FR-100): a writer and an SEO
+# specialist change the blog's repository; an editor reviews each pull
+# request, and a fact-checker (in the QA Stage) checks every claim against
+# its source and runs the Markdown, link and spelling checks. The Floor
+# works on the repository only, never on live stores, ad platforms or
+# customer email (PRD §4). The format is in
+# docs/guide/floors-and-agents.md, under "Floor Templates".
+name: Content & blog
+description: A writing team that drafts and revises the posts and pages in the blog's repository, edits each change and checks its facts.
+icon: pen-line
+theme: editorial
+roles:
+  - role: writer
+    count: 1
+  - role: seo-specialist
+    count: 1
+  - role: editor
+    count: 1
+  - role: fact-checker
+    count: 1
+settings:
+  setupCommand: if [ -f package.json ]; then npm install; fi
+  testCommand: npm run check:markdown && npm run check:links && npm run check:spelling
+  mergePolicy: send_to_me
+  roundCap: 3
+  requiredReviewers: [editor]
+manager:
+  planningGuidance: |-
+    This Floor started from the Content & blog Floor Template. It works on the blog's repository only: its posts, pages and their front matter. It never acts on a live store, an ad platform or customer email. An issue that needs one (sending an email to subscribers, posting to a social or ad platform) is for the Owner: say so on the issue and ask the Owner with a Notice rather than planning it. The words of an email or a social post can still be written as a file in the repository, for the Owner to use.
+
+    The work Roles:
+    - The writer writes and revises posts and pages, from an outline or the issue's notes.
+    - The SEO specialist improves how pages show in search results: titles, meta descriptions, headings, links, structured data, redirects and the sitemap.
+
+    The editor reviews every pull request, and the fact-checker checks what the editor approves: every claim against its source, and the blog's checks (Markdown lint, links and spelling).
+
+    When an issue needs both work Roles, give the writer the first turn and the SEO specialist the second: a new post is the writer, then the SEO specialist. Retitling or linking existing posts is the SEO specialist's alone. Give an issue only the Roles whose work it needs.
+
+    Plan posts in a series one after another, so each can link to the one before. Merging a post may publish it, which is why each pull request waits for the Owner's approval.
+  firstIssue:
+    title: Set up the blog's checks
+    body: |-
+      Add these scripts to `package.json` (making one if the repository has none), so that the Floor's check command runs each of them. Each exits with an error, naming the file and the line, when its check fails:
+
+      - `check:markdown`: lints every post and page, such as with `markdownlint-cli2`, with the rules the blog follows in its config.
+      - `check:links`: every link in the posts goes to a page or a file that exists, such as with `lychee` or `linkinator`.
+      - `check:spelling`: spell-checks every post and page in the blog's language, such as with `cspell`, with a word list for the names and terms the blog uses.
+
+      Say in the README how to run them.
+
+      ## Acceptance criteria
+
+      - [ ] `npm run check:markdown`, `check:links` and `check:spelling` each run and pass on the default branch
+      - [ ] Each fails, naming the file and the line, when its check finds a problem
+      - [ ] The README says how to run them, and where the spelling check's word list is
+labels: []

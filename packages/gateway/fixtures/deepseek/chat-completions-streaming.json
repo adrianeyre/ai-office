@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/chat/completions",
+    "headers": {
+      "accept": "text/event-stream",
+      "content-type": "application/json",
+      "user-agent": "opencode/1.2.0"
+    },
+    "body": "{\"model\":\"deepseek-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"Name one risk.\"}],\"stream\":true,\"stream_options\":{\"include_usage\":true}}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/event-stream"
+    },
+    "body": "data: {\"id\":\"deepseek-1791547200-2\",\"object\":\"chat.completion.chunk\",\"created\":1791547200,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Flaky\",\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"deepseek-1791547200-2\",\"object\":\"chat.completion.chunk\",\"created\":1791547200,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" tests.\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"deepseek-1791547200-2\",\"object\":\"chat.completion.chunk\",\"created\":1791547200,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: {\"id\":\"deepseek-1791547200-2\",\"object\":\"chat.completion.chunk\",\"created\":1791547200,\"model\":\"deepseek-flash\",\"choices\":[],\"usage\":{\"prompt_tokens\":20,\"completion_tokens\":5,\"total_tokens\":25,\"prompt_tokens_details\":{\"cached_tokens\":0},\"prompt_cache_hit_tokens\":0,\"prompt_cache_miss_tokens\":20}}\n\ndata: [DONE]\n\n"
+  }
+}

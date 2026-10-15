@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/v1/models",
+    "headers": {
+      "accept": "application/json"
+    },
+    "body": ""
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"object\":\"list\",\"data\":[{\"id\":\"MiniMax-M3\",\"object\":\"model\",\"created\":1786579200,\"owned_by\":\"minimax\"},{\"id\":\"MiniMax-M2.7\",\"object\":\"model\",\"created\":1775001600,\"owned_by\":\"minimax\"},{\"id\":\"MiniMax-M2.7-highspeed\",\"object\":\"model\",\"created\":1775001600,\"owned_by\":\"minimax\"}]}"
+  }
+}

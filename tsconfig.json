@@ -1,0 +1,18 @@
+{
+  // Type-checks the root's own config files. Each package has its own
+  // tsconfig.json; `pnpm typecheck` runs this one and then every package's.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "types": ["node"]
+  },
+  "include": [
+    "eslint.config.js",
+    "vitest.config.ts",
+    "docker/**/*.ts",
+    "test/**/*.ts",
+    "site/**/*.ts",
+    "release/**/*.ts"
+  ]
+}

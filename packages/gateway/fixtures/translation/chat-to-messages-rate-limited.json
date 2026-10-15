@@ -1,0 +1,72 @@
+{
+  "description": "A Chat Completions request the Anthropic account refuses with a 429: the error comes back in the OpenAI format, with retry-after.",
+  "account": "anthropic",
+  "request": {
+    "path": "/v1/chat/completions",
+    "body": {
+      "model": "claude-sonnet-5-5",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hello"
+        }
+      ]
+    }
+  },
+  "upstream": {
+    "response": {
+      "status": 429,
+      "headers": {
+        "content-type": "application/json",
+        "request-id": "req_011CWtranslateChat03",
+        "retry-after": "17"
+      },
+      "body": "{\"type\": \"error\", \"error\": {\"type\": \"rate_limit_error\", \"message\": \"Number of request tokens has exceeded your per-minute rate limit.\"}}"
+    },
+    "request": {
+      "path": "/v1/messages",
+      "body": {
+        "model": "claude-sonnet-5-5",
+        "max_tokens": 32000,
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Hello"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "response": {
+    "status": 429,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-request-id": "req_011CWtranslateChat03",
+      "retry-after": "17"
+    },
+    "body": {
+      "error": {
+        "message": "Number of request tokens has exceeded your per-minute rate limit.",
+        "type": "rate_limit_error",
+        "param": null,
+        "code": null
+      }
+    }
+  },
+  "record": {
+    "endpoint": "chat_completions",
+    "model": "claude-sonnet-5-5",
+    "streamed": false,
+    "status": 429,
+    "inputTokens": null,
+    "outputTokens": null,
+    "cacheReadInputTokens": null,
+    "cacheCreationInputTokens": null,
+    "upstreamRequestId": "req_011CWtranslateChat03"
+  }
+}

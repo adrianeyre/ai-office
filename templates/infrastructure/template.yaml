@@ -1,0 +1,59 @@
+# The Infrastructure Floor Template (PRD FR-100): a platform engineer
+# changes the repository's Terraform; a security reviewer reviews each pull
+# request, and plan QA runs the format, validation, plan and policy checks
+# and reads the plan. Its commands only plan, from no state and with no
+# cloud credentials: none applies, so nothing on the Floor changes live
+# infrastructure or a cloud account (PRD §4). Applying a merged change is
+# the Owner's own pipeline's.
+# packages/orchestrator/src/templates/infrastructure.test.ts checks that no
+# command applies or deploys. The format is in
+# docs/guide/floors-and-agents.md, under "Floor Templates".
+name: Infrastructure
+description: A platform team that changes the Terraform in the repository, reviews each change for security and checks its plan and policies, without ever applying it.
+icon: server
+theme: data-centre
+roles:
+  - role: platform-engineer
+    count: 1
+  - role: security-reviewer
+    count: 1
+  - role: plan-qa
+    count: 1
+settings:
+  setupCommand: ""
+  testCommand: terraform fmt -check -recursive && terraform init -input=false -backend=false && terraform validate && terraform plan -input=false -lock=false -refresh=false && checkov --directory . --quiet
+  mergePolicy: send_to_me
+  roundCap: 3
+  requiredReviewers: [security-reviewer]
+manager:
+  planningGuidance: |-
+    This Floor started from the Infrastructure Floor Template. It works on the repository's infrastructure code only: its Terraform modules, variables, outputs and policies. It never acts on live infrastructure or a cloud account: no Agent here holds cloud credentials or the remote state, and nothing on this Floor applies a plan. Its checks plan from no state, to show what a change would make. Applying a merged change is for the Owner, through their own pipeline. An issue that needs live infrastructure or a cloud account (applying, importing a resource that exists, moving state, rotating a secret, finding out what is deployed now) is for the Owner: say so on the issue and ask the Owner with a Notice rather than planning it.
+
+    The platform engineer changes the Terraform. The security reviewer reviews every pull request for who can reach and change what, and plan QA checks what the security reviewer approves: the format, validation, plan and policy checks, and the plan itself, for anything it would destroy or replace.
+
+    Plan issues that change the same module or the same resources one after another. Plan a change that would destroy or replace a resource that holds data (a database, a bucket, a disk) as an issue on its own, and say on the issue that the Owner reads its plan before applying it. A rename of resources is an issue on its own, with its `moved` blocks.
+  firstIssue:
+    title: Set up the infrastructure's checks
+    body: |-
+      Make the Floor's check command run in a new sandbox with no cloud credentials and no remote state, which this Floor's sandboxes never have. It runs, one after another, at the top of the repository:
+
+      - `terraform fmt -check -recursive`: every file is formatted as Terraform formats it.
+      - `terraform init -input=false -backend=false`: installs the providers and modules at the releases `.terraform.lock.hcl` pins, without reaching the remote state.
+      - `terraform validate`: the configuration is valid.
+      - `terraform plan -input=false -lock=false -refresh=false`: plans the whole configuration from no state, without reading what is deployed, so that the plan shows every resource the configuration makes.
+      - `checkov --directory . --quiet`: the policy checks, with checkov's own policies and the repository's in `policies/`, named in `.checkov.yaml` with every check the repository skips and its reason.
+
+      For the plan to run so:
+
+      - Keep the root module's `backend` block out of the repository: the Owner's own pipeline writes it (such as a `backend.tf`) before it runs `terraform init`, so that this Floor's plan uses no state.
+      - Let each provider plan without credentials, from settings whose defaults are stand-ins (for AWS, `skip_credentials_validation`, `skip_requesting_account_id` and `skip_metadata_api_check`), which the Owner's pipeline sets to the real ones.
+      - Give the plan what a data source would read from the cloud as variables instead, with stand-in defaults.
+
+      Say in the README how to run the checks, and that only the Owner's pipeline applies.
+
+      ## Acceptance criteria
+
+      - [ ] The check command runs and passes on the default branch, with no cloud credentials and no remote state
+      - [ ] `checkov --directory . --quiet` fails, naming the resource and the policy, for a resource that breaks a policy
+      - [ ] The README says how to run the checks, and that only the Owner's pipeline applies
+labels: []

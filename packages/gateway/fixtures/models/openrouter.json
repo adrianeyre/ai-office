@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/models?limit=1000",
+    "headers": {
+      "accept": "application/json"
+    },
+    "body": ""
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"data\":[{\"id\":\"anthropic/claude-sonnet-4.5\",\"canonical_slug\":\"anthropic/claude-4.5-sonnet-20250929\",\"name\":\"Anthropic: Claude Sonnet 4.5\",\"created\":1759161676,\"context_length\":1000000,\"pricing\":{\"prompt\":\"0.000003\",\"completion\":\"0.000015\",\"input_cache_read\":\"0.0000003\",\"input_cache_write\":\"0.00000375\"}},{\"id\":\"deepseek/deepseek-v4-pro\",\"canonical_slug\":\"deepseek/deepseek-v4-pro-0813\",\"name\":\"DeepSeek: DeepSeek V4 Pro\",\"created\":1786579200,\"context_length\":1048576,\"pricing\":{\"prompt\":\"0.00000132\",\"completion\":\"0.00000396\",\"input_cache_read\":\"0.000000044\"}},{\"id\":\"openrouter/auto\",\"canonical_slug\":\"openrouter/auto\",\"name\":\"Auto Router\",\"created\":1699401600,\"context_length\":2000000,\"pricing\":{\"prompt\":\"-1\",\"completion\":\"-1\"}}],\"total_count\":3,\"links\":{\"next\":null}}"
+  }
+}

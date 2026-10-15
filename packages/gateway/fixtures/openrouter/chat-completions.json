@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/chat/completions",
+    "headers": {
+      "accept": "application/json",
+      "content-type": "application/json",
+      "user-agent": "opencode/1.2.0"
+    },
+    "body": "{\"model\":\"anthropic/claude-sonnet-4.5\",\"messages\":[{\"role\":\"user\",\"content\":\"Summarise PR #14 in one line.\"}]}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"id\":\"gen-1791547200-openrouter1\",\"object\":\"chat.completion\",\"created\":1791547200,\"model\":\"anthropic/claude-sonnet-4.5\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Adds retries and a circuit breaker to the AI Gateway.\",\"refusal\":null,\"reasoning\":null},\"finish_reason\":\"stop\",\"native_finish_reason\":\"end_turn\",\"logprobs\":null}],\"usage\":{\"prompt_tokens\":1200,\"completion_tokens\":14,\"total_tokens\":1214,\"cost\":0.000831,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":1000,\"cache_write_tokens\":0,\"audio_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":null,\"upstream_inference_prompt_cost\":0.0009,\"upstream_inference_completions_cost\":0.00021},\"completion_tokens_details\":{\"reasoning_tokens\":0}},\"provider\":\"Anthropic\"}"
+  }
+}

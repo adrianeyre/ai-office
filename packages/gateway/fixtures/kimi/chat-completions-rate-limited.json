@@ -1,0 +1,20 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "headers": {
+      "accept": "application/json",
+      "content-type": "application/json",
+      "user-agent": "opencode/1.2.0"
+    },
+    "body": "{\"model\":\"kimi-k3\",\"messages\":[{\"role\":\"user\",\"content\":\"Summarise PR #14 in one line.\"}]}"
+  },
+  "response": {
+    "status": 429,
+    "headers": {
+      "content-type": "application/json",
+      "retry-after": "20"
+    },
+    "body": "{\"error\":{\"message\":\"Your account org-0123 request reached organization max RPM: 200, please try again after 20 seconds\",\"type\":\"rate_limit_reached_error\"}}"
+  }
+}

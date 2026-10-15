@@ -1,0 +1,10 @@
+{
+  // Type-checks the website's script, which runs in the browser: the root
+  // tsconfig.json checks site/build.ts, which runs in Node. `.mts`, so the
+  // root's `site/**/*.ts` leaves it to this one.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["es2024", "dom", "dom.iterable"]
+  },
+  "include": ["script.mts"]
+}

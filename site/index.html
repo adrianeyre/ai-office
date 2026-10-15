@@ -1,0 +1,2200 @@
+<!doctype html>
+<!--
+  The AI Office website. Its double-brace placeholders are filled in by
+  site/build.ts, which holds the repository's address; the screenshots and
+  icons it names are copied in from docs/images/ and apps/web at build time,
+  and the fonts from site/fonts/. Everything works without JavaScript:
+  script.mts (built into script.js) only adds the menu button, the system tabs, copy buttons, the
+  screenshot viewer, the setup guide's progress and the policies' dialogs.
+-->
+<html lang="en-GB" class="no-js">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script>
+      document.documentElement.classList.replace("no-js", "js");
+    </script>
+    <title>
+      AI Office: a 3D office where AI Agents work your GitHub issues
+    </title>
+    <meta
+      name="description"
+      content="AI Office is a self-hosted 3D office where AI Agents work your GitHub issues in sandboxes, with a Manager to chat to and a built-in AI Gateway that pools your Claude, ChatGPT and other AI Accounts."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="theme-color"
+      content="#fafaff"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#0c0d1a"
+      media="(prefers-color-scheme: dark)"
+    />
+    <link rel="canonical" href="{{SITE_URL}}/" />
+    <link rel="icon" href="favicon.ico" sizes="any" />
+    <link rel="icon" href="brand/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="AI Office" />
+    <meta
+      property="og:description"
+      content="A self-hosted 3D office where AI Agents work your GitHub issues."
+    />
+    <meta property="og:url" content="{{SITE_URL}}/" />
+    <meta property="og:image" content="{{SITE_URL}}/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link
+      rel="preload"
+      href="fonts/inter-latin-wght-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <script type="module" src="script.js"></script>
+  </head>
+  <body>
+    <!-- Icons: Lucide (ISC), and the GitHub mark. -->
+    <svg
+      class="sprite"
+      aria-hidden="true"
+      focusable="false"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <symbol id="i-building-2" viewBox="0 0 24 24">
+        <path d="M10 12h4" />
+        <path d="M10 8h4" />
+        <path d="M14 21v-3a2 2 0 0 0-4 0v3" />
+        <path
+          d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2"
+        />
+        <path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16" />
+      </symbol>
+      <symbol id="i-shield-check" viewBox="0 0 24 24">
+        <path
+          d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+        />
+        <path d="m9 12 2 2 4-4" />
+      </symbol>
+      <symbol id="i-network" viewBox="0 0 24 24">
+        <rect x="16" y="16" width="6" height="6" rx="1" />
+        <rect x="2" y="16" width="6" height="6" rx="1" />
+        <rect x="9" y="2" width="6" height="6" rx="1" />
+        <path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3" />
+        <path d="M12 12V8" />
+      </symbol>
+      <symbol id="i-gauge" viewBox="0 0 24 24">
+        <path d="m12 14 4-4" />
+        <path d="M3.34 19a10 10 0 1 1 17.32 0" />
+      </symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24">
+        <path d="M10.268 21a2 2 0 0 0 3.464 0" />
+        <path
+          d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"
+        />
+      </symbol>
+      <symbol id="i-activity" viewBox="0 0 24 24">
+        <path
+          d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"
+        />
+      </symbol>
+      <symbol id="i-layout-template" viewBox="0 0 24 24">
+        <rect width="18" height="7" x="3" y="3" rx="1" />
+        <rect width="9" height="7" x="3" y="14" rx="1" />
+        <rect width="5" height="7" x="16" y="14" rx="1" />
+      </symbol>
+      <symbol id="i-container" viewBox="0 0 24 24">
+        <path
+          d="M22 7.7c0-.6-.4-1.2-.8-1.5l-6.3-3.9a1.72 1.72 0 0 0-1.7 0l-10.3 6c-.5.2-.9.8-.9 1.4v6.6c0 .5.4 1.2.8 1.5l6.3 3.9a1.72 1.72 0 0 0 1.7 0l10.3-6c.5-.3.9-1 .9-1.5Z"
+        />
+        <path d="M10 21.9V14L2.1 9.1" />
+        <path d="m10 14 11.9-6.9" />
+        <path d="M14 19.8v-8.1" />
+        <path d="M18 17.5V9.4" />
+      </symbol>
+      <symbol id="i-monitor" viewBox="0 0 24 24">
+        <rect width="20" height="14" x="2" y="3" rx="2" />
+        <line x1="8" x2="16" y1="21" y2="21" />
+        <line x1="12" x2="12" y1="17" y2="21" />
+      </symbol>
+      <symbol id="i-terminal" viewBox="0 0 24 24">
+        <path d="M12 19h8" />
+        <path d="m4 17 6-6-6-6" />
+      </symbol>
+      <symbol id="i-git-branch" viewBox="0 0 24 24">
+        <path d="M15 6a9 9 0 0 0-9 9V3" />
+        <circle cx="18" cy="6" r="3" />
+        <circle cx="6" cy="18" r="3" />
+      </symbol>
+      <symbol id="i-key-round" viewBox="0 0 24 24">
+        <path
+          d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"
+        />
+        <circle cx="16.5" cy="7.5" r=".5" fill="currentColor" />
+      </symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24">
+        <path d="M4 5h16" />
+        <path d="M4 12h16" />
+        <path d="M4 19h16" />
+      </symbol>
+      <symbol id="i-arrow-right" viewBox="0 0 24 24">
+        <path d="M5 12h14" />
+        <path d="m12 5 7 7-7 7" />
+      </symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24">
+        <path
+          d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"
+        />
+        <circle cx="12" cy="12" r="3" />
+      </symbol>
+      <symbol id="i-arrow-up-right" viewBox="0 0 24 24">
+        <path d="M7 7h10v10" />
+        <path d="M7 17 17 7" />
+      </symbol>
+      <symbol id="i-sparkles" viewBox="0 0 24 24">
+        <path
+          d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"
+        />
+        <path d="M20 2v4" />
+        <path d="M22 4h-4" />
+        <circle cx="4" cy="20" r="2" />
+      </symbol>
+      <symbol id="i-layers" viewBox="0 0 24 24">
+        <path
+          d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"
+        />
+        <path
+          d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"
+        />
+        <path
+          d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"
+        />
+      </symbol>
+      <symbol id="i-message-square-text" viewBox="0 0 24 24">
+        <path
+          d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"
+        />
+        <path d="M7 11h10" />
+        <path d="M7 15h6" />
+        <path d="M7 7h8" />
+      </symbol>
+      <symbol id="i-server" viewBox="0 0 24 24">
+        <rect width="20" height="8" x="2" y="2" rx="2" ry="2" />
+        <rect width="20" height="8" x="2" y="14" rx="2" ry="2" />
+        <line x1="6" x2="6.01" y1="6" y2="6" />
+        <line x1="6" x2="6.01" y1="18" y2="18" />
+      </symbol>
+      <symbol id="i-laptop" viewBox="0 0 24 24">
+        <path
+          d="M18 5a2 2 0 0 1 2 2v8.526a2 2 0 0 0 .212.897l1.068 2.127a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45l1.068-2.127A2 2 0 0 0 4 15.526V7a2 2 0 0 1 2-2z"
+        />
+        <path d="M20.054 15.987H3.946" />
+      </symbol>
+      <symbol id="i-scale" viewBox="0 0 24 24">
+        <path d="M12 3v18" />
+        <path d="m19 8 3 8a5 5 0 0 1-6 0zV7" />
+        <path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1" />
+        <path d="m5 8 3 8a5 5 0 0 1-6 0zV7" />
+        <path d="M7 21h10" />
+      </symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24">
+        <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24">
+        <path d="M20 6 9 17l-5-5" />
+      </symbol>
+      <symbol id="i-chevron-left" viewBox="0 0 24 24">
+        <path d="m15 18-6-6 6-6" />
+      </symbol>
+      <symbol id="i-chevron-right" viewBox="0 0 24 24">
+        <path d="m9 18 6-6-6-6" />
+      </symbol>
+      <symbol id="i-x" viewBox="0 0 24 24">
+        <path d="M18 6 6 18" />
+        <path d="m6 6 12 12" />
+      </symbol>
+      <symbol id="i-github-mark" viewBox="0 0 24 24">
+        <path
+          fill="currentColor"
+          stroke="none"
+          d="M12 .5a11.5 11.5 0 0 0-3.64 22.42c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.76.41-1.27.74-1.56-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.2-3.1-.12-.29-.52-1.46.11-3.05 0 0 .98-.31 3.2 1.18a11.1 11.1 0 0 1 5.82 0c2.22-1.5 3.2-1.18 3.2-1.18.63 1.59.23 2.76.11 3.05.75.81 1.2 1.84 1.2 3.1 0 4.43-2.7 5.41-5.26 5.69.42.36.8 1.08.8 2.18v3.23c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"
+        />
+      </symbol>
+    </svg>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="#top">
+          <picture>
+            <source
+              srcset="brand/logo-dark.svg"
+              media="(prefers-color-scheme: dark)"
+            />
+            <img src="brand/logo.svg" alt="AI Office" width="152" height="40" />
+          </picture>
+        </a>
+        <button
+          class="menu-toggle icon-button"
+          type="button"
+          aria-expanded="false"
+          aria-controls="site-nav"
+          aria-label="Open the menu"
+          hidden
+        >
+          <svg class="icon" aria-hidden="true"><use href="#i-menu" /></svg>
+        </button>
+        <nav class="site-nav" id="site-nav" aria-label="Sections">
+          <ul class="nav-links">
+            <li><a href="#features">Features</a></li>
+            <li><a href="#screenshots">Screenshots</a></li>
+            <li><a href="#quick-start">Quick start</a></li>
+            <li><a href="#setup">Full setup</a></li>
+            <li><a href="#docs">Docs</a></li>
+            <li class="nav-cta">
+              <a class="button button-small" href="{{REPO_URL}}">
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-github-mark" />
+                </svg>
+                GitHub
+              </a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" tabindex="-1">
+      <section class="hero" id="top" aria-labelledby="hero-title">
+        <div class="hero-backdrop" aria-hidden="true"></div>
+        <div class="container hero-inner">
+          <div class="hero-text">
+            <p class="eyebrow">
+              <svg class="icon" aria-hidden="true">
+                <use href="#i-sparkles" />
+              </svg>
+              Self-hosted · Bring your own AI Accounts
+            </p>
+            <h1 id="hero-title">
+              A 3D office where
+              <span class="gradient-text">AI Agents</span> work your GitHub
+              issues
+            </h1>
+            <p class="lead">
+              Each repository is a Floor with a Manager and a team of Agents.
+              Label an issue, or tell the Manager “complete issues 1 to 5”, and
+              watch them plan, code, review and open the pull request, each in
+              its own sandbox.
+            </p>
+            <div class="hero-actions">
+              <a class="button button-large" href="#quick-start">
+                Get started
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-arrow-right" />
+                </svg>
+              </a>
+              <a
+                class="button button-secondary button-large"
+                href="{{REPO_URL}}"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-github-mark" />
+                </svg>
+                View on GitHub
+              </a>
+            </div>
+            <div class="terminal terminal-mini">
+              <pre
+                tabindex="0"
+                aria-label="Get AI Office and run it"
+              ><code><span class="prompt" aria-hidden="true">$ </span>git clone {{REPO_URL}}.git
+<span class="prompt" aria-hidden="true">$ </span>cd {{REPO_NAME}} && pnpm install
+<span class="prompt" aria-hidden="true">$ </span>cp .env.example .env && pnpm dev</code></pre>
+            </div>
+          </div>
+          <figure class="hero-shot">
+            <div class="window">
+              <div class="window-bar" aria-hidden="true">
+                <span></span><span></span><span></span>
+                <p class="window-address">localhost:3045</p>
+              </div>
+              <a href="images/office-floor.png" data-lightbox>
+                <img
+                  src="images/office-floor.png"
+                  width="1440"
+                  height="900"
+                  fetchpriority="high"
+                  alt="A Floor of the 3D Office: Agents at their desks with the tokens they have used today above their heads, the Manager's office, a meeting room with a whiteboard, a break area with table football and table tennis, and a Chat with the Manager button."
+                />
+              </a>
+            </div>
+            <figcaption>
+              <strong>A Floor.</strong> The team at their desks, the meeting
+              room and the break area.
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="container">
+          <ul class="facts" aria-label="At a glance">
+            <li>
+              <svg class="icon" aria-hidden="true">
+                <use href="#i-server" />
+              </svg>
+              <span
+                ><strong>Self-hosted</strong> on your machine or one
+                server</span
+              >
+            </li>
+            <li>
+              <svg class="icon" aria-hidden="true">
+                <use href="#i-container" />
+              </svg>
+              <span><strong>Sandboxed</strong> Agents in Docker</span>
+            </li>
+            <li>
+              <svg class="icon" aria-hidden="true">
+                <use href="#i-gauge" />
+              </svg>
+              <span
+                ><strong>Token Caps</strong> office, Floor, Agent and
+                issue</span
+              >
+            </li>
+            <li>
+              <svg class="icon" aria-hidden="true">
+                <use href="#i-network" />
+              </svg>
+              <span><strong>AI Gateway</strong> built in</span>
+            </li>
+          </ul>
+          <div class="providers">
+            <p class="providers-title">Pool your AI Accounts</p>
+            <ul class="provider-list">
+              <li>Claude</li>
+              <li>ChatGPT</li>
+              <li>Grok</li>
+              <li>Gemini</li>
+              <li>OpenRouter</li>
+              <li>DeepSeek</li>
+              <li>Z.ai</li>
+              <li>MiniMax</li>
+              <li>Kimi</li>
+              <li>Ollama</li>
+              <li>AWS Bedrock</li>
+              <li>Google Vertex AI</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="about" class="section" aria-labelledby="about-title">
+        <div class="container">
+          <div class="section-head">
+            <p class="kicker">Why AI Office</p>
+            <h2 id="about-title">What AI Office is</h2>
+          </div>
+          <div class="about-grid">
+            <div class="about-text">
+              <p class="about-lead">
+                Coding agents do real work on well-scoped issues, but running
+                several at once is hard to see and hard to steer: who is doing
+                what, where work is stuck, what it is costing, and which AI
+                Account has hit its rate limit.
+              </p>
+              <p>
+                AI Office makes all of it visible, bounded and controllable, and
+                fun to watch. It is a web application you run yourself, on your
+                own machine or a single server, with one Owner. Every Agent's
+                live activity, every issue and pull request, and every model
+                call and its tokens are one or two clicks away: click a monitor
+                to see what an Agent is doing, open the whiteboard to read the
+                plan, or read the Notice Board to see what needs you.
+              </p>
+            </div>
+            <ul class="pillars">
+              <li>
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-eye" />
+                </svg>
+                <h3>Visible</h3>
+                <p>Live activity, plans and every model call, a click away.</p>
+              </li>
+              <li>
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-gauge" />
+                </svg>
+                <h3>Bounded</h3>
+                <p>Token Caps and Round Caps: nothing spends without bound.</p>
+              </li>
+              <li>
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-message-square-text" />
+                </svg>
+                <h3>Controllable</h3>
+                <p>Steer each Floor by chat; approve what needs you.</p>
+              </li>
+              <li>
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-building-2" />
+                </svg>
+                <h3>Fun to watch</h3>
+                <p>A 3D office, with desks, Handoffs, meetings and breaks.</p>
+              </li>
+            </ul>
+          </div>
+
+          <h3 class="pipeline-title">How an issue gets done</h3>
+          <ol class="pipeline">
+            <li>
+              <span class="pipeline-number" aria-hidden="true">1</span>
+              <h4>You file it</h4>
+              <p>
+                Label one of your issues <code>ai-office</code>, or name issues
+                to the Floor's Manager in its chat to make a Batch with a Plan
+                you approve.
+              </p>
+            </li>
+            <li>
+              <span class="pipeline-number" aria-hidden="true">2</span>
+              <h4>The Manager triages it</h4>
+              <p>
+                It checks the issue is clear enough to work, comments its
+                decision, and asks you on the Notice Board when it is not.
+              </p>
+            </li>
+            <li>
+              <span class="pipeline-number" aria-hidden="true">3</span>
+              <h4>Agents work it in sandboxes</h4>
+              <p>
+                The issue moves through four Stages, each with its label. Each
+                Agent works in its own Docker sandbox, reaching models only
+                through the AI Gateway and never with your credentials.
+              </p>
+            </li>
+            <li>
+              <span class="pipeline-number" aria-hidden="true">4</span>
+              <h4>AI reviewers review the pull request</h4>
+              <p>
+                In a Review Loop, capped by a Round Cap, so AIs never argue
+                forever.
+              </p>
+            </li>
+            <li>
+              <span class="pipeline-number" aria-hidden="true">5</span>
+              <h4>The Merge Policy decides</h4>
+              <p>
+                The Floor merges automatically once CI passes, or sends the pull
+                request to you through a Notice.
+              </p>
+            </li>
+          </ol>
+          <div class="stage-track">
+            <p class="stage-track-title">The four Stages, by label</p>
+            <ol class="stage-chips">
+              <li><code>needs-work</code></li>
+              <li><code>needs-review</code></li>
+              <li><code>needs-qa</code></li>
+              <li><code>needs-docs</code></li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="features"
+        class="section section-alt"
+        aria-labelledby="features-title"
+      >
+        <div class="container">
+          <div class="section-head">
+            <p class="kicker">Features</p>
+            <h2 id="features-title">Everything a team of Agents needs</h2>
+            <p class="section-intro">
+              An office to work in, a Manager to steer it, sandboxes to keep it
+              safe and a Gateway to pay for it, all in one app you run yourself.
+            </p>
+          </div>
+          <ul class="bento">
+            <li class="card card-feature card-wide">
+              <span class="card-icon">
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-building-2" />
+                </svg>
+              </span>
+              <h3>The 3D Office</h3>
+              <p>
+                A lobby with the office-wide Notice Board and a lift to every
+                Floor. Agents sit at their desks, walk tickets to the next desk
+                on a Handoff, meet in the meeting room for a Kickoff and
+                Wrap-up, and take breaks. It works on phones and tablets, with a
+                2D view and reduced motion too.
+              </p>
+            </li>
+            <li class="card card-feature card-wide">
+              <span class="card-icon">
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-message-square-text" />
+                </svg>
+              </span>
+              <h3>A Manager on every Floor</h3>
+              <p>
+                Chat with the Manager: “complete issues 1 to 5”, “skip 4”, “move
+                5 up”, “status”. It triages, plans Batches on the whiteboard and
+                escalates to you. Grilling Sessions interview you until a
+                feature is understood, then write the issues.
+              </p>
+            </li>
+            <li class="card card-feature">
+              <span class="card-icon">
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-container" />
+                </svg>
+              </span>
+              <h3>Sandboxed Agents</h3>
+              <p>
+                Agents run Claude Code, Codex or opencode in Docker sandboxes,
+                with a read-only, short-lived GitHub token for their repository.
+                Commits are authored as you, with an
+                <code>Agent:</code> trailer naming the Agent.
+              </p>
+            </li>
+            <li class="card card-feature">
+              <span class="card-icon">
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-network" />
+                </svg>
+              </span>
+              <h3>A built-in AI Gateway</h3>
+              <p>
+                Every model call passes through it. Anthropic- and
+                OpenAI-compatible endpoints, load balancing, retries, a circuit
+                breaker, Combos, model mappings and prompt-cache keep-alive.
+                Your own tools can use it too, at AI Office's own address, with
+                a Gateway Key.
+              </p>
+            </li>
+            <li class="card card-feature">
+              <span class="card-icon">
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-layers" />
+                </svg>
+              </span>
+              <h3>Your AI Accounts, pooled</h3>
+              <p>
+                Claude (Pro or Max) and ChatGPT (Plus, Pro or Business)
+                subscriptions, and API keys for Anthropic, xAI, Gemini,
+                OpenRouter, DeepSeek, Z.ai, MiniMax, Kimi, Ollama, AWS Bedrock,
+                Google Vertex AI and compatible endpoints. Mix AI Providers on
+                one Floor: Claude codes, ChatGPT reviews.
+              </p>
+            </li>
+            <li class="card card-feature">
+              <span class="card-icon">
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-gauge" />
+                </svg>
+              </span>
+              <h3>Hard limits</h3>
+              <p>
+                Token Caps office-wide, per Floor, per Agent and per issue;
+                Round Caps on Review Loops; usage windows and pause thresholds
+                for subscriptions. An Agent can never loop or spend without
+                bound.
+              </p>
+            </li>
+            <li class="card card-feature">
+              <span class="card-icon">
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-bell" />
+                </svg>
+              </span>
+              <h3>Notice Board and Connections</h3>
+              <p>
+                Everything that needs you, in one place: pull requests to
+                approve, blocked Agents, reached caps. The Communications Agent
+                tells you elsewhere too: Slack, email, webhooks, phone push, and
+                Wrap-up reports to Confluence, Notion or Google Docs.
+              </p>
+            </li>
+            <li class="card card-feature">
+              <span class="card-icon">
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-activity" />
+                </svg>
+              </span>
+              <h3>Activity and Analytics</h3>
+              <p>
+                A complete, read-only Activity Feed of everything that happens,
+                filtered by Floor, Agent, issue and type. Analytics of requests,
+                tokens, estimated cost, latency and errors, and the history of
+                every Gateway request.
+              </p>
+            </li>
+            <li class="card card-feature card-wide">
+              <span class="card-icon">
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-layout-template" />
+                </svg>
+              </span>
+              <h3>Floor Templates and Roles</h3>
+              <p>
+                Start a Floor from Development, Online store, Website &amp;
+                marketing, Content &amp; blog, Documentation, Design system,
+                Data &amp; analytics, Infrastructure, Mobile app or Blank, or
+                your own. Edit Roles and Skills in their libraries.
+              </p>
+            </li>
+            <li class="card card-feature card-wide">
+              <span class="card-icon">
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-shield-check" />
+                </svg>
+              </span>
+              <h3>Secure by default</h3>
+              <p>
+                No default password, optional TOTP, sign-in rate limits, AI
+                Account credentials encrypted at rest and never sent to a
+                sandbox, and every AI Gateway call checked against a Gateway
+                Key. HTTPS with Caddy when you deploy it.
+              </p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section
+        id="screenshots"
+        class="section"
+        aria-labelledby="screenshots-title"
+      >
+        <div class="container">
+          <div class="section-head">
+            <p class="kicker">Screenshots</p>
+            <h2 id="screenshots-title">See it at work</h2>
+            <p class="section-intro">
+              Taken from the running app by its own end-to-end tooling. Select a
+              picture to see it full size.
+            </p>
+          </div>
+          <div class="gallery">
+            <figure>
+              <a href="images/office.png" data-lightbox>
+                <img
+                  src="images/office.png"
+                  width="1440"
+                  height="900"
+                  loading="lazy"
+                  alt="The 3D Office in overview: the lift menu listing the Lobby and a web-shop Floor, and the Floor's desks, meeting room and break area."
+                />
+              </a>
+              <figcaption>
+                <strong>The Office.</strong> The lobby, the lift to each Floor
+                and the Notice Board.
+              </figcaption>
+            </figure>
+            <figure>
+              <a href="images/notice-board.png" data-lightbox>
+                <img
+                  src="images/notice-board.png"
+                  width="1440"
+                  height="900"
+                  loading="lazy"
+                  alt="The Notice Board page listing action and info Notices, office-wide and for each Floor."
+                />
+              </a>
+              <figcaption>
+                <strong>Notice Board.</strong> Action and info Notices,
+                office-wide and per Floor.
+              </figcaption>
+            </figure>
+            <figure>
+              <a href="images/agent-live-view.png" data-lightbox>
+                <img
+                  src="images/agent-live-view.png"
+                  width="1440"
+                  height="900"
+                  loading="lazy"
+                  alt="An Agent's live view, streaming the text, tool calls and diffs from its sandbox."
+                />
+              </a>
+              <figcaption>
+                <strong>An Agent's live view.</strong> Its sandbox as it works:
+                text, tool calls and diffs.
+              </figcaption>
+            </figure>
+            <figure>
+              <a href="images/activity.png" data-lightbox>
+                <img
+                  src="images/activity.png"
+                  width="1440"
+                  height="900"
+                  loading="lazy"
+                  alt="The Activity Feed with filters for Floor, Agent, issue, event type and time."
+                />
+              </a>
+              <figcaption>
+                <strong>Activity.</strong> Every event, filtered by Floor,
+                Agent, issue, type and time.
+              </figcaption>
+            </figure>
+            <figure>
+              <a href="images/gateway-requests.png" data-lightbox>
+                <img
+                  src="images/gateway-requests.png"
+                  width="1440"
+                  height="900"
+                  loading="lazy"
+                  alt="The Gateway requests table, with each request's AI Account, Model, tokens, cost and timings."
+                />
+              </a>
+              <figcaption>
+                <strong>Gateway requests.</strong> Every request through the AI
+                Gateway, with its tokens, cost and timings.
+              </figcaption>
+            </figure>
+            <figure>
+              <a href="images/analytics.png" data-lightbox>
+                <img
+                  src="images/analytics.png"
+                  width="1440"
+                  height="900"
+                  loading="lazy"
+                  alt="Analytics charts of requests, tokens, cost, latency and errors over time."
+                />
+              </a>
+              <figcaption>
+                <strong>Analytics.</strong> Requests, tokens, cost, latency and
+                errors over time.
+              </figcaption>
+            </figure>
+            <figure>
+              <a href="images/ai-settings.png" data-lightbox>
+                <img
+                  src="images/ai-settings.png"
+                  width="1440"
+                  height="900"
+                  loading="lazy"
+                  alt="AI Settings: AI Providers, AI Accounts with a Claude subscription's 5-hour and weekly usage, and the Gateway's configuration."
+                />
+              </a>
+              <figcaption>
+                <strong>AI Settings.</strong> AI Providers, AI Accounts and the
+                Gateway's configuration.
+              </figcaption>
+            </figure>
+            <figure>
+              <a href="images/admin-storage.png" data-lightbox>
+                <img
+                  src="images/admin-storage.png"
+                  width="1440"
+                  height="900"
+                  loading="lazy"
+                  alt="The Admin page: office settings, the prompt-cache TTL and the Storage card."
+                />
+              </a>
+              <figcaption>
+                <strong>Admin.</strong> Office settings, the prompt-cache TTL
+                and Storage.
+              </figcaption>
+            </figure>
+            <figure>
+              <a href="images/lobby-people.png" data-lightbox>
+                <img
+                  src="images/lobby-people.png"
+                  width="1400"
+                  height="900"
+                  loading="lazy"
+                  alt="The lobby: the receptionist greets the Owner by name, a visitor waits on a sofa, and a panel says the Notice Board is empty."
+                />
+              </a>
+              <figcaption>
+                <strong>The lobby.</strong> Reception, where the Communications
+                Agent greets you.
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="requirements"
+        class="section section-alt"
+        aria-labelledby="requirements-title"
+      >
+        <div class="container">
+          <div class="section-head">
+            <p class="kicker">Before you start</p>
+            <h2 id="requirements-title">Requirements</h2>
+          </div>
+          <ul class="requirements">
+            <li class="card">
+              <span class="card-icon">
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-laptop" />
+                </svg>
+              </span>
+              <p>
+                <strong>Windows, macOS or Linux</strong>, or a single server
+                such as an EC2 instance.
+              </p>
+            </li>
+            <li class="card">
+              <span class="card-icon">
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-container" />
+                </svg>
+              </span>
+              <p>
+                <strong>Docker</strong>: Docker Desktop on Windows and macOS (on
+                Windows it runs on WSL 2), or Docker Engine on Linux. It runs
+                Postgres 18 and the Agents' sandboxes.
+              </p>
+            </li>
+            <li class="card">
+              <span class="card-icon">
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-terminal" />
+                </svg>
+              </span>
+              <p>
+                <strong>Node 26 or later and pnpm 12 or later</strong>, as the
+                repository's <code>package.json</code> requires (older versions
+                are refused), and Git.
+              </p>
+            </li>
+            <li class="card">
+              <span class="card-icon">
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-git-branch" />
+                </svg>
+              </span>
+              <p>
+                <strong>A GitHub account</strong>, to create the AI Office
+                GitHub App and install it on the repositories that will be
+                Floors.
+              </p>
+            </li>
+            <li class="card">
+              <span class="card-icon">
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-key-round" />
+                </svg>
+              </span>
+              <p>
+                <strong>At least one AI Account</strong>: a Claude or ChatGPT
+                subscription, or an API key for one of the supported AI
+                Providers.
+              </p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section
+        id="quick-start"
+        class="section"
+        aria-labelledby="quick-start-title"
+      >
+        <div class="container narrow">
+          <div class="section-head">
+            <p class="kicker">Five minutes</p>
+            <h2 id="quick-start-title">Quick start</h2>
+            <p class="section-intro">
+              From nothing to AI Office running on
+              <a href="http://localhost:3045">http://localhost:3045</a>, in
+              development. Pick your system. For Agents to work issues, carry on
+              with the <a href="#setup">full setup</a>.
+            </p>
+          </div>
+
+          <div class="os-tabs terminal" data-os-tabs>
+            <section
+              class="os-panel"
+              id="quick-windows"
+              data-os="windows"
+              aria-labelledby="quick-windows-title"
+            >
+              <h3 id="quick-windows-title">Windows</h3>
+              <p>
+                Install
+                <a href="https://www.docker.com/products/docker-desktop/"
+                  >Docker Desktop</a
+                >
+                first. It needs WSL 2: if it asks, run
+                <code>wsl --install</code> in an administrator PowerShell and
+                restart. Then, in PowerShell:
+              </p>
+              <pre
+                tabindex="0"
+              ><code><span class="comment"># Git and fnm (a Node version manager); follow fnm's instructions
+# to add it to your PowerShell profile, then open a new terminal</span>
+winget install Git.Git
+winget install Schniz.fnm
+fnm install 26
+fnm default 26
+
+<span class="comment"># pnpm 12 or later</span>
+iwr https://get.pnpm.io/install.ps1 -useb | iex
+
+<span class="comment"># In a new terminal: get AI Office and run it</span>
+git clone {{REPO_URL}}.git
+cd {{REPO_NAME}}
+pnpm install
+Copy-Item .env.example .env
+pnpm dev</code></pre>
+            </section>
+
+            <section
+              class="os-panel"
+              id="quick-macos"
+              data-os="macos"
+              aria-labelledby="quick-macos-title"
+            >
+              <h3 id="quick-macos-title">macOS</h3>
+              <p>
+                Install
+                <a href="https://www.docker.com/products/docker-desktop/"
+                  >Docker Desktop</a
+                >
+                and <a href="https://brew.sh/">Homebrew</a> first. Then, in
+                Terminal:
+              </p>
+              <pre
+                tabindex="0"
+              ><code><span class="comment"># Git and fnm (a Node version manager); follow fnm's instructions
+# to add it to your shell profile, then open a new terminal</span>
+xcode-select --install
+brew install fnm
+fnm install 26
+fnm default 26
+
+<span class="comment"># pnpm 12 or later</span>
+curl -fsSL https://get.pnpm.io/install.sh | sh -
+
+<span class="comment"># In a new terminal: get AI Office and run it</span>
+git clone {{REPO_URL}}.git
+cd {{REPO_NAME}}
+pnpm install
+cp .env.example .env
+pnpm dev</code></pre>
+            </section>
+
+            <section
+              class="os-panel"
+              id="quick-linux"
+              data-os="linux"
+              aria-labelledby="quick-linux-title"
+            >
+              <h3 id="quick-linux-title">Linux</h3>
+              <p>
+                Install
+                <a href="https://docs.docker.com/engine/install/"
+                  >Docker Engine</a
+                >
+                and add yourself to the <code>docker</code> group first. Then:
+              </p>
+              <pre
+                tabindex="0"
+              ><code><span class="comment"># Git and fnm (a Node version manager); follow fnm's instructions
+# to add it to your shell profile, then open a new terminal</span>
+sudo apt install git   <span class="comment"># or your package manager's equivalent</span>
+curl -fsSL https://fnm.vercel.app/install | bash
+fnm install 26
+fnm default 26
+
+<span class="comment"># pnpm 12 or later</span>
+curl -fsSL https://get.pnpm.io/install.sh | sh -
+
+<span class="comment"># In a new terminal: get AI Office and run it</span>
+git clone {{REPO_URL}}.git
+cd {{REPO_NAME}}
+pnpm install
+cp .env.example .env
+pnpm dev</code></pre>
+            </section>
+          </div>
+
+          <div class="callout-grid">
+            <div class="callout">
+              <h3>
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-monitor" />
+                </svg>
+                Open the app
+              </h3>
+              <p>
+                <code>pnpm dev</code> starts the development Postgres in Docker,
+                applies the database migrations, then runs the server and the
+                web app together. Open
+                <a href="http://localhost:3045">http://localhost:3045</a>: on
+                the first run it asks you to create the Owner password.
+              </p>
+            </div>
+            <div class="callout">
+              <h3>
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-network" />
+                </svg>
+                Use the AI Gateway
+              </h3>
+              <p>
+                That one address is the AI Gateway too, at <code>/v1</code>.
+                Make a Gateway Key under <strong>API Key Management</strong> and
+                point your own tools at it: Claude Code with
+                <code>ANTHROPIC_BASE_URL=http://localhost:3045</code>, Codex and
+                other OpenAI clients with <code>http://localhost:3045/v1</code>.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="setup"
+        class="section section-alt"
+        aria-labelledby="setup-title"
+      >
+        <div class="container">
+          <div class="section-head">
+            <p class="kicker">Step by step</p>
+            <h2 id="setup-title">Full setup guide</h2>
+            <p class="section-intro">
+              Everything from a fresh machine to Agents opening pull requests.
+              Each step links to the detailed guide in the repository.
+            </p>
+          </div>
+
+          <div class="setup-layout">
+            <nav class="toc" aria-label="Setup steps">
+              <p class="toc-title" aria-hidden="true">On this guide</p>
+              <ol>
+                <li>
+                  <a href="#setup-prerequisites">Install the prerequisites</a>
+                </li>
+                <li><a href="#setup-clone">Clone and install</a></li>
+                <li>
+                  <a href="#setup-env">Create <code>.env</code></a>
+                </li>
+                <li><a href="#setup-run">Run AI Office</a></li>
+                <li>
+                  <a href="#setup-sign-in">Sign in for the first time</a>
+                </li>
+                <li><a href="#setup-github-app">Create the GitHub App</a></li>
+                <li><a href="#setup-install-app">Install the App</a></li>
+                <li>
+                  <a href="#setup-sandboxes">Build the sandbox images</a>
+                </li>
+                <li>
+                  <a href="#setup-ai-accounts">Add your AI Accounts</a>
+                </li>
+                <li><a href="#setup-floor">Add a Floor</a></li>
+                <li>
+                  <a href="#setup-first-issue">Hand over the first issue</a>
+                </li>
+              </ol>
+            </nav>
+
+            <div class="setup-steps">
+              <article class="setup-step" id="setup-prerequisites">
+                <h3>
+                  <span class="step-number">1</span> Install the prerequisites
+                </h3>
+                <p>
+                  You need Git, Node 26 or later, pnpm 12 or later, and Docker.
+                </p>
+                <div
+                  class="table-wrap"
+                  tabindex="0"
+                  role="region"
+                  aria-label="Prerequisites by system, scrollable"
+                >
+                  <table class="wide-table">
+                    <caption class="visually-hidden">
+                      How to install each prerequisite on each system
+                    </caption>
+                    <thead>
+                      <tr>
+                        <td></td>
+                        <th scope="col">Windows</th>
+                        <th scope="col">macOS</th>
+                        <th scope="col">Linux</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th scope="row">Git</th>
+                        <td><code>winget install Git.Git</code></td>
+                        <td><code>xcode-select --install</code></td>
+                        <td>
+                          Your package manager, e.g.
+                          <code>sudo apt install git</code>
+                        </td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Docker</th>
+                        <td>
+                          <a
+                            href="https://www.docker.com/products/docker-desktop/"
+                            >Docker Desktop</a
+                          >, on WSL 2 (<code>wsl --install</code>)
+                        </td>
+                        <td>
+                          <a
+                            href="https://www.docker.com/products/docker-desktop/"
+                            >Docker Desktop</a
+                          >
+                        </td>
+                        <td>
+                          <a href="https://docs.docker.com/engine/install/"
+                            >Docker Engine</a
+                          >, then add yourself to the <code>docker</code> group
+                        </td>
+                      </tr>
+                      <tr>
+                        <th scope="row">
+                          Node, via
+                          <a href="https://github.com/Schniz/fnm">fnm</a>
+                        </th>
+                        <td><code>winget install Schniz.fnm</code></td>
+                        <td><code>brew install fnm</code></td>
+                        <td>
+                          <code class="wrap"
+                            >curl -fsSL https://fnm.vercel.app/install |
+                            bash</code
+                          >
+                        </td>
+                      </tr>
+                      <tr>
+                        <th scope="row">pnpm</th>
+                        <td>
+                          <code class="wrap"
+                            >iwr https://get.pnpm.io/install.ps1 -useb |
+                            iex</code
+                          >
+                        </td>
+                        <td colspan="2">
+                          <code class="wrap"
+                            >curl -fsSL https://get.pnpm.io/install.sh | sh
+                            -</code
+                          >
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p>Then install Node 26 with fnm, and check both versions:</p>
+                <pre tabindex="0"><code>fnm install 26
+fnm default 26
+node --version   <span class="comment"># v26 or later</span>
+pnpm --version   <span class="comment"># 12 or later</span></code></pre>
+                <p class="note">
+                  On Windows, if an older pnpm still shows, run
+                  <code>where.exe pnpm</code>: the installer's copy in
+                  <code>%LOCALAPPDATA%\pnpm</code> must come first on your PATH.
+                  More in
+                  <a
+                    href="{{REPO_URL}}/blob/main/docs/guide/running.md#1-install-the-prerequisites"
+                    >Running AI Office</a
+                  >.
+                </p>
+              </article>
+
+              <article class="setup-step" id="setup-clone">
+                <h3><span class="step-number">2</span> Clone and install</h3>
+                <pre tabindex="0"><code>git clone {{REPO_URL}}.git
+cd {{REPO_NAME}}
+pnpm install</code></pre>
+                <p>
+                  Start Docker (on Windows and macOS, open Docker Desktop and
+                  wait until the engine is running). <code>docker info</code>
+                  should answer without an error.
+                </p>
+              </article>
+
+              <article class="setup-step" id="setup-env">
+                <h3>
+                  <span class="step-number">3</span> Create <code>.env</code>
+                </h3>
+                <p>
+                  Copy the example file to <code>.env</code> in the repository
+                  root:
+                </p>
+                <pre
+                  tabindex="0"
+                ><code><span class="comment"># Windows (PowerShell)</span>
+Copy-Item .env.example .env
+
+<span class="comment"># macOS, Linux and Git Bash</span>
+cp .env.example .env</code></pre>
+                <p>
+                  That is all development needs: the example already points at
+                  the development Postgres and has sample secrets. Those secrets
+                  are public, so for anything else generate your own and change
+                  <code>POSTGRES_PASSWORD</code> (and the password in
+                  <code>DATABASE_URL</code>) too:
+                </p>
+                <pre
+                  tabindex="0"
+                ><code><span class="comment"># SESSION_SECRET: 32 random bytes as 64 hex characters</span>
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+<span class="comment"># ENCRYPTION_KEY: exactly 32 random bytes, base64-encoded</span>
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"</code></pre>
+                <p class="note">
+                  Never commit <code>.env</code>. <code>ENCRYPTION_KEY</code>
+                  encrypts your AI Account credentials: change it and saved ones
+                  can no longer be read. Every setting is explained in
+                  <a href="{{REPO_URL}}/blob/main/.env.example"
+                    ><code>.env.example</code></a
+                  >.
+                </p>
+              </article>
+
+              <article class="setup-step" id="setup-run">
+                <h3><span class="step-number">4</span> Run AI Office</h3>
+                <h4>In development</h4>
+                <pre tabindex="0"><code>pnpm dev</code></pre>
+                <p>
+                  This starts the development Postgres (<code>pnpm db:up</code>,
+                  on port 3048), applies pending migrations, then runs the
+                  server (port 3046) and the web app (port 3045, which proxies
+                  <code>/api</code> and the AI Gateway's <code>/v1</code> to the
+                  server) together. Open
+                  <a href="http://localhost:3045">http://localhost:3045</a>.
+                  <code>pnpm db:down</code> stops the database; its data stays
+                  in a Docker volume.
+                </p>
+                <h4>Or with docker compose</h4>
+                <pre
+                  tabindex="0"
+                ><code>AGENT_UID=1000 AGENT_GID=1000 pnpm sandbox:build   <span class="comment"># the sandbox images (step 8)</span>
+docker compose up --build --wait
+curl localhost:3045/health   <span class="comment"># {"status":"ok","database":"up"}</span></code></pre>
+                <p>
+                  This runs the whole AI Office in Docker: the app and Postgres
+                  18, published on <code>127.0.0.1:3045</code>, and the
+                  sandboxes Agents and the Manager chat work in, which the app
+                  starts on your Docker. That one address serves the web app and
+                  the AI Gateway's <code>/v1</code>. Data survives
+                  <code>docker compose down</code>. On Linux, set
+                  <code>DOCKER_GID</code> to the Docker socket's group (<code
+                    >stat -c %g /var/run/docker.sock</code
+                  >). Sandboxes' clones live in
+                  <code>AI_OFFICE_SANDBOX_DIR</code> (<code
+                    >~/.ai-office/sandboxes</code
+                  >
+                  by default), mounted into the app at the same path; never put
+                  it under a directory others may write to, such as
+                  <code>/tmp</code>. On macOS it must be a path Docker Desktop
+                  shares, and on Windows a Linux-style path, never
+                  <code>C:\…</code>.
+                </p>
+                <p class="note">
+                  Opening AI Office beyond your machine
+                  (<code>AI_OFFICE_BIND_ADDRESS</code>) opens the AI Gateway
+                  too. Every Gateway call needs a Gateway Key, but use
+                  <code>docker compose --profile tls up</code>, which adds Caddy
+                  for HTTPS, rather than plain HTTP; see
+                  <a
+                    href="{{REPO_URL}}/blob/main/docs/processes/deploying-to-ec2.md"
+                    >Deploying to EC2</a
+                  >
+                  for a whole server deployment.
+                </p>
+              </article>
+
+              <article class="setup-step" id="setup-sign-in">
+                <h3>
+                  <span class="step-number">5</span> Sign in for the first time
+                </h3>
+                <ul>
+                  <li>
+                    <strong>Create the Owner password.</strong> There is no
+                    default: the first visit goes to <code>/setup</code>. It
+                    must be at least 12 characters, use at least 6 different
+                    characters, and mix three of lower case, upper case, digits
+                    and symbols (unless it is 20 characters or more). From then
+                    on, sign in at <code>/login</code>. Under docker compose the
+                    setup screen also asks for the one-time setup token AI
+                    Office wrote as it started:
+                    <code>docker compose logs app</code> shows the file it is
+                    in, and
+                    <code>docker compose exec app cat &lt;file&gt;</code>
+                    shows it. Nobody else can become the Owner first.
+                  </li>
+                  <li>
+                    <strong>Turn on TOTP</strong> (optional, recommended
+                    whenever AI Office is not on <code>localhost</code>): in
+                    Admin, scan the QR code into an authenticator app, confirm
+                    with a code, and save the ten recovery codes.
+                  </li>
+                  <li>
+                    <strong>Set your GitHub login</strong> on Admin's
+                    <strong>Intake</strong> card: AI Office only takes issues
+                    you opened or labelled. The
+                    <strong>Git identity</strong> card sets who commits are
+                    authored as.
+                  </li>
+                </ul>
+              </article>
+
+              <article class="setup-step" id="setup-github-app">
+                <h3>
+                  <span class="step-number">6</span> Create the GitHub App
+                </h3>
+                <p>
+                  AI Office acts on GitHub as a GitHub App: it pushes branches,
+                  opens pull requests, posts reviews and comments, and merges.
+                </p>
+                <ol>
+                  <li>
+                    Open
+                    <a href="https://github.com/settings/apps/new"
+                      >Settings → Developer settings → GitHub Apps → New GitHub
+                      App</a
+                    >
+                    (for an organisation's repositories, in the organisation's
+                    settings).
+                  </li>
+                  <li>
+                    Give it a unique name, such as
+                    <code>AI Office (your-login)</code>. Any homepage URL will
+                    do. Leave the callback URL empty and OAuth during
+                    installation off.
+                  </li>
+                  <li>
+                    <strong>Webhook:</strong> untick <strong>Active</strong>. AI
+                    Office checks for issues on a timer; webhooks are optional
+                    (below).
+                  </li>
+                  <li>
+                    <strong>Repository permissions</strong>: exactly these, and
+                    every other permission at <strong>No access</strong>.
+                  </li>
+                </ol>
+                <div
+                  class="table-wrap"
+                  tabindex="0"
+                  role="region"
+                  aria-label="The GitHub App's repository permissions, scrollable"
+                >
+                  <table>
+                    <caption class="visually-hidden">
+                      The GitHub App's repository permissions
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Permission</th>
+                        <th scope="col">Access</th>
+                        <th scope="col">What AI Office does with it</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th scope="row">Checks</th>
+                        <td>Read-only</td>
+                        <td>
+                          Reads a pull request's check runs, for the Merge
+                          Policy
+                        </td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Contents</th>
+                        <td>Read and write</td>
+                        <td>Pushes each issue's branch, reads files, merges</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Issues</th>
+                        <td>Read and write</td>
+                        <td>
+                          Reads your issues, creates and moves labels, comments
+                        </td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Metadata</th>
+                        <td>Read-only</td>
+                        <td>
+                          Reads the repository and its rulesets (set for every
+                          App)
+                        </td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Pull requests</th>
+                        <td>Read and write</td>
+                        <td>
+                          Opens a pull request per issue and posts AI reviews
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <ol start="5">
+                  <li>
+                    <strong>Where can this GitHub App be installed?</strong>
+                    Only on this account. Then
+                    <strong>Create GitHub App</strong>.
+                  </li>
+                  <li>
+                    Copy the <strong>App ID</strong>, and under
+                    <strong>Private keys</strong> choose
+                    <strong>Generate a private key</strong>.
+                  </li>
+                  <li>
+                    In AI Office, open <strong>Floor Settings</strong>, and in
+                    the <strong>GitHub</strong> card give the App ID and paste
+                    the whole <code>.pem</code> file under
+                    <strong>Add a GitHub App</strong>. It is kept encrypted, and
+                    used at once, with no restart. Add more Apps, or an access
+                    token and a read-only one, the same way.
+                  </li>
+                </ol>
+                <p class="note">
+                  The private key is a credential: delete the downloaded file
+                  once the App is added. Administration and Workflows are left
+                  out on purpose, so Agents can never change a repository's
+                  settings or its CI.
+                </p>
+                <h4>Webhooks (optional)</h4>
+                <p>
+                  If GitHub can reach your AI Office over HTTPS, webhooks make
+                  it act at once instead of at the next check. Choose a secret
+                  of at least 20 characters (<code>openssl rand -hex 32</code>),
+                  enter it on Admin's <strong>GitHub webhooks</strong> card,
+                  then on the App tick <strong>Active</strong>, set the URL to
+                  your address followed by <code>/api/github/webhooks</code>
+                  with the same secret, and subscribe to
+                  <strong>Issues</strong>, <strong>Label</strong>,
+                  <strong>Pull request</strong>, <strong>Check run</strong> and
+                  <strong>Check suite</strong>.
+                </p>
+                <p>
+                  Full details:
+                  <a
+                    href="{{REPO_URL}}/blob/main/docs/processes/setting-up-a-floor.md"
+                    >Setting up the GitHub App and your Floors</a
+                  >.
+                </p>
+              </article>
+
+              <article class="setup-step" id="setup-install-app">
+                <h3><span class="step-number">7</span> Install the App</h3>
+                <p>
+                  On the App's page choose <strong>Install App</strong>, pick
+                  the account, then
+                  <strong>Only select repositories</strong> and the repository
+                  that will be a Floor. Start with a small test repository with
+                  a passing CI check; the guide has one ready to copy,
+                  <code>ai-office-sandbox</code>.
+                </p>
+              </article>
+
+              <article class="setup-step" id="setup-sandboxes">
+                <h3>
+                  <span class="step-number">8</span> Build the sandbox images
+                </h3>
+                <p>
+                  Agents work in Docker sandboxes running Claude Code, Codex or
+                  opencode. Build the images as the user that runs AI Office
+                  (<code>pnpm dev</code> builds any that are missing), or, for
+                  docker compose, for its <code>node</code> user with
+                  <code>AGENT_UID=1000 AGENT_GID=1000</code> in front:
+                </p>
+                <pre
+                  tabindex="0"
+                ><code>pnpm sandbox:build          <span class="comment"># all three</span>
+pnpm sandbox:build claude   <span class="comment"># or only those your Agents' AI Providers need</span></code></pre>
+                <p>
+                  Sandboxes join a Docker network with no route out, where they
+                  reach only the sandbox relay: the AI Gateway's own port
+                  through it, and over HTTPS the hosts
+                  <code>SANDBOX_EGRESS_HOSTS</code> names, and nothing else. AI
+                  Office reaches the Gateway from them at the same address
+                  everywhere,
+                  <code>SANDBOX_GATEWAY_URL=http://sandbox-relay:3047</code>,
+                  which <code>.env.example</code> already sets. Then:
+                </p>
+                <div
+                  class="table-wrap"
+                  tabindex="0"
+                  role="region"
+                  aria-label="What else to set, scrollable"
+                >
+                  <table>
+                    <caption class="visually-hidden">
+                      What else to set for each way of running AI Office
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Where AI Office runs</th>
+                        <th scope="col">Also</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th scope="row">
+                          <code>pnpm dev</code>, Windows and macOS (Docker
+                          Desktop)
+                        </th>
+                        <td>
+                          Nothing: <code>pnpm dev</code> starts the relay with
+                          the development Postgres
+                        </td>
+                      </tr>
+                      <tr>
+                        <th scope="row"><code>pnpm dev</code>, Linux</th>
+                        <td>
+                          The <code>docker0</code> bridge's address (<code
+                            >ip -4 addr show docker0</code
+                          >, usually <code>172.17.0.1</code>), where the relay
+                          reaches the Gateway:
+                          <code>GATEWAY_HOST=172.17.0.1</code>
+                        </td>
+                      </tr>
+                      <tr>
+                        <th scope="row">docker compose</th>
+                        <td>
+                          Nothing to set: compose starts the relay and sets
+                          <code>SANDBOX_GATEWAY_URL</code>,
+                          <code>SANDBOX_NETWORK</code> and
+                          <code>SANDBOX_WORK_DIR</code> itself, whatever
+                          <code>.env</code> says. Build the images with
+                          <code
+                            >AGENT_UID=1000 AGENT_GID=1000 pnpm
+                            sandbox:build</code
+                          >
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p class="note">
+                  Never set <code>SANDBOX_NETWORK</code> to <code>bridge</code>,
+                  Docker's default bridge, which has a route out, nor
+                  <code>GATEWAY_HOST</code> to <code>0.0.0.0</code>. Sandboxes
+                  never receive an AI Account credential: each gets a Gateway
+                  Key of its own. See
+                  <a
+                    href="{{REPO_URL}}/blob/main/docs/guide/issue-pipeline.md#sandboxes"
+                    >Sandboxes</a
+                  >.
+                </p>
+              </article>
+
+              <article class="setup-step" id="setup-ai-accounts">
+                <h3><span class="step-number">9</span> Add your AI Accounts</h3>
+                <p>
+                  In <strong>AI Settings → AI Accounts</strong>. None come from
+                  the environment, and until one is added every Gateway request
+                  fails. Credentials are encrypted with
+                  <code>ENCRYPTION_KEY</code> and never shown again.
+                </p>
+                <ul>
+                  <li>
+                    <strong>Claude subscription (Pro or Max).</strong> Read and
+                    accept the terms warning, choose
+                    <strong>Sign in to Claude</strong>, sign in, and paste back
+                    the code the page shows. AI Office refreshes the token
+                    itself and shows your 5-hour and weekly usage.
+                  </li>
+                  <li>
+                    <strong
+                      >ChatGPT subscription (Plus, Pro or Business).</strong
+                    >
+                    Accept the terms warning and choose
+                    <strong>Sign in to OpenAI</strong>. The sign-in ends on
+                    <code>http://localhost:1455</code>, which AI Office listens
+                    on while it waits, so on the same machine it finishes by
+                    itself; when AI Office runs elsewhere, paste the page's
+                    whole address back.
+                  </li>
+                  <li>
+                    <strong>API keys</strong>: Anthropic Console, xAI, Gemini,
+                    OpenRouter, DeepSeek, Z.ai, MiniMax, Kimi, Ollama Cloud, AWS
+                    Bedrock, Google Vertex AI, or any Anthropic- or
+                    OpenAI-compatible endpoint.
+                  </li>
+                </ul>
+                <p>
+                  Each AI Provider has a default Model you choose, and each
+                  Agent can override it. See
+                  <a
+                    href="{{REPO_URL}}/blob/main/docs/guide/ai-gateway.md#ai-accounts"
+                    >AI Accounts</a
+                  >
+                  in the AI Gateway guide.
+                </p>
+              </article>
+
+              <article class="setup-step" id="setup-floor">
+                <h3><span class="step-number">10</span> Add a Floor</h3>
+                <p>
+                  Admin's <strong>Floors</strong> card lists the repositories
+                  the App is installed on. Pick a
+                  <strong>Floor Template</strong> (Development, the default,
+                  gives a Manager, a coder, a reviewer and QA), then
+                  <strong>Add Floor</strong>. AI Office creates the pipeline's
+                  labels on the repository within a minute.
+                </p>
+                <p>
+                  Choose the Floor's Merge Policy on its admin page, then
+                  protect the repository's default branch on GitHub: require CI
+                  and forbid direct pushes. AI Office never changes protection
+                  itself. See
+                  <a
+                    href="{{REPO_URL}}/blob/main/docs/processes/setting-up-a-floor.md#6-protect-the-default-branch"
+                    >Protect the default branch</a
+                  >.
+                </p>
+              </article>
+
+              <article class="setup-step" id="setup-first-issue">
+                <h3>
+                  <span class="step-number">11</span> Hand over the first issue
+                </h3>
+                <p>
+                  Open a small issue with a list of acceptance criteria and
+                  label it <code>ai-office</code>. Within a minute the Manager
+                  comments its triage and labels it <code>needs-work</code>, and
+                  an Agent picks it up: watch it at its desk, or click its
+                  monitor for the live view. Or open the Floor's Manager chat
+                  and type <code>complete issues 1 to 5</code> for a Batch with
+                  a Plan on the whiteboard.
+                </p>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="docs" class="section" aria-labelledby="docs-title">
+        <div class="container">
+          <div class="section-head">
+            <p class="kicker">Go deeper</p>
+            <h2 id="docs-title">Documentation</h2>
+            <p class="section-intro">
+              How AI Office works, part by part, is in the guide in the
+              repository.
+            </p>
+          </div>
+          <ul class="doc-links">
+            <li>
+              <a
+                class="doc-card"
+                href="{{REPO_URL}}/blob/main/docs/guide/running.md"
+              >
+                <span class="doc-title">Running AI Office</span>
+                <span class="doc-text"
+                  >Development, docker compose, first run and sign-in, storage
+                  and configuration export.</span
+                >
+                <svg class="icon doc-arrow" aria-hidden="true">
+                  <use href="#i-arrow-up-right" />
+                </svg>
+              </a>
+            </li>
+            <li>
+              <a
+                class="doc-card"
+                href="{{REPO_URL}}/blob/main/docs/processes/setting-up-a-floor.md"
+              >
+                <span class="doc-title"
+                  >Setting up the GitHub App and your Floors</span
+                >
+                <span class="doc-text"
+                  >Everything GitHub needs, from the App to branch
+                  protection.</span
+                >
+                <svg class="icon doc-arrow" aria-hidden="true">
+                  <use href="#i-arrow-up-right" />
+                </svg>
+              </a>
+            </li>
+            <li>
+              <a
+                class="doc-card"
+                href="{{REPO_URL}}/blob/main/docs/processes/deploying-to-ec2.md"
+              >
+                <span class="doc-title">Deploying to EC2</span>
+                <span class="doc-text"
+                  >HTTPS with Caddy, access, backups and upgrades.</span
+                >
+                <svg class="icon doc-arrow" aria-hidden="true">
+                  <use href="#i-arrow-up-right" />
+                </svg>
+              </a>
+            </li>
+            <li>
+              <a
+                class="doc-card"
+                href="{{REPO_URL}}/blob/main/docs/guide/ai-gateway.md"
+              >
+                <span class="doc-title">The AI Gateway</span>
+                <span class="doc-text"
+                  >Endpoints, Gateway Keys, AI Accounts, load balancing and
+                  Analytics.</span
+                >
+                <svg class="icon doc-arrow" aria-hidden="true">
+                  <use href="#i-arrow-up-right" />
+                </svg>
+              </a>
+            </li>
+            <li>
+              <a
+                class="doc-card"
+                href="{{REPO_URL}}/blob/main/docs/guide/floors-and-agents.md"
+              >
+                <span class="doc-title">Floors and Agents</span>
+                <span class="doc-text"
+                  >Floor Templates, the Role library and Token Caps.</span
+                >
+                <svg class="icon doc-arrow" aria-hidden="true">
+                  <use href="#i-arrow-up-right" />
+                </svg>
+              </a>
+            </li>
+            <li>
+              <a
+                class="doc-card"
+                href="{{REPO_URL}}/blob/main/docs/guide/issue-pipeline.md"
+              >
+                <span class="doc-title">The issue pipeline</span>
+                <span class="doc-text"
+                  >Intake, triage, sandboxes, reviews and the Merge
+                  Policy.</span
+                >
+                <svg class="icon doc-arrow" aria-hidden="true">
+                  <use href="#i-arrow-up-right" />
+                </svg>
+              </a>
+            </li>
+          </ul>
+          <p class="doc-more">
+            <a href="{{REPO_URL}}/blob/main/docs/guide/README.md"
+              >The whole guide</a
+            >
+            and the
+            <a href="{{REPO_URL}}/blob/main/GLOSSARY.md">glossary</a>.
+          </p>
+        </div>
+      </section>
+
+      <section
+        id="licence"
+        class="section section-alt section-compact"
+        aria-labelledby="licence-title"
+      >
+        <div class="container narrow licence">
+          <span class="card-icon">
+            <svg class="icon" aria-hidden="true"><use href="#i-scale" /></svg>
+          </span>
+          <div>
+            <h2 id="licence-title">Licence</h2>
+            <p>
+              AI Office has not chosen its licence yet: one will be picked when
+              it is released, and until then no licence is granted. The
+              third-party assets it includes, such as 3D models and the Inter
+              typeface in its logo, are listed with their own licences (CC0-1.0,
+              OFL-1.1 and Apache-2.0) in
+              <a href="{{REPO_URL}}/blob/main/THIRD-PARTY-NOTICES.md"
+                ><code>THIRD-PARTY-NOTICES.md</code></a
+              >.
+            </p>
+            <p>
+              Claude and ChatGPT subscriptions are used under their providers'
+              terms: AI Office shows each one's terms before you sign in.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="cta" aria-labelledby="cta-title">
+        <div class="container">
+          <div class="cta-inner">
+            <h2 id="cta-title">Get AI Office</h2>
+            <p>The code, the issues and the full guide are on GitHub.</p>
+            <div class="cta-actions">
+              <a class="button button-inverse button-large" href="{{REPO_URL}}">
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-github-mark" />
+                </svg>
+                View on GitHub
+              </a>
+              <a
+                class="button button-ghost-inverse button-large"
+                href="#quick-start"
+                >Quick start</a
+              >
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- The policies. Without JavaScript they are read here, at the
+           footer's links; script.js moves each into a dialog the footer's
+           buttons open, as the app's footer does. -->
+      <div class="policies" id="policies">
+        <section
+          class="policy container narrow"
+          id="privacy-policy"
+          aria-labelledby="privacy-policy-title"
+          data-close-label="Close privacy policy"
+        >
+          <h2 id="privacy-policy-title">Privacy Policy</h2>
+          <div class="policy-body">
+            <p class="policy-updated">Last updated: October 2026</p>
+
+            <h3>Who looks after your data</h3>
+            <p>
+              This website, {{SITE_URL}}, is a single static page about AI
+              Office, published from AI Office's repository and hosted by GitHub
+              Pages. It has no sign-in, no forms and no comments, and asks you
+              for nothing.
+            </p>
+
+            <h3>What this website collects</h3>
+            <p>
+              Nothing. There is no analytics, no tracking and no advertising.
+              The page sets no cookies and keeps nothing in your browser's
+              storage, and everything it shows (its text, fonts, icons and
+              screenshots) comes from this site itself, so viewing it sends
+              nothing to anyone else.
+            </p>
+
+            <h3>Who else sees it</h3>
+            <ul>
+              <li>
+                <strong>GitHub</strong> hosts this website. Like any web host,
+                it receives each visitor's IP address and the request its
+                browser makes, and may keep them in its server logs for security
+                and to keep the service running, as set out in the
+                <a
+                  href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement"
+                  >GitHub General Privacy Statement</a
+                >.
+              </li>
+              <li>
+                <strong>Links</strong> to GitHub and to other sites, such as
+                Docker or Homebrew, leave this website: what those sites collect
+                is set out in their own privacy policies.
+              </li>
+            </ul>
+
+            <h3>The AI Office app</h3>
+            <p>
+              The app itself is self-hosted, so whoever runs a copy of it is
+              responsible for what it holds. Its own privacy policy, in its
+              footer, sets out what it keeps and where it sends it.
+            </p>
+
+            <h3>Your rights</h3>
+            <p>
+              This website holds nothing about you. For what GitHub holds, see
+              its privacy statement; for a question about this page,
+              <a href="{{REPO_URL}}/issues">open an issue on GitHub</a>.
+            </p>
+          </div>
+        </section>
+
+        <section
+          class="policy container narrow"
+          id="terms-and-conditions"
+          aria-labelledby="terms-and-conditions-title"
+          data-close-label="Close terms and conditions"
+        >
+          <h2 id="terms-and-conditions-title">Terms and Conditions</h2>
+          <div class="policy-body">
+            <p class="policy-updated">Last updated: October 2026</p>
+
+            <h3>Using this website</h3>
+            <p>
+              This website gives information about AI Office: what it is, what
+              it needs and how to set it up. By using it, you agree to these
+              terms, and to GitHub's own terms for the GitHub Pages it is hosted
+              on.
+            </p>
+
+            <h3>The software</h3>
+            <p>
+              AI Office has not chosen its licence yet: one will be picked when
+              it is released, and until then no licence is granted, as the
+              Licence section above says. The third-party assets it includes
+              keep their own licences, listed in
+              <a href="{{REPO_URL}}/blob/main/THIRD-PARTY-NOTICES.md"
+                ><code>THIRD-PARTY-NOTICES.md</code></a
+              >.
+            </p>
+
+            <h3>Your accounts and their terms</h3>
+            <p>
+              The setup this page describes connects your own GitHub App and AI
+              Accounts, and their providers' terms still apply. Some
+              subscriptions limit automated use: check yours before AI Office
+              load-balances across it. Any charges from an AI provider are
+              yours.
+            </p>
+
+            <h3>Names and trademarks</h3>
+            <p>
+              Claude, ChatGPT, GitHub, Docker and the other products named here
+              belong to their owners, and are named only to say what AI Office
+              works with.
+            </p>
+
+            <h3>No warranty</h3>
+            <p>
+              This website and its instructions are provided as they are,
+              without warranty of any kind. Its authors are not liable for any
+              loss arising from their use, to the extent the law allows.
+            </p>
+
+            <h3>Changes</h3>
+            <p>
+              These terms may change with the website; the date above says when
+              they last did.
+            </p>
+          </div>
+        </section>
+
+        <section
+          class="policy container narrow"
+          id="cookie-policy"
+          aria-labelledby="cookie-policy-title"
+          data-close-label="Close cookie policy"
+        >
+          <h2 id="cookie-policy-title">Cookie Policy</h2>
+          <div class="policy-body">
+            <p class="policy-updated">Last updated: October 2026</p>
+
+            <h3>No cookies</h3>
+            <p>
+              This website sets no cookies, and keeps nothing in your browser's
+              local storage, session storage or any other storage. There is
+              nothing to accept, and no banner asks you to.
+            </p>
+
+            <h3>What is stored</h3>
+            <div
+              class="table-wrap"
+              tabindex="0"
+              role="region"
+              aria-label="Cookies and browser storage, scrollable"
+            >
+              <table>
+                <caption>
+                  Cookies and browser storage this website uses
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Type</th>
+                    <th scope="col">Purpose</th>
+                    <th scope="col">How long</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td colspan="4">None</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>The AI Office app</h3>
+            <p>
+              The app you run yourself sets two strictly necessary cookies, to
+              sign you in, and remembers your settings in your browser; its own
+              cookie policy, in its footer, lists each one.
+            </p>
+
+            <h3>Other sites</h3>
+            <p>
+              Links to GitHub and to other sites leave this website, and those
+              sites may set cookies of their own under their own policies.
+            </p>
+          </div>
+        </section>
+
+        <section
+          class="policy container narrow"
+          id="accessibility"
+          aria-labelledby="accessibility-title"
+          data-close-label="Close accessibility statement"
+        >
+          <h2 id="accessibility-title">Accessibility</h2>
+          <div class="policy-body">
+            <p class="policy-updated">Last reviewed: October 2026</p>
+
+            <div class="status-box">
+              <svg class="icon" aria-hidden="true">
+                <use href="#i-shield-check" />
+              </svg>
+              <p>
+                <strong>Conformance status:</strong> this website is built to
+                meet the Web Content Accessibility Guidelines (WCAG) 2.2 at
+                <strong>Level AA</strong>.
+              </p>
+            </div>
+
+            <h3>What we have done</h3>
+            <ul>
+              <li>
+                <strong>Keyboard access</strong> — every link, button, tab and
+                dialog works with a keyboard alone, with a clear focus outline
+                that the sticky header never hides. A “Skip to content” link
+                leads the page.
+              </li>
+              <li>
+                <strong>Screen readers</strong> — one main heading, headings in
+                order and labelled landmarks; every control has a name, every
+                screenshot a description, and copying a command is announced.
+              </li>
+              <li>
+                <strong>Colour and contrast</strong> — text has at least 4.5:1
+                contrast with its background, and controls, icons and focus
+                outlines at least 3:1, in both light and dark mode, which follow
+                your device. Windows Contrast Themes are respected.
+              </li>
+              <li>
+                <strong>Motion</strong> — transitions are short, and smooth
+                scrolling and animation are switched off when your device asks
+                for reduced motion.
+              </li>
+              <li>
+                <strong>Zoom and reflow</strong> — the page reflows down to 320
+                pixels wide and when zoomed to 400%, without scrolling sideways.
+              </li>
+              <li>
+                <strong>Target sizes</strong> — every control is at least 24 by
+                24 pixels, and the buttons at least 44 pixels tall on touch
+                screens.
+              </li>
+              <li>
+                <strong>Dialogs</strong> — the screenshot viewer and these
+                policies move focus in, keep it there, close on Escape and hand
+                focus back to whatever opened them.
+              </li>
+              <li>
+                <strong>Without JavaScript</strong> — every part of the page,
+                these policies included, can still be read and reached.
+              </li>
+            </ul>
+
+            <h3>Known limitations</h3>
+            <ul>
+              <li>
+                The widest tables, such as the prerequisites by system, scroll
+                sideways inside their own frame on narrow screens; the frame
+                takes focus, so the arrow keys scroll it.
+              </li>
+            </ul>
+
+            <h3>Feedback</h3>
+            <p>
+              If something is hard to use, please
+              <a href="{{REPO_URL}}/issues">open an issue on GitHub</a>
+              saying what you were trying to do, and with which browser and
+              assistive technology.
+            </p>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-grid">
+        <div class="footer-brand">
+          <img
+            src="brand/icon.svg"
+            alt=""
+            width="40"
+            height="40"
+            loading="lazy"
+          />
+          <p>
+            <strong>AI Office</strong><br />
+            A 3D office where AI Agents work your GitHub issues.
+          </p>
+        </div>
+        <nav class="footer-nav" aria-label="This page">
+          <h2 class="footer-heading">On this page</h2>
+          <ul>
+            <li><a href="#features">Features</a></li>
+            <li><a href="#screenshots">Screenshots</a></li>
+            <li><a href="#quick-start">Quick start</a></li>
+            <li><a href="#setup">Full setup</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-nav" aria-label="The project">
+          <h2 class="footer-heading">The project</h2>
+          <ul>
+            <li><a href="{{REPO_URL}}">GitHub</a></li>
+            <li><a href="{{REPO_URL}}/issues">Issues</a></li>
+            <li>
+              <a href="{{REPO_URL}}/blob/main/docs/guide/README.md">Guide</a>
+            </li>
+            <li><a href="{{REPO_URL}}/blob/main/GLOSSARY.md">Glossary</a></li>
+          </ul>
+        </nav>
+      </div>
+      <div class="footer-bar">
+        <nav class="container" aria-label="About AI Office">
+          <ul class="footer-legal">
+            <li>
+              <a
+                class="footer-link footer-credit"
+                href="{{REPO_URL}}"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-github-mark" />
+                </svg>
+                Website design<span class="visually-hidden"
+                  >, source on GitHub, opens in a new tab</span
+                >
+              </a>
+            </li>
+            <li>
+              <a
+                class="footer-link"
+                href="#privacy-policy"
+                data-policy="privacy-policy"
+                >Privacy Policy</a
+              >
+            </li>
+            <li>
+              <a
+                class="footer-link"
+                href="#terms-and-conditions"
+                data-policy="terms-and-conditions"
+                >Terms and Conditions</a
+              >
+            </li>
+            <li>
+              <a
+                class="footer-link"
+                href="#cookie-policy"
+                data-policy="cookie-policy"
+                >Cookie Policy</a
+              >
+            </li>
+            <li>
+              <a
+                class="footer-link"
+                href="#accessibility"
+                data-policy="accessibility"
+                >Accessibility</a
+              >
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </footer>
+
+    <p class="visually-hidden" role="status" id="announcer"></p>
+  </body>
+</html>

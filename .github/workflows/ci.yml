@@ -1,0 +1,147 @@
+# Lint, typecheck, test, end-to-end and screenshot tests on Linux (PRD §9).
+# Node and pnpm come from the pins in the root package.json, never from
+# versions written here. Docker is available on ubuntu-latest, so
+# Testcontainers tests run here even though they skip in the Sandcastle
+# sandbox.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint, typecheck, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Reads `devEngines.runtime` from package.json (a minimum, so the newest
+      # matching Node).
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
+
+      # Reads `devEngines.packageManager` from package.json and caches the pnpm
+      # store, keyed on pnpm-lock.yaml.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          cache: true
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+  # Playwright against the built app and Postgres 18 (Testcontainers), in
+  # Chromium. A failed run uploads its traces, screenshots and report.
+  e2e:
+    name: End-to-end
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          cache: true
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm --filter @ai-office/e2e exec playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        run: pnpm e2e
+
+      # The 3D scenes' screenshot tests, drawn with SwiftShader: run even
+      # when an end-to-end test failed, so a scene's change is always seen.
+      - name: Scene screenshot tests
+        if: ${{ !cancelled() }}
+        run: pnpm scenes
+
+      - name: Upload traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-traces
+          path: |
+            e2e/test-results/
+            e2e/playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # The 3D Office's key scenes against their reference pictures (PRD §9,
+  # Visual), in headless Chromium with WebGL in software, so no GPU is
+  # needed. Needs no Docker. A failed run uploads the actual, expected and
+  # diff pictures.
+  screenshots:
+    name: Screenshots
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          cache: true
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm --filter @ai-office/e2e exec playwright install --with-deps chromium
+
+      - name: Screenshot tests
+        run: pnpm scenes
+
+      - name: Upload differences
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: screenshot-differences
+          path: |
+            e2e/test-results/scenes/
+            e2e/playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore

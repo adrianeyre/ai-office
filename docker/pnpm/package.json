@@ -1,0 +1,11 @@
+{
+  "name": "ai-office-app-pnpm",
+  "private": true,
+  "description": "The pnpm the app image (the root Dockerfile) installs, at an exact version; package-lock.json records its SHA-512, which npm ci checks.",
+  "dependencies": {
+    "pnpm": "12.10.0"
+  },
+  "allowScripts": {
+    "pnpm": false
+  }
+}

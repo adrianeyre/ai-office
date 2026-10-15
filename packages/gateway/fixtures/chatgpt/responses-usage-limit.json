@@ -1,0 +1,26 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/backend-api/codex/responses",
+    "headers": {
+      "accept": "text/event-stream",
+      "content-type": "application/json",
+      "openai-beta": "responses=experimental",
+      "originator": "codex_exec",
+      "session_id": "0199c8a4-5b1e-7d40-9a51-3f2e1c0d9b7a",
+      "user-agent": "codex_exec/0.47.0 (Ubuntu 24.4.0; x86_64) unknown"
+    },
+    "body": "{\"model\":\"gpt-5-codex\",\"instructions\":\"You are Codex, a coding agent. Work in the repository.\",\"input\":[{\"type\":\"message\",\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"Which test is flaky?\"}]}],\"tools\":[],\"tool_choice\":\"auto\",\"parallel_tool_calls\":false,\"reasoning\":{\"effort\":\"medium\",\"summary\":\"auto\"},\"store\":false,\"stream\":true,\"include\":[\"reasoning.encrypted_content\"],\"prompt_cache_key\":\"0199c8a4-5b1e-7d40-9a51-3f2e1c0d9b7a\"}"
+  },
+  "response": {
+    "status": 429,
+    "headers": {
+      "content-type": "application/json",
+      "x-request-id": "chatgpt-req-0004",
+      "x-codex-primary-used-percent": "100.0",
+      "x-codex-primary-window-minutes": "300",
+      "x-codex-primary-reset-after-seconds": "4800"
+    },
+    "body": "{\"error\":{\"type\":\"usage_limit_reached\",\"message\":\"The usage limit has been reached\",\"plan_type\":\"plus\",\"resets_at\":1791552000,\"resets_in_seconds\":4800}}"
+  }
+}

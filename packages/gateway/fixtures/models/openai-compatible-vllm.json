@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/v1/models",
+    "headers": {
+      "accept": "application/json"
+    },
+    "body": ""
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"object\":\"list\",\"data\":[{\"id\":\"Qwen/Qwen3-Coder-30B-A3B-Instruct\",\"object\":\"model\",\"created\":1791547200,\"owned_by\":\"vllm\",\"max_model_len\":262144},{\"id\":\"llama-3.3-70b-versatile\",\"object\":\"model\",\"created\":1791547200,\"owned_by\":\"vllm\"}]}"
+  }
+}

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Git as Sandcastle runs it on the host: through AI Office's guard (S1-2),
+# which runs it as AI Office runs its own. See ../guard.ts.
+exec node "$(dirname -- "$0")/../guard.ts" "$@"

@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/openai/v1/responses",
+    "headers": {
+      "accept": "application/json",
+      "content-type": "application/json",
+      "user-agent": "opencode/1.2.0"
+    },
+    "body": "{\"model\":\"llama-3.3-70b-versatile\",\"input\":\"Name one risk.\",\"store\":false}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"id\":\"resp_5c20\",\"object\":\"response\",\"created_at\":1791547200,\"status\":\"completed\",\"model\":\"llama-3.3-70b-versatile\",\"output\":[{\"type\":\"message\",\"id\":\"msg_5c20\",\"status\":\"completed\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"Flaky tests.\",\"annotations\":[]}]}],\"usage\":{\"input_tokens\":22,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":5,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":27}}"
+  }
+}

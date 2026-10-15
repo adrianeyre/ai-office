@@ -1,0 +1,285 @@
+# AI Office: the app (server, AI Gateway and web) and Postgres 18 (PRD §7).
+#
+#   cp .env.example .env   # works for development; for anything else set
+#                          # new POSTGRES_PASSWORD, SESSION_SECRET and
+#                          # ENCRYPTION_KEY (served beyond this machine,
+#                          # the app refuses the samples)
+#   AGENT_UID=1000 AGENT_GID=1000 pnpm sandbox:build   # Agents' sandboxes
+#   docker compose up --build
+#
+# One entry point: the app is published on 127.0.0.1:3045 (unless
+# AI_OFFICE_BIND_ADDRESS and AI_OFFICE_PORT say otherwise), and that one
+# address serves the web app, its /api and the AI Gateway's /v1 paths, so
+# your own tools use ANTHROPIC_BASE_URL=http://localhost:3045 (OpenAI
+# clients http://localhost:3045/v1) with a Gateway Key. Whatever
+# AI_OFFICE_BIND_ADDRESS opens to the network opens the Gateway too: every
+# Gateway request needs a Gateway Key, but beyond this machine use the
+# `tls` profile below. The Gateway's own port, 3047, is never published:
+# it is the sandboxes' way in, through the sandbox relay, as
+# http://sandbox-relay:3047. Data lives in the named
+# volume `postgres-data`, which survives `docker compose down` (but not
+# `down --volumes`).
+#
+# Agents and the Manager chat work here too: the app starts their
+# sandboxes with the host's Docker (the socket below), from images that
+# must be built on the host first, for the app's `node` user (UID and GID
+# 1000), as above. Their clones live in AI_OFFICE_SANDBOX_DIR
+# (~/.ai-office/sandboxes by default), mounted at the same path inside
+# the app, because the host's Docker mounts them into the sandboxes by
+# that path. Each sandbox is on a network of its own with no route out,
+# which the app joins the sandbox relay (below) to, and nothing else.
+#
+# The `tls` profile adds Caddy in front of the app, serving AI_OFFICE_DOMAIN
+# over HTTPS on ports 80 and 443 with automatic certificates (PRD §7; see
+# docs/processes/deploying-to-ec2.md), the AI Gateway's /v1 included. Set
+# PUBLIC_URL to https://<domain>, TRUST_PROXY to 1 and PROXY_SECRET
+# (openssl rand -hex 32) with it: Caddy sends PROXY_SECRET with every
+# request, and the app believes the client address Caddy gives only from a
+# request that carries it.
+#
+#   docker compose --profile tls up --build --detach --wait
+#
+# Every image is pinned by digest as well as tag: the digest is what Docker
+# pulls, so a tag re-pointed at other code changes nothing here; the tag
+# only says which release it is. Moving to a newer one changes both
+# (`docker buildx imagetools inspect postgres:18.6-alpine` prints a tag's
+# digest), and docker/supply-chain.pen-test.test.ts checks every image has
+# one.
+name: ai-office
+
+services:
+  postgres:
+    image: postgres:18.6-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    environment:
+      POSTGRES_DB: ai_office
+      POSTGRES_USER: ai_office
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      # Postgres listens on 3048, not its default 5432.
+      PGPORT: "3048"
+    volumes:
+      # Postgres 18 images keep their data under /var/lib/postgresql/18/.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "--username=ai_office", "--dbname=ai_office"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # Makes the sandboxes' work directory on the host, if it is not there,
+  # and gives it to the app's `node` user (UID 1000), then exits. (Docker
+  # would otherwise make it as root, which the app cannot write to.) It
+  # runs as root, so it takes only what the app may use (pen-testing I2-4):
+  # a directory Docker has just made to mount it (root's, and empty), or
+  # one made for the app before (UID 1000's). Docker follows a symbolic link
+  # at the path on the host to mount what it points at, so a directory of
+  # another user's, or root's with something in it, is refused, never
+  # chowned, and `chown -h` never follows a link. The default is in the
+  # home directory of whoever runs compose, not under the world-writable
+  # /tmp, where another local user could have made the path first. It is
+  # left private to the app's user (0700, pen-testing I2-5): every Floor's
+  # clone is beneath it.
+  sandbox-dir:
+    image: alpine:3.22.6@sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8
+    user: root
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        dir=$$SANDBOX_WORK_DIR
+        refuse() {
+          echo "sandbox-dir: $$dir $$1, so it is not taken for the sandboxes' clones. Remove it, or set AI_OFFICE_SANDBOX_DIR to a directory of the app's own." >&2
+          exit 1
+        }
+        if test -h "$$dir"; then
+          refuse "is a symbolic link"
+        elif [ ! -e "$$dir" ]; then
+          mkdir "$$dir"
+        elif [ ! -d "$$dir" ]; then
+          refuse "is not a directory"
+        else
+          owner=$$(stat -c %u "$$dir")
+          if [ "$$owner" = 0 ] && [ -n "$$(ls -A "$$dir")" ]; then
+            refuse "is root's and not empty"
+          elif [ "$$owner" != 0 ] && [ "$$owner" != "$$APP_UID" ]; then
+            refuse "belongs to UID $$owner"
+          fi
+        fi
+        chown -h "$$APP_UID:$$APP_GID" "$$dir"
+        chmod 0700 "$$dir"
+    environment:
+      SANDBOX_WORK_DIR: ${AI_OFFICE_SANDBOX_DIR:-${HOME}/.ai-office/sandboxes}
+      # The app's `node` user and group.
+      APP_UID: "1000"
+      APP_GID: "1000"
+    volumes:
+      - ${AI_OFFICE_SANDBOX_DIR:-${HOME}/.ai-office/sandboxes}:${AI_OFFICE_SANDBOX_DIR:-${HOME}/.ai-office/sandboxes}
+    network_mode: none
+    restart: "no"
+
+  app:
+    build: .
+    image: ai-office:local
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      sandbox-dir:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://ai_office:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:3048/ai_office
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY in .env}
+      RETIRED_ENCRYPTION_KEYS: ${RETIRED_ENCRYPTION_KEYS:-}
+      HOST: 0.0.0.0
+      PORT: "3045"
+      # Where the port below is published: what tells the app whether it is
+      # served beyond this machine, as HOST is its container's own. Beyond
+      # it, the app refuses .env.example's public secrets.
+      PUBLISHED_ADDRESS: ${AI_OFFICE_BIND_ADDRESS:-127.0.0.1}
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      TRUST_PROXY: ${TRUST_PROXY:-}
+      PROXY_SECRET: ${PROXY_SECRET:-}
+      LOG_LEVEL: ${LOG_LEVEL:-}
+      # The AI Gateway's own port, for the sandboxes only, through the
+      # sandbox relay (app:3047); everything else reaches the Gateway at /v1
+      # on the app's port.
+      GATEWAY_HOST: 0.0.0.0
+      GATEWAY_PORT: "3047"
+      # ChatGPT's sign-in ends on localhost:1455; published to the host's
+      # loopback only, so a browser on the host finishes it by itself.
+      OAUTH_CALLBACK_HOST: 0.0.0.0
+      # Internal hosts an address the Owner gives may name (ADR 0007).
+      ALLOWED_INTERNAL_HOSTS: ${ALLOWED_INTERNAL_HOSTS:-}
+      # GitHub's GitHub Apps and access tokens are added in Floor Settings
+      # and kept in the database (ADR 0011); only its API's address is here.
+      GITHUB_API_URL: ${GITHUB_API_URL:-}
+      # Each sandbox has a network of its own, which the app joins the
+      # sandbox relay to; on it the Gateway is http://sandbox-relay:3047.
+      # SANDBOX_NETWORK is the relay's network, where the app finds it. Set
+      # here, whatever .env says: .env's SANDBOX_GATEWAY_URL and
+      # SANDBOX_NETWORK are for `pnpm dev`.
+      SANDBOX_GATEWAY_URL: http://sandbox-relay:3047
+      SANDBOX_NETWORK: ai-office-sandboxes
+      # Where clones are made: the same path here as on the Docker host.
+      SANDBOX_WORK_DIR: ${AI_OFFICE_SANDBOX_DIR:-${HOME}/.ai-office/sandboxes}
+    ports:
+      # The one entry point: the web app, /api and the AI Gateway's /v1.
+      - ${AI_OFFICE_BIND_ADDRESS:-127.0.0.1}:${AI_OFFICE_PORT:-3045}:3045
+      - 127.0.0.1:1455:1455
+    # The AI Gateway's own port, unpublished: the sandboxes' way in,
+    # through the sandbox relay.
+    expose:
+      - "3047"
+    # Only the default network: sandboxes reach the AI Gateway through the
+    # sandbox relay, and nothing else of the app (its web app, API, sign-in
+    # routes or ChatGPT's sign-in callback).
+    networks:
+      - default
+    # The host's Docker socket, for the Sandcastle sandboxes Agents work
+    # in and the Manager chat's (PRD FR-19): the app's `docker` CLI starts
+    # them on the host's Docker. Access to it is access to the host's
+    # Docker, which is as good as root on the host. The app runs as
+    # `node`, so it joins the group that owns the socket: set DOCKER_GID
+    # to that group's ID (`stat -c %g /var/run/docker.sock`).
+    #
+    # The sandboxes' work directory, at the same path as on the host: the
+    # host's Docker resolves the clones' paths the app gives it there.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${AI_OFFICE_SANDBOX_DIR:-${HOME}/.ai-office/sandboxes}:${AI_OFFICE_SANDBOX_DIR:-${HOME}/.ai-office/sandboxes}
+    group_add:
+      - ${DOCKER_GID:-0}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - --eval
+        - "fetch('http://127.0.0.1:3045/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # The sandbox relay (docker/sandbox-relay/relay.ts): the sandboxes'
+  # networks have no route out and the app is not on them, so this is how Agents' sandboxes reach the AI
+  # Gateway (sandbox-relay:3047, forwarded to app:3047) and the internet:
+  # its HTTPS proxy (sandbox-relay:3128, which the sandbox images name as
+  # HTTPS_PROXY) reaches port 443 of the hosts SANDBOX_EGRESS_HOSTS names,
+  # and nothing else. Each connection is a line in its log.
+  sandbox-relay:
+    image: node:26.10.0-slim@sha256:930557a230abacbc3f4fd9b8648abf8f4bee1e17cb72195dcdfb2f709bc85b33
+    user: node
+    command: ["node", "/relay/relay.ts"]
+    environment:
+      RELAY_GATEWAY: app:3047
+      SANDBOX_EGRESS_HOSTS: ${SANDBOX_EGRESS_HOSTS:-}
+    volumes:
+      - ./docker/sandbox-relay/relay.ts:/relay/relay.ts:ro
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - default
+      - sandboxes
+    restart: unless-stopped
+
+  # The `tls` profile: HTTPS in front of the app, with certificates Caddy
+  # obtains and renews itself, the AI Gateway's /v1 included. Only Caddy's
+  # ports 80 and 443 need to be reachable; leave the app's own port on
+  # 127.0.0.1.
+  caddy:
+    image: caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+    profiles:
+      - tls
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      # The name AI Office is reached at, such as ai-office.example.com.
+      # localhost gets a certificate from Caddy's own local CA.
+      AI_OFFICE_DOMAIN: ${AI_OFFICE_DOMAIN:-localhost}
+      # Sent to the app with every request, to prove it came through Caddy.
+      PROXY_SECRET: ${PROXY_SECRET:-}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates and the ACME account: keep them, or every restart asks
+      # for new certificates and may hit the CA's rate limits.
+      - caddy-data:/data
+      - caddy-config:/config
+    # Only the default network: Caddy never reaches the sandboxes' network.
+    networks:
+      - default
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  # The sandbox relay's network (SANDBOX_NETWORK), where AI Office finds
+  # the relay. Each of Agents' sandboxes (started by the host's Docker) is
+  # on a network of its own, made like this one, which AI Office joins the
+  # relay to as sandbox-relay and removes after it (ADR 0006). The relay is
+  # the only other container on a sandbox's network: sandboxes reach
+  # the AI Gateway through it, as sandbox-relay:3047, and nothing else of
+  # the stack, since neither the app, Postgres nor Caddy is on it, and no
+  # other sandbox. It is internal: it has no route out, so a sandbox
+  # reaches the internet only through the sandbox relay's proxy. Nothing
+  # else is on this one, and inter-container traffic is off on it, so a
+  # container started on it by other means reaches nothing either.
+  sandboxes:
+    name: ai-office-sandboxes
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "false"

@@ -1,0 +1,29 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/backend-api/codex/responses",
+    "headers": {
+      "accept": "text/event-stream",
+      "content-type": "application/json",
+      "openai-beta": "responses=experimental",
+      "originator": "codex_exec",
+      "session_id": "0199c8a4-5b1e-7d40-9a51-3f2e1c0d9b7a",
+      "user-agent": "codex_exec/0.47.0 (Ubuntu 24.4.0; x86_64) unknown"
+    },
+    "body": "{\"model\":\"gpt-5-codex\",\"instructions\":\"You are Codex, a coding agent. Work in the repository.\",\"input\":[{\"type\":\"message\",\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"Which test is flaky?\"}]}],\"tools\":[],\"tool_choice\":\"auto\",\"parallel_tool_calls\":false,\"reasoning\":{\"effort\":\"medium\",\"summary\":\"auto\"},\"store\":false,\"stream\":true,\"include\":[\"reasoning.encrypted_content\"],\"prompt_cache_key\":\"0199c8a4-5b1e-7d40-9a51-3f2e1c0d9b7a\"}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/event-stream",
+      "x-request-id": "chatgpt-req-0001",
+      "x-codex-primary-used-percent": "23.0",
+      "x-codex-primary-window-minutes": "300",
+      "x-codex-primary-reset-after-seconds": "12400",
+      "x-codex-secondary-used-percent": "41.0",
+      "x-codex-secondary-window-minutes": "10080",
+      "x-codex-secondary-reset-after-seconds": "302000"
+    },
+    "body": "event: response.created\ndata: {\"type\":\"response.created\",\"sequence_number\":0,\"response\":{\"id\":\"resp_0a1\",\"object\":\"response\",\"created_at\":1791547200,\"status\":\"in_progress\",\"model\":\"gpt-5-codex\",\"output\":[]}}\n\nevent: response.in_progress\ndata: {\"type\":\"response.in_progress\",\"sequence_number\":1,\"response\":{\"id\":\"resp_0a1\",\"object\":\"response\",\"created_at\":1791547200,\"status\":\"in_progress\",\"model\":\"gpt-5-codex\",\"output\":[]}}\n\nevent: response.output_item.added\ndata: {\"type\":\"response.output_item.added\",\"sequence_number\":2,\"output_index\":0,\"item\":{\"type\":\"reasoning\",\"id\":\"rs_0a1\",\"summary\":[]}}\n\nevent: response.output_item.done\ndata: {\"type\":\"response.output_item.done\",\"sequence_number\":3,\"output_index\":0,\"item\":{\"type\":\"reasoning\",\"id\":\"rs_0a1\",\"summary\":[],\"encrypted_content\":\"gAAAAABo-fake-encrypted-reasoning\"}}\n\nevent: response.output_item.added\ndata: {\"type\":\"response.output_item.added\",\"sequence_number\":4,\"output_index\":1,\"item\":{\"type\":\"message\",\"id\":\"msg_0a1\",\"status\":\"in_progress\",\"role\":\"assistant\",\"content\":[]}}\n\nevent: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"sequence_number\":5,\"item_id\":\"msg_0a1\",\"output_index\":1,\"content_index\":0,\"delta\":\"The flaky test is \"}\n\nevent: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"sequence_number\":6,\"item_id\":\"msg_0a1\",\"output_index\":1,\"content_index\":0,\"delta\":\"test/merge.test.ts.\"}\n\nevent: response.output_item.done\ndata: {\"type\":\"response.output_item.done\",\"sequence_number\":7,\"output_index\":1,\"item\":{\"type\":\"message\",\"id\":\"msg_0a1\",\"status\":\"completed\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"The flaky test is test/merge.test.ts.\",\"annotations\":[]}]}}\n\nevent: response.completed\ndata: {\"type\":\"response.completed\",\"sequence_number\":8,\"response\":{\"id\":\"resp_0a1\",\"object\":\"response\",\"created_at\":1791547200,\"status\":\"completed\",\"model\":\"gpt-5-codex\",\"output\":[{\"type\":\"reasoning\",\"id\":\"rs_0a1\",\"summary\":[],\"encrypted_content\":\"gAAAAABo-fake-encrypted-reasoning\"},{\"type\":\"message\",\"id\":\"msg_0a1\",\"status\":\"completed\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"The flaky test is test/merge.test.ts.\",\"annotations\":[]}]}],\"usage\":{\"input_tokens\":2310,\"input_tokens_details\":{\"cached_tokens\":1920},\"output_tokens\":64,\"output_tokens_details\":{\"reasoning_tokens\":48},\"total_tokens\":2374}}}\n\n"
+  }
+}

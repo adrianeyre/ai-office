@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/v1/models",
+    "headers": {
+      "accept": "application/json"
+    },
+    "body": ""
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"object\":\"list\",\"data\":[{\"id\":\"gpt-oss:120b\",\"object\":\"model\",\"created\":1791547200,\"owned_by\":\"ollama\"},{\"id\":\"deepseek-v3.1:671b\",\"object\":\"model\",\"created\":1791547200,\"owned_by\":\"ollama\"},{\"id\":\"qwen3-coder:480b\",\"object\":\"model\",\"created\":1791547200,\"owned_by\":\"ollama\"}]}"
+  }
+}

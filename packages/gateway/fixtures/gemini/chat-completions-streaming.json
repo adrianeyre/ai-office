@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/v1beta/openai/chat/completions",
+    "headers": {
+      "accept": "text/event-stream",
+      "content-type": "application/json",
+      "user-agent": "opencode/0.15.2"
+    },
+    "body": "{\"model\":\"gemini-2.5-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"Name one risk.\"}],\"stream\":true,\"stream_options\":{\"include_usage\":true}}"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/event-stream"
+    },
+    "body": "data: {\"choices\":[{\"delta\":{\"content\":\"Flaky\",\"role\":\"assistant\"},\"index\":0}],\"created\":1791547200,\"id\":\"gemini-chunk-1\",\"model\":\"gemini-2.5-flash\",\"object\":\"chat.completion.chunk\"}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\" tests.\"},\"index\":0}],\"created\":1791547200,\"id\":\"gemini-chunk-1\",\"model\":\"gemini-2.5-flash\",\"object\":\"chat.completion.chunk\"}\n\ndata: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\",\"index\":0}],\"created\":1791547200,\"id\":\"gemini-chunk-1\",\"model\":\"gemini-2.5-flash\",\"object\":\"chat.completion.chunk\",\"usage\":{\"completion_tokens\":3,\"prompt_tokens\":5,\"total_tokens\":8}}\n\ndata: [DONE]\n\n"
+  }
+}

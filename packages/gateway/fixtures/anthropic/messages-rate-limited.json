@@ -1,0 +1,25 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/v1/messages",
+    "headers": {
+      "accept": "application/json",
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+      "user-agent": "claude-cli/2.1.0 (external, cli)"
+    },
+    "body": "{\"model\":\"claude-sonnet-5-5\",\"max_tokens\":1024,\"messages\":[{\"role\":\"user\",\"content\":\"Review this diff.\"}]}"
+  },
+  "response": {
+    "status": 429,
+    "headers": {
+      "content-type": "application/json",
+      "request-id": "req_011CWgatewayRateLimited01",
+      "anthropic-organization-id": "00000000-0000-4000-8000-000000000000",
+      "retry-after": "17",
+      "anthropic-ratelimit-requests-remaining": "0",
+      "x-should-retry": "true"
+    },
+    "body": "{\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"This request would exceed the rate limit for your organization of 50 requests per minute.\"},\"request_id\":\"req_011CWgatewayRateLimited01\"}"
+  }
+}

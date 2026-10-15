@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/backend-api/codex/models?client_version=0.999.0",
+    "headers": {
+      "accept": "application/json"
+    },
+    "body": ""
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"models\":[{\"slug\":\"gpt-5-codex\",\"display_name\":\"gpt-5-codex\",\"description\":\"Optimized for coding tasks.\",\"context_window\":272000,\"supported_reasoning_levels\":[{\"effort\":\"low\"},{\"effort\":\"medium\"},{\"effort\":\"high\"}],\"visibility\":\"list\"},{\"slug\":\"gpt-5\",\"display_name\":\"gpt-5\",\"description\":\"Broad world knowledge.\",\"context_window\":272000,\"visibility\":\"list\"}]}"
+  }
+}

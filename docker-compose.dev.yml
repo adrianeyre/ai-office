@@ -1,0 +1,72 @@
+# Postgres for development: `pnpm dev` starts it (`pnpm db:up`) before
+# migrating, on 127.0.0.1:3048, with the credentials .env.example's
+# DATABASE_URL uses. `pnpm db:down` stops it; the data stays in the
+# `postgres-data` volume of the `ai-office-dev` project until
+# `docker compose -f docker-compose.dev.yml down --volumes`. The image is
+# docker-compose.yml's, pinned by the same digest.
+#
+# It also starts the sandboxes' network and the sandbox relay, for AI Office
+# run outside compose (`pnpm dev`, or the server by itself): the relay is on
+# ai-office-sandboxes (SANDBOX_NETWORK's default), and each sandbox has a
+# network of its own with no route out, which AI Office joins the relay to
+# (ADR 0006). Sandboxes reach the AI Gateway on this machine as
+# http://sandbox-relay:3047 and the internet only through the relay's
+# HTTPS proxy, to the hosts
+# SANDBOX_EGRESS_HOSTS names (docker/sandbox-relay/relay.ts). The relay
+# reaches the Gateway at the host's address on Docker's bridge, so
+# GATEWAY_HOST must let it in (docs/guide/running.md). Run AI Office either
+# this way or under docker-compose.yml, not both: each has its own relay on
+# the one ai-office-sandboxes network.
+name: ai-office-dev
+services:
+  postgres:
+    image: postgres:18.6-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    environment:
+      POSTGRES_DB: ai_office
+      POSTGRES_USER: ai_office
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+    ports:
+      - 127.0.0.1:3048:5432
+    volumes:
+      # Postgres 18 images keep their data under /var/lib/postgresql/18/.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "--username=ai_office", "--dbname=ai_office"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  sandbox-relay:
+    image: node:26.10.0-slim@sha256:930557a230abacbc3f4fd9b8648abf8f4bee1e17cb72195dcdfb2f709bc85b33
+    user: node
+    command: ["node", "/relay/relay.ts"]
+    environment:
+      RELAY_GATEWAY: host.docker.internal:${GATEWAY_PORT:-3047}
+      SANDBOX_EGRESS_HOSTS: ${SANDBOX_EGRESS_HOSTS:-}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - ./docker/sandbox-relay/relay.ts:/relay/relay.ts:ro
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - default
+      - sandboxes
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+
+networks:
+  # Where AI Office finds the sandbox relay outside compose; each sandbox
+  # has an internal network of its own, which the relay joins. Internal, and
+  # with inter-container traffic off: nothing else is on it.
+  sandboxes:
+    name: ai-office-sandboxes
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "false"
