@@ -6,6 +6,7 @@ import {
   useState,
   type CSSProperties,
   type ReactNode,
+  type RefObject,
 } from "react";
 import { Link, Outlet } from "@tanstack/react-router";
 import {
@@ -39,8 +40,10 @@ import { browser, postJson } from "./api.ts";
 import { CompanyLogo } from "./brand/company-logo.tsx";
 import { healthQuery } from "./health.ts";
 import {
+  clampMenuHeight,
   inOrder,
   moved,
+  menuHeights,
   navigationWidths,
   useNavigationPrefs,
 } from "./navigation-prefs.ts";
@@ -402,6 +405,102 @@ function ResizeHandle() {
 }
 
 /**
+ * The line above Sign out, dragged up or down to make the menu of pages
+ * shorter or taller (on wide screens), the menu scrolling within it when
+ * its pages do not fit. With focus, the up and down arrows move it, Home
+ * and End take it to its least and to all its pages, and Enter or a double
+ * click gives the menu back its own height. The height is kept in this
+ * browser.
+ */
+function MenuDivider({ menu }: { menu: RefObject<HTMLDivElement | null> }) {
+  const height = useNavigationPrefs((state) => state.menuHeight);
+  const setHeight = useNavigationPrefs((state) => state.setMenuHeight);
+  const resetHeight = useNavigationPrefs((state) => state.resetMenuHeight);
+  const [dragging, setDragging] = useState(false);
+  const from = useRef<{ y: number; height: number } | undefined>(undefined);
+
+  /** All the menu's pages: no taller than that, so nothing is left below. */
+  const tallest = () => {
+    const pages = menu.current?.scrollHeight ?? 0;
+    return pages > 0 ? Math.max(menuHeights.min, pages) : menuHeights.max;
+  };
+  const set = (next: number, save = true) => {
+    setHeight(Math.min(tallest(), next), save);
+  };
+  const current = () => height ?? menu.current?.clientHeight ?? 0;
+
+  return (
+    <div
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label="Resize the menu's pages"
+      aria-controls="navigation-pages"
+      aria-valuenow={height}
+      aria-valuemin={menuHeights.min}
+      aria-valuetext={
+        height === undefined
+          ? "All the pages showing"
+          : `${String(height)} pixels tall`
+      }
+      title="Drag to make the menu shorter or taller; double-click to reset it"
+      tabIndex={0}
+      data-dragging={dragging ? "" : undefined}
+      className={cn(
+        // A tall strip to grab, with the line through its middle.
+        height === undefined ? "mt-auto" : "-mt-1.5",
+        "relative -mb-1.5 hidden h-3 shrink-0 cursor-row-resize touch-none rounded-full outline-none md:block",
+        "before:absolute before:inset-x-0 before:top-1/2 before:h-px before:bg-border hover:before:h-0.5 hover:before:bg-ring/60 focus-visible:before:h-0.5 focus-visible:before:bg-ring data-dragging:before:h-0.5 data-dragging:before:bg-ring",
+      )}
+      onPointerDown={(event) => {
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        from.current = { y: event.clientY, height: current() };
+        setDragging(true);
+      }}
+      onPointerMove={(event) => {
+        if (from.current !== undefined) {
+          set(from.current.height + event.clientY - from.current.y, false);
+        }
+      }}
+      onPointerUp={(event) => {
+        if (from.current !== undefined) {
+          set(from.current.height + event.clientY - from.current.y);
+        }
+        from.current = undefined;
+        setDragging(false);
+      }}
+      onPointerCancel={() => {
+        if (from.current !== undefined) {
+          set(from.current.height);
+        }
+        from.current = undefined;
+        setDragging(false);
+      }}
+      onDoubleClick={resetHeight}
+      onKeyDown={(event) => {
+        const next =
+          event.key === "ArrowUp"
+            ? current() - resizeStep
+            : event.key === "ArrowDown"
+              ? current() + resizeStep
+              : event.key === "Home"
+                ? menuHeights.min
+                : event.key === "End"
+                  ? tallest()
+                  : undefined;
+        if (next !== undefined) {
+          event.preventDefault();
+          set(clampMenuHeight(next));
+        } else if (event.key === "Enter") {
+          event.preventDefault();
+          resetHeight();
+        }
+      }}
+    />
+  );
+}
+
+/**
  * The frame around every page: a skip link, navigation, server status, the
  * page (the matched route, unless `children` is given) and the footer.
  */
@@ -446,6 +545,8 @@ function SignedInLayout({ children }: { children?: ReactNode }) {
   const collapsed = useNavigationPrefs((state) => state.collapsed);
   const toggleCollapsed = useNavigationPrefs((state) => state.toggleCollapsed);
   const width = useNavigationPrefs((state) => state.width);
+  const menuHeight = useNavigationPrefs((state) => state.menuHeight);
+  const menu = useRef<HTMLDivElement>(null);
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -470,7 +571,12 @@ function SignedInLayout({ children }: { children?: ReactNode }) {
           id="navigation"
           data-collapsed={collapsed ? "" : undefined}
           style={
-            { "--navigation-width": `${String(width)}px` } as CSSProperties
+            {
+              "--navigation-width": `${String(width)}px`,
+              ...(menuHeight !== undefined && {
+                "--menu-height": `${String(menuHeight)}px`,
+              }),
+            } as CSSProperties
           }
           className={cn(
             "flex-col gap-4 border-b bg-card p-4 md:sticky md:top-0 md:flex md:h-dvh md:shrink-0 md:overflow-y-auto md:border-r md:border-b-0 md:pt-4",
@@ -504,8 +610,24 @@ function SignedInLayout({ children }: { children?: ReactNode }) {
               )}
             </Button>
           </div>
-          <MainNavigation collapsed={collapsed} onNavigate={closeNavigation} />
-          <div className="mt-auto space-y-2 border-t pt-3 text-muted-foreground">
+          {/* Its own height, or the Owner's, scrolling within it either way. */}
+          <div
+            id="navigation-pages"
+            ref={menu}
+            className={cn(
+              "md:min-h-0 md:overflow-y-auto",
+              menuHeight !== undefined &&
+                "md:h-[var(--menu-height)] md:shrink-0",
+            )}
+          >
+            <MainNavigation
+              collapsed={collapsed}
+              onNavigate={closeNavigation}
+            />
+          </div>
+          {/* At the foot with Sign out, until the Owner moves it. */}
+          <MenuDivider menu={menu} />
+          <div className="space-y-2 border-t pt-3 text-muted-foreground md:border-t-0 md:pt-0">
             <SessionControls collapsed={collapsed} />
             <ServerStatus collapsed={collapsed} />
           </div>
