@@ -55,7 +55,7 @@ import { liftLocation } from "./scene/lift.ts";
 import { useLiftStore } from "./scene/lift-store.ts";
 import { SetupPage } from "./setup-page.tsx";
 import { TerminalPage } from "./terminal-page.tsx";
-import { OverviewPage } from "./overview-page.tsx";
+import { OverviewPage, overviewSearchSchema } from "./overview-page.tsx";
 import { WhiteboardPage } from "./whiteboard.tsx";
 
 // Code-based routes. The setup and login pages stand alone; every other page
@@ -561,7 +561,26 @@ const workingNowRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/overview",
   staticData: { title: "Overview" },
-  component: OverviewPage,
+  validateSearch: (search) => overviewSearchSchema.parse(search),
+  component: function OverviewRoute() {
+    const search: unknown = workingNowRoute.useSearch();
+    const filters = overviewSearchSchema.parse(search);
+    const navigate = workingNowRoute.useNavigate();
+    return (
+      <OverviewPage
+        filters={filters}
+        onFiltersChange={(next) => {
+          void navigate({
+            search: Object.fromEntries(
+              Object.entries(next).filter(([, value]) => value !== undefined),
+            ),
+            // Typing or filtering is not a step back to take.
+            replace: true,
+          });
+        }}
+      />
+    );
+  },
 });
 
 /** The request history's search: its filters. */

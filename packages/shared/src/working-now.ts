@@ -16,6 +16,8 @@ export const workingAgentSchema = z.object({
   floorName: z.string(),
   repository: z.string(),
   issue: z.number().int(),
+  /** As it was when the pipeline picked it up; null when unknown. */
+  issueTitle: z.string().nullable(),
   stage: z.enum(pipelineStages),
   status: z.enum(["running", "queued"]),
   /** Null while no Agent fits it. */
@@ -26,6 +28,14 @@ export const workingAgentSchema = z.object({
   queuedAt: at,
   /** Null while it is queued. */
   startedAt: at.nullable(),
+  /** What its sandbox did last, said or ran; null before it does anything. */
+  latest: z
+    .object({
+      kind: z.enum(["text", "tool"]),
+      text: z.string(),
+      at,
+    })
+    .nullable(),
 });
 export type WorkingAgent = z.infer<typeof workingAgentSchema>;
 
