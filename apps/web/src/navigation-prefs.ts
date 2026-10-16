@@ -2,16 +2,34 @@ import { create } from "zustand";
 
 // How the Owner likes the main navigation, kept in this browser only: the
 // order of its items, dragged into place, whether it is collapsed to its
-// icons, and how wide it is, dragged by its right edge. Storage can be missing or refuse (a private window, blocked
+// icons, how wide it is, dragged by its right edge, and how tall its menu
+// of pages is, dragged by the line above Sign out. Storage can be missing or refuse (a private window, blocked
 // site data), so every read and write is guarded and the navigation works
 // without it: in its default order, expanded.
 
 const orderKey = "ai-office:navigation-order";
 const collapsedKey = "ai-office:navigation-collapsed";
 const widthKey = "ai-office:navigation-width";
+const menuHeightKey = "ai-office:navigation-menu-height";
 
 /** The navigation's width in pixels: its first, and the least and most. */
 export const navigationWidths = { initial: 220, min: 160, max: 400 } as const;
+
+/** The menu of pages' height in pixels, when set: its least and most. */
+export const menuHeights = { min: 96, max: 1600 } as const;
+
+/** `height` within the menu's least and most, whole. */
+export const clampMenuHeight = (height: number): number =>
+  Math.round(Math.min(menuHeights.max, Math.max(menuHeights.min, height)));
+
+/** The saved menu height; none, for its own height, when none is saved. */
+const savedMenuHeight = (): number | undefined => {
+  const text = read(menuHeightKey);
+  const height = Number(text);
+  return text === null || !Number.isFinite(height)
+    ? undefined
+    : clampMenuHeight(height);
+};
 
 /** The navigation's width collapsed to its icons, in pixels (`md:w-16`). */
 export const collapsedNavigationWidth = 64;
@@ -126,6 +144,14 @@ export interface NavigationPrefs {
   /** Sets the width while dragging; `save` keeps it once the drag ends. */
   readonly setWidth: (width: number, save?: boolean) => void;
   readonly resetWidth: () => void;
+  /**
+   * How tall the menu of pages is on wide screens, in pixels, scrolling
+   * within it; none for its own height.
+   */
+  readonly menuHeight: number | undefined;
+  /** Sets the menu's height while dragging; `save` keeps it once it ends. */
+  readonly setMenuHeight: (height: number, save?: boolean) => void;
+  readonly resetMenuHeight: () => void;
   readonly setOrder: (order: readonly string[]) => void;
   readonly resetOrder: () => void;
   readonly toggleCollapsed: () => void;
@@ -145,6 +171,18 @@ export const useNavigationPrefs = create<NavigationPrefs>()((set, get) => ({
   resetWidth: () => {
     remove(widthKey);
     set({ width: navigationWidths.initial });
+  },
+  menuHeight: savedMenuHeight(),
+  setMenuHeight: (height, save = true) => {
+    const clamped = clampMenuHeight(height);
+    if (save) {
+      write(menuHeightKey, String(clamped));
+    }
+    set({ menuHeight: clamped });
+  },
+  resetMenuHeight: () => {
+    remove(menuHeightKey);
+    set({ menuHeight: undefined });
   },
   setOrder: (order) => {
     write(orderKey, JSON.stringify(order));
@@ -167,5 +205,6 @@ export function reloadNavigationPrefs(): void {
     order: savedOrder(),
     collapsed: read(collapsedKey) === "true",
     width: savedWidth(),
+    menuHeight: savedMenuHeight(),
   });
 }

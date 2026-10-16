@@ -265,6 +265,50 @@ describe("the app layout", () => {
     ).toBeNull();
   });
 
+  it("has its pages made shorter by dragging the line above Sign out, or with the arrow keys, kept in this browser", async () => {
+    renderAt("/");
+    const line = await screen.findByRole("separator", {
+      name: "Resize the menu's pages",
+    });
+    const aside = document.getElementById("navigation");
+    const pages = document.getElementById("navigation-pages");
+    expect(line.getAttribute("aria-valuetext")).toBe("All the pages showing");
+    expect(aside?.style.getPropertyValue("--menu-height")).toBe("");
+    expect(line.className).toContain("mt-auto");
+
+    // From the least, the down arrow makes it taller.
+    line.focus();
+    await userEvent.keyboard("{Home}{ArrowDown}");
+    expect(line.getAttribute("aria-valuenow")).toBe("112");
+    expect(aside?.style.getPropertyValue("--menu-height")).toBe("112px");
+    expect(pages?.className).toContain("md:h-[var(--menu-height)]");
+    expect(line.className).not.toContain("mt-auto");
+    expect(localStorage.getItem("ai-office:navigation-menu-height")).toBe(
+      "112",
+    );
+
+    // Dragged: by how far the pointer moves, never under its least.
+    line.setPointerCapture = vi.fn();
+    fireEvent.pointerDown(line, { clientY: 400, pointerId: 1 });
+    fireEvent.pointerMove(line, { clientY: 500, pointerId: 1 });
+    expect(aside?.style.getPropertyValue("--menu-height")).toBe("212px");
+    fireEvent.pointerUp(line, { clientY: 0, pointerId: 1 });
+    expect(line.getAttribute("aria-valuenow")).toBe("96");
+    expect(localStorage.getItem("ai-office:navigation-menu-height")).toBe("96");
+
+    // A new visit keeps it; a double click gives the menu its own height.
+    cleanup();
+    reloadNavigationPrefs();
+    renderAt("/");
+    const again = await screen.findByRole("separator", {
+      name: "Resize the menu's pages",
+    });
+    expect(again.getAttribute("aria-valuenow")).toBe("96");
+    fireEvent.doubleClick(again);
+    expect(again.getAttribute("aria-valuetext")).toBe("All the pages showing");
+    expect(localStorage.getItem("ai-office:navigation-menu-height")).toBeNull();
+  });
+
   it("is reordered with the keyboard or by dragging, kept in this browser", async () => {
     renderAt("/");
     const nav = await screen.findByRole("navigation", { name: "Main" });
