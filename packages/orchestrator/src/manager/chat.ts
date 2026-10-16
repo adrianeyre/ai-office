@@ -294,6 +294,12 @@ export interface ManagerChat {
     listener: (update: ManagerChatUpdate) => void,
   ): { readonly pending: PendingReply[]; unsubscribe(): void };
   /**
+   * Ends what the Manager of a Floor removed is doing: the reply it is
+   * writing, or the request it is carrying out (research, fact-finding, a
+   * Grilling Session's turn), keeping why. Resolves once it has ended.
+   */
+  end(floorId: string): Promise<void>;
+  /**
    * Keeps one of the Manager's status reports in the Floor's chat, and
    * tells listeners: in answer to the Owner's message `replyTo`, or, with
    * none, of its own accord (the daily report).
@@ -3130,6 +3136,15 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
 
     tasksChanged(floorId) {
       publish(floorId, { type: "tasks" });
+    },
+
+    async end(floorId) {
+      const answering = busy.get(floorId);
+      if (answering == null) {
+        return;
+      }
+      answering.controller.abort();
+      await answering.done;
     },
 
     async stop() {

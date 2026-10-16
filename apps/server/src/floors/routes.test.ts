@@ -10,7 +10,9 @@ import { createFakeGitHub, type FakeGitHub } from "@ai-office/github/testing";
 import {
   databaseStores,
   memoryStores,
+  memoryWorkQueueStore,
   type OfficeStores,
+  type WorkQueueStore,
 } from "@ai-office/orchestrator";
 import {
   floorListSchema,
@@ -19,7 +21,7 @@ import {
   installedRepositoryListSchema,
 } from "@ai-office/shared";
 import type { FastifyInstance } from "fastify";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { buildApp } from "../app.ts";
 import { createLogger } from "../logger.ts";
@@ -40,6 +42,7 @@ async function setUp(
   stores: OfficeStores,
   bus: EventBus,
   github?: GitHubApp | null,
+  workQueue?: WorkQueueStore,
 ): Promise<Setup> {
   const fake = createFakeGitHub();
   fake.installRepository("adrianeyre/web-shop");
@@ -52,6 +55,7 @@ async function setUp(
     events: bus,
     stores,
     ...(github === null ? {} : { github: github ?? fake }),
+    ...(workQueue === undefined ? {} : { workQueue }),
   });
   return { server, owner: await signIn(server), fake, bus };
 }
@@ -531,6 +535,39 @@ describe("the Floor API without a working GitHub", () => {
       expect(response.statusCode).toBe(502);
       expect(response.json()).toMatchObject({ error: "github_unavailable" });
     }
+  });
+});
+
+describe("removing a Floor", () => {
+  it("ends its work, none of it to start again", async () => {
+    const stores = memoryStores();
+    const work = memoryWorkQueueStore(stores.floors);
+    const setup = await setUp(
+      stores,
+      createEventBus({ store: memoryEventStore() }),
+      undefined,
+      work,
+    );
+    await addWebShop(setup);
+    const queued = await work.add(
+      {
+        floorId: "web-shop",
+        issue: 7,
+        stage: "needs-work",
+        agentId: null,
+        priority: "normal",
+      },
+      new Date(),
+    );
+    expect(queued?.status).toBe("queued");
+
+    await request(setup, "POST", "/api/floors/web-shop/archive");
+    await vi.waitFor(async () => {
+      expect(await work.active()).toEqual([]);
+    });
+    expect(await work.recent("web-shop", 10)).toMatchObject([
+      { issue: 7, status: "cancelled" },
+    ]);
   });
 });
 

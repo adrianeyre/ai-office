@@ -562,6 +562,33 @@ const cases: Case[] = [
     },
   ],
   [
+    "ends what a removed Floor's Manager is doing, keeping why",
+    async (stores) => {
+      const setup = await setUp(stores);
+      setup.model.next(
+        (_request, { onText, signal }) =>
+          new Promise((_resolve, reject) => {
+            onText("Let me think");
+            signal?.addEventListener("abort", () => {
+              reject(new Error("aborted"));
+            });
+          }),
+      );
+      const { message } = await setup.chat.send("web-shop", "Plan it?");
+      await vi.waitFor(() => {
+        expect(setup.updates.some(({ type }) => type === "delta")).toBe(true);
+      });
+      await stores.floors.archive("web-shop", new Date());
+      await setup.chat.end("web-shop");
+      expect(await answerTo(setup, message.id)).toMatchObject({
+        kind: "error",
+        text: `AI Office stopped before ${setup.manager.name} finished answering.`,
+      });
+      // A Floor with nothing going on has nothing to end.
+      await setup.chat.end("web-shop");
+    },
+  ],
+  [
     "reads messages after one it was given, a Floor at a time",
     async (stores) => {
       const setup = await setUp(stores);

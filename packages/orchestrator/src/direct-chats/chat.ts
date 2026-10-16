@@ -101,6 +101,11 @@ export interface DirectChats {
     readonly pending: { readonly replyTo: number; readonly text: string }[];
     unsubscribe(): void;
   };
+  /**
+   * Stops the replies a removed Floor's Agents are writing, keeping why,
+   * and waits for them.
+   */
+  end(floorId: string): Promise<void>;
   /** Stops the replies being written, keeping why, and waits for them. */
   stop(): Promise<void>;
 }
@@ -256,8 +261,15 @@ export function createDirectChats(options: DirectChatsOptions): DirectChats {
   /** Chats whose Model is answering, and the reply so far. */
   const busy = new Map<
     string,
-    { replyTo: number; text: string; controller: AbortController } | null
+    {
+      replyTo: number;
+      text: string;
+      controller: AbortController;
+      done: Promise<void>;
+    } | null
   >();
+  /** The Floor of each Agent's chat answering, to end a removed Floor's. */
+  const floorOfChat = new Map<string, string>();
   const replies = new Set<Promise<void>>();
   let stopped = false;
 
@@ -446,6 +458,15 @@ export function createDirectChats(options: DirectChatsOptions): DirectChats {
     },
 
     async send(ref, text, model) {
+      if (ref.kind !== "terminal") {
+        const floor = await options.floors.get(ref.floorId);
+        if (floor !== undefined && floor.archivedAt !== null) {
+          throw new FloorError(
+            floorErrorCodes.floorArchived,
+            `The Floor "${floor.name}" is archived.`,
+          );
+        }
+      }
       const target = await targetOf(ref, model);
       if (busy.has(target.chat)) {
         throw new DirectChatError(
@@ -482,13 +503,23 @@ export function createDirectChats(options: DirectChatsOptions): DirectChats {
       if (stopped) {
         controller.abort();
       }
-      busy.set(target.chat, { replyTo: message.id, text: "", controller });
-      const reply = answer(target, message, controller).catch(
-        (error: unknown) => {
+      const reply = answer(target, message, controller)
+        .catch((error: unknown) => {
           busy.delete(target.chat);
           options.onError?.(error);
-        },
-      );
+        })
+        .finally(() => {
+          floorOfChat.delete(target.chat);
+        });
+      busy.set(target.chat, {
+        replyTo: message.id,
+        text: "",
+        controller,
+        done: reply,
+      });
+      if (target.floorId !== null) {
+        floorOfChat.set(target.chat, target.floorId);
+      }
       replies.add(reply);
       void reply.finally(() => replies.delete(reply));
       return { message, reply: undefined };
@@ -515,6 +546,17 @@ export function createDirectChats(options: DirectChatsOptions): DirectChats {
           }
         },
       };
+    },
+
+    async end(floorId) {
+      const ending = [...floorOfChat]
+        .filter(([, floor]) => floor === floorId)
+        .map(([chat]) => busy.get(chat))
+        .filter((replying) => replying != null);
+      for (const replying of ending) {
+        replying.controller.abort();
+      }
+      await Promise.all(ending.map(({ done }) => done));
     },
 
     async stop() {

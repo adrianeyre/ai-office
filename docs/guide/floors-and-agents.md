@@ -63,7 +63,13 @@ labels AI Office creates, and what intake picks up.
   a removed reviewer is no longer required, and a Floor with reviewers but
   none required requires its oldest.
 - Archiving (`POST /api/floors/:floorId/archive`) stops the Floor's intake
-  and hides it from the Floor list. Its row and history are kept, and its
+  and hides it from the Floor list. It also ends everything the Floor was
+  doing, however it was archived (the Floors card or a configuration
+  import): its running work is interrupted and cancelled, its sandboxes
+  stopped, its queued work cancelled, the Manager's reply or request (its
+  research, fact-finding, a Grilling Session's turn) stopped, and its
+  Agents' direct chats stopped and refused. None of it starts again.
+  Its row and history are kept, and its
   settings can no longer be changed. Its Agents' Gateway Keys, the
   Manager's too, call no model from then on (pen-testing G1-4; see
   [Gateway Keys](ai-gateway.md#gateway-keys)).
@@ -839,8 +845,9 @@ above the API keys:
 A Floor's name starts as its repository's. **Rename Floor** at the top of
 the Floor in Agent Settings (or **Name** in its Floor admin) changes it
 everywhere but the repository. **Remove Floor** beside it in General Settings'
-**Floors in use** archives it, after asking: its work stops and it is
-hidden, and its history is kept; its repository can be added again.
+**Floors in use** archives it, after asking: everything its Agents and
+Manager are doing ends at once, none of it to start again, and it is
+hidden; its history is kept, and its repository can be added again.
 
 ## Token accounting and Token Caps
 
