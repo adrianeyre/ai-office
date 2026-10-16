@@ -218,7 +218,7 @@ function MainNavigation({
         Drag an item, or press Alt with the up or down arrow, to change the
         order.
       </p>
-      <ul className="space-y-0.5">
+      <ul className="space-y-px">
         {items.map(({ to, label, icon: Icon }, index) => (
           <li
             key={to}
@@ -278,8 +278,8 @@ function MainNavigation({
               className={cn(
                 // The current page: the accent's fill, its ink, and a bar in
                 // the primary colour at its left edge.
-                "relative flex items-center gap-2.5 rounded-lg py-2 pr-2 pl-3 text-sm text-foreground/80 transition-colors duration-150 hover:bg-muted hover:text-foreground data-[status=active]:bg-accent data-[status=active]:font-medium data-[status=active]:text-accent-foreground pointer-coarse:min-h-11",
-                "before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-full before:bg-primary before:opacity-0 before:transition-opacity data-[status=active]:before:opacity-100",
+                "relative flex items-center gap-2.5 rounded-lg py-1.5 pr-2 pl-3 text-sm text-foreground/80 transition-colors duration-150 hover:bg-muted hover:text-foreground data-[status=active]:bg-accent data-[status=active]:font-medium data-[status=active]:text-accent-foreground pointer-coarse:min-h-11",
+                "before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-primary before:opacity-0 before:transition-opacity data-[status=active]:before:opacity-100",
                 collapsed && "md:justify-center md:px-0",
               )}
             >
@@ -473,7 +473,7 @@ function SignedInLayout({ children }: { children?: ReactNode }) {
             { "--navigation-width": `${String(width)}px` } as CSSProperties
           }
           className={cn(
-            "flex-col gap-6 border-b bg-card p-4 md:sticky md:top-0 md:flex md:h-dvh md:shrink-0 md:overflow-y-auto md:border-r md:border-b-0 md:pt-5",
+            "flex-col gap-4 border-b bg-card p-4 md:sticky md:top-0 md:flex md:h-dvh md:shrink-0 md:overflow-y-auto md:border-r md:border-b-0 md:pt-4",
             collapsed
               ? "md:w-16 md:px-2"
               : "md:w-[var(--navigation-width)] md:pr-2",
@@ -505,7 +505,7 @@ function SignedInLayout({ children }: { children?: ReactNode }) {
             </Button>
           </div>
           <MainNavigation collapsed={collapsed} onNavigate={closeNavigation} />
-          <div className="mt-auto space-y-3 border-t pt-4 text-muted-foreground">
+          <div className="mt-auto space-y-2 border-t pt-3 text-muted-foreground">
             <SessionControls collapsed={collapsed} />
             <ServerStatus collapsed={collapsed} />
           </div>
