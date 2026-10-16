@@ -893,6 +893,47 @@ const cases: Case[] = [
     },
   ],
   [
+    "ends all the work of a Floor removed, running and queued, for good, and the other Floor works on",
+    async (setup) => {
+      setup.limit.current = 3;
+      await setup.coders("web-shop");
+      const queue = setup.queue({ stoppedFloors: () => stops.stopped() });
+      const stops = createFloorStops({
+        store: memoryFloorStopStore(),
+        events: setup.bus,
+        work: setup.store,
+        queue: () => queue,
+      });
+      await queue.start();
+      // Two coders: #1 and #2 run, #3 waits for one of them.
+      for (const issue of [1, 2, 3]) {
+        await queue.enqueue(work("web-shop", issue));
+      }
+      await queue.enqueue(work("blog", 4));
+      await vi.waitFor(() => {
+        expect(setup.started).toEqual([1, 2, 4]);
+      });
+
+      await setup.stores.floors.archive("web-shop", start);
+      await stops.end("web-shop");
+      // The running work was interrupted, the queued work cancelled.
+      expect(
+        (await setup.store.recent("web-shop", 10))
+          .map(({ issue, status }) => [issue, status])
+          .sort(),
+      ).toEqual([
+        [1, "cancelled"],
+        [2, "cancelled"],
+        [3, "cancelled"],
+      ]);
+      expect(await setup.statuses()).toMatchObject({ 4: "running" });
+      queue.wake();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(setup.started).toEqual([1, 2, 4]);
+      await queue.stop();
+    },
+  ],
+  [
     "queues work for the Agent named, and reads a Floor's latest work newest first",
     async (setup) => {
       setup.limit.current = 3;

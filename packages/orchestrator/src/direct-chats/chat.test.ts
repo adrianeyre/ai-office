@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { memoryStores } from "../stores.ts";
 import type { ModelClient, ModelRequest } from "../models/client.ts";
@@ -94,6 +94,7 @@ describe("createDirectChats", () => {
     githubRepositoryId: 1,
     repository: "adrianeyre/web-shop",
     name: "Web shop",
+    archivedAt: null as Date | null,
   };
 
   it("answers with why when the Agent is paused, asking no model", async () => {
@@ -137,6 +138,67 @@ describe("createDirectChats", () => {
       ],
     ]);
     expect(models.requests).toEqual([]);
+  });
+
+  it("stops a removed Floor's Agents answering, and refuses them more", async () => {
+    const stores = memoryStores();
+    const started: string[] = [];
+    const chats = createDirectChats({
+      store: stores.directChats,
+      floors: {
+        ...stores.floors,
+        get: (id: string) =>
+          Promise.resolve(id === floor.id ? (floor as never) : undefined),
+      },
+      agents: {
+        ...stores.agents,
+        list: () =>
+          Promise.resolve([
+            {
+              id: "bo",
+              floorId: "web-shop",
+              name: "Bo",
+              role: "coder",
+              aiProvider: "Claude",
+              modelOverride: null,
+              enabled: true,
+              extraInstructions: "",
+            } as never,
+          ]),
+      },
+      models: {
+        complete: () => Promise.reject(new Error("Chats stream.")),
+        // Answers until it is stopped.
+        stream: (_request, { signal }) =>
+          new Promise((_resolve, reject) => {
+            started.push("bo");
+            signal?.addEventListener("abort", () => {
+              reject(new Error("aborted"));
+            });
+          }),
+      },
+      terminalModels: answering().client,
+      defaultModels: () => Promise.resolve({ Claude: "claude-opus-5-5" }),
+    });
+    const ref = { kind: "agent", floorId: "web-shop", agentId: "bo" } as const;
+    await chats.send(ref, "Hi");
+    await vi.waitFor(() => {
+      expect(started).toEqual(["bo"]);
+    });
+    floor.archivedAt = new Date();
+    try {
+      await chats.end("web-shop");
+      expect((await chats.history(ref)).messages.at(-1)).toMatchObject({
+        kind: "error",
+        text: "AI Office stopped before Bo finished answering.",
+      });
+      await expect(chats.send(ref, "Still there?")).rejects.toMatchObject({
+        code: "floor_archived",
+      });
+    } finally {
+      floor.archivedAt = null;
+      await chats.stop();
+    }
   });
 
   it("offers the Terminal each AI Provider's default Model, Claude's first", async () => {

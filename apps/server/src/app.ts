@@ -708,18 +708,19 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     templates: floorTemplates,
     roles: () => stores.roles.list(),
   });
-  registerFloorRoutes(app, {
-    stops:
-      options.floorStops ??
-      createFloorStops({
-        store: stores.floorStops,
-        events,
-        work,
-        queue: () => ({
-          interrupt: () => Promise.resolve(false),
-          wake: () => undefined,
-        }),
+  const floorStops =
+    options.floorStops ??
+    createFloorStops({
+      store: stores.floorStops,
+      events,
+      work,
+      queue: () => ({
+        interrupt: () => Promise.resolve(false),
+        wake: () => undefined,
       }),
+    });
+  registerFloorRoutes(app, {
+    stops: floorStops,
     floors: createFloors({
       store: stores.floors,
       github: options.github,
@@ -1016,25 +1017,24 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   uiKeys.keys = gatewayKeys;
   // Direct chats: the Owner talks one to one with any Agent (its own Model
   // and Gateway Key), or with the AI itself in the Terminal.
+  const directChats =
+    options.directChats ??
+    createDirectChats({
+      store: stores.directChats,
+      floors: stores.floors,
+      agents: workingAgents,
+      roles: stores.roles,
+      models: options.models ?? noModels,
+      terminalModels: options.terminalModels ?? noModels,
+      defaultModels,
+      ...(options.redactor === undefined ? {} : { redactor: options.redactor }),
+      now,
+      onError: (error) => {
+        app.log.error({ err: error }, "A direct chat failed.");
+      },
+    });
   registerDirectChatRoutes(app, {
-    chats:
-      options.directChats ??
-      createDirectChats({
-        store: stores.directChats,
-        floors: stores.floors,
-        agents: workingAgents,
-        roles: stores.roles,
-        models: options.models ?? noModels,
-        terminalModels: options.terminalModels ?? noModels,
-        defaultModels,
-        ...(options.redactor === undefined
-          ? {}
-          : { redactor: options.redactor }),
-        now,
-        onError: (error) => {
-          app.log.error({ err: error }, "A direct chat failed.");
-        },
-      }),
+    chats: directChats,
     usage: directChatUsageOf({
       history: requestHistory,
       contextWindow: contextWindowOf(modelCatalogue),
@@ -1157,7 +1157,24 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       );
     }
   });
+  // A Floor removed (archived) stops all it was doing, not only what it
+  // would start: its Agents' work and sandboxes, its Manager's reply or
+  // request, and its Agents' direct chats. However it was removed, from
+  // the Floors card or a configuration import.
+  const endRemovedFloors = events.subscribe(
+    async ({ event }) => {
+      if (event.type === "floor.archived") {
+        await Promise.all([
+          floorStops.end(event.floorId),
+          managerChat.end(event.floorId),
+          directChats.end(event.floorId),
+        ]);
+      }
+    },
+    { types: ["floor.archived"] },
+  );
   app.addHook("onClose", (_instance, done) => {
+    endRemovedFloors();
     agentKeys.stop();
     if (options.workingAgents === undefined) {
       workingAgents.stop();

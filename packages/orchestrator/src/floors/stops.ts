@@ -10,6 +10,7 @@ import type { WorkQueueStore } from "../work/store.ts";
 // Agent, as the watchdog's retry does, and no work starts there until the
 // Owner continues; then each piece starts again from its issue's label
 // and branch. Stops live in `floor_stops`, so one outlasts a restart.
+// A Floor removed has its work ended for good: none of it starts again.
 
 /** A Floor the Owner stopped, and when. */
 export interface FloorStop {
@@ -74,13 +75,20 @@ export interface FloorStops {
   stop(floorId: string): Promise<void>;
   /** Lets the Floor's Agents carry on with their work. */
   carryOn(floorId: string): Promise<void>;
+  /**
+   * Ends all the work of a Floor removed: its running work is interrupted
+   * and cancelled, its sandboxes stopped, and the work queued for it is
+   * cancelled, none of it to start again. Resolves once the running work
+   * has ended.
+   */
+  end(floorId: string): Promise<void>;
 }
 
 export interface FloorStopsOptions {
   readonly store: FloorStopStore;
   readonly events: EventBus;
   /** The work running and queued, to find the Floor's. */
-  readonly work: Pick<WorkQueueStore, "active">;
+  readonly work: Pick<WorkQueueStore, "active" | "end">;
   /** The work queue, made after the stops it reads. */
   readonly queue: () => Pick<WorkQueue, "interrupt" | "wake">;
   readonly now?: () => Date;
@@ -124,6 +132,25 @@ export function createFloorStops(options: FloorStopsOptions): FloorStops {
       stops.delete(floorId);
       await events.publish({ type: "floor.continued", version: 1, floorId });
       options.queue().wake();
+    },
+    async end(floorId) {
+      const items = (await options.work.active()).filter(
+        (item) => item.floorId === floorId,
+      );
+      await Promise.all(
+        items.map(async (item) => {
+          if (item.status === "queued") {
+            // None is claimed meanwhile: no work starts on a Floor removed.
+            await options.work.end(item.id, "cancelled", now());
+          } else {
+            await options.queue().interrupt(item.id);
+          }
+        }),
+      );
+      // A Floor removed is not stopped any more: it is gone.
+      if (stops.delete(floorId)) {
+        await store.remove(floorId);
+      }
     },
   };
 }
