@@ -1164,6 +1164,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     work,
     stops: floorStops,
     managerChat,
+    events,
   });
   // A Floor removed (archived) stops all it was doing, not only what it
   // would start: its Agents' work and sandboxes, its Manager's reply or

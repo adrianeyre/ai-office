@@ -32,12 +32,13 @@ async function setUp() {
       return Promise.resolve();
     }),
   };
+  const events = createEventBus({ store: memoryEventStore() });
   const server = await buildApp({
     logger: createLogger({ level: "silent", secrets: [] }),
     checkDatabase: () => Promise.resolve(true),
     webDistDir: "/nonexistent",
     auth: await testAuth(),
-    events: createEventBus({ store: memoryEventStore() }),
+    events,
     stores,
     github: fake,
     workQueue: work,
@@ -56,7 +57,7 @@ async function setUp() {
     (await call("POST", "/api/floors", { repository: "adrianeyre/web-shop" }))
       .statusCode,
   ).toBe(201);
-  return { server, stores, work, answering, managerChat, call };
+  return { server, stores, work, events, answering, managerChat, call };
 }
 
 describe("the Working now API", () => {
@@ -75,6 +76,14 @@ describe("the Working now API", () => {
       },
       new Date("2026-10-16T09:00:00.000Z"),
     );
+    await setup.events.publish({
+      type: "issue.picked_up",
+      version: 1,
+      floorId: "web-shop",
+      issue: 7,
+      title: "Add a basket",
+      url: "https://github.com/adrianeyre/web-shop/issues/7",
+    });
     setup.answering.push({
       floorId: "web-shop",
       replyTo: 3,
@@ -92,6 +101,7 @@ describe("the Working now API", () => {
           floorName: "web-shop",
           repository: "adrianeyre/web-shop",
           issue: 7,
+          issueTitle: "Add a basket",
           stage: "needs-work",
           status: "queued",
           agentId: coder?.id,
@@ -99,6 +109,8 @@ describe("the Working now API", () => {
           role: "coder",
           queuedAt: "2026-10-16T09:00:00.000Z",
           startedAt: null,
+          // Nothing yet: it has not started.
+          latest: null,
         },
       ],
       managers: [
@@ -130,6 +142,53 @@ describe("the Working now API", () => {
     expect(ended.statusCode).toBe(200);
     expect(setup.managerChat.end).toHaveBeenCalledWith("web-shop");
     expect(workingNowSchema.parse(ended.json()).managers).toEqual([]);
+  });
+
+  it("says what running work's sandbox did last", async () => {
+    const setup = await setUp();
+    const coder = (await setup.stores.agents.list("web-shop")).find(
+      ({ role }) => role === "coder",
+    );
+    if (coder === undefined) {
+      throw new Error("The Floor has no coder.");
+    }
+    await setup.work.add(
+      {
+        floorId: "web-shop",
+        issue: 3,
+        stage: "needs-work",
+        agentId: coder.id,
+        priority: "normal",
+      },
+      new Date(Date.now() - 60_000),
+    );
+    await setup.work.claimNext(1, new Date(Date.now() - 30_000));
+    const subject = {
+      version: 1,
+      floorId: "web-shop",
+      agentId: coder.id,
+      issue: 3,
+      sandboxId: "sbx-1",
+    } as const;
+    await setup.events.publish({
+      type: "sandbox.text",
+      ...subject,
+      text: "Reading the basket.",
+    });
+    await setup.events.publish({
+      type: "sandbox.tool_call",
+      ...subject,
+      name: "Bash",
+      args: "pnpm test",
+    });
+    const [running] = workingNowSchema.parse(
+      (await setup.call("GET", "/api/working-now")).json(),
+    ).work;
+    expect(running).toMatchObject({
+      status: "running",
+      issueTitle: null,
+      latest: { kind: "tool", text: "Bash pnpm test" },
+    });
   });
 
   it("answers 404 for work or a Manager no longer going on", async () => {

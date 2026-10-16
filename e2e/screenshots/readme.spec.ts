@@ -169,6 +169,7 @@ test("the README's screenshots", async ({ office, page }) => {
         floorName: "web-shop",
         repository: "adrianeyre/web-shop",
         issue: 1,
+        issueTitle: "Add a basket",
         stage: "needs-work",
         status: "running",
         agentId: coder.id,
@@ -176,6 +177,11 @@ test("the README's screenshots", async ({ office, page }) => {
         role: "coder",
         queuedAt: minutesAgo(14),
         startedAt: minutesAgo(13),
+        latest: {
+          kind: "tool",
+          text: "Bash pnpm test",
+          at: minutesAgo(0),
+        },
       },
       {
         id: 2,
@@ -183,6 +189,7 @@ test("the README's screenshots", async ({ office, page }) => {
         floorName: "web-shop",
         repository: "adrianeyre/web-shop",
         issue: 2,
+        issueTitle: "Add a wish list",
         stage: "needs-review",
         status: "queued",
         agentId: reviewer?.id ?? null,
@@ -190,6 +197,7 @@ test("the README's screenshots", async ({ office, page }) => {
         role: "reviewer",
         queuedAt: minutesAgo(3),
         startedAt: null,
+        latest: null,
       },
     ],
     managers: [

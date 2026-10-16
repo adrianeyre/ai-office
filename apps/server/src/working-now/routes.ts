@@ -1,3 +1,4 @@
+import type { EventBus } from "@ai-office/events";
 import type {
   AgentRecord,
   FloorStore,
@@ -27,8 +28,47 @@ export function registerWorkingNowRoutes(
     readonly work: Pick<WorkQueueStore, "active">;
     readonly stops: Pick<FloorStops, "cancel">;
     readonly managerChat: Pick<ManagerChat, "working" | "end">;
+    /** The event log: each issue's title, and each sandbox's last step. */
+    readonly events: Pick<EventBus, "history">;
   },
 ): void {
+  const titleOf = async (floorId: string, issue: number) => {
+    const [picked] = await options.events.history({
+      filter: { floorId, issue, types: ["issue.picked_up"] },
+      limit: 1,
+    });
+    return picked?.event.type === "issue.picked_up" ? picked.event.title : null;
+  };
+  const latestOf = async (
+    floorId: string,
+    agentId: string,
+    issue: number,
+    since: Date,
+  ): Promise<WorkingAgent["latest"]> => {
+    const [last] = await options.events.history({
+      filter: {
+        floorId,
+        agentId,
+        issue,
+        types: ["sandbox.text", "sandbox.tool_call"],
+      },
+      from: since,
+      limit: 1,
+    });
+    if (last === undefined) {
+      return null;
+    }
+    const at = last.occurredAt.toISOString();
+    return last.event.type === "sandbox.text"
+      ? { kind: "text", text: last.event.text, at }
+      : last.event.type === "sandbox.tool_call"
+        ? {
+            kind: "tool",
+            text: `${last.event.name} ${last.event.args}`.trim(),
+            at,
+          }
+        : null;
+  };
   const workingNow = async (): Promise<WorkingNow> => {
     const floors = new Map(
       (await options.floors.list()).map((floor) => [floor.id, floor]),
@@ -42,32 +82,46 @@ export function registerWorkingNowRoutes(
         .flat()
         .map((agent) => [agent.id, agent]),
     );
-    const work = (await options.work.active()).flatMap(
-      (item): WorkingAgent[] => {
-        const floor = floors.get(item.floorId);
-        if (floor === undefined) {
-          return [];
-        }
-        const agent =
-          item.agentId === null ? undefined : agents.get(item.agentId);
-        return [
-          {
-            id: item.id,
-            floorId: floor.id,
-            floorName: floor.name,
-            repository: floor.repository,
-            issue: item.issue,
-            stage: item.stage,
-            status: item.status === "running" ? "running" : "queued",
-            agentId: item.agentId,
-            agentName: agent?.name ?? null,
-            role: item.role ?? agent?.role ?? null,
-            queuedAt: item.createdAt.toISOString(),
-            startedAt: item.startedAt?.toISOString() ?? null,
+    const work = (
+      await Promise.all(
+        (await options.work.active()).map(
+          async (item): Promise<WorkingAgent[]> => {
+            const floor = floors.get(item.floorId);
+            if (floor === undefined) {
+              return [];
+            }
+            const agent =
+              item.agentId === null ? undefined : agents.get(item.agentId);
+            const [issueTitle, latest] = await Promise.all([
+              titleOf(floor.id, item.issue),
+              item.status === "running" &&
+              item.agentId !== null &&
+              item.startedAt !== null
+                ? latestOf(floor.id, item.agentId, item.issue, item.startedAt)
+                : null,
+            ]);
+            return [
+              {
+                id: item.id,
+                floorId: floor.id,
+                floorName: floor.name,
+                repository: floor.repository,
+                issue: item.issue,
+                issueTitle,
+                stage: item.stage,
+                status: item.status === "running" ? "running" : "queued",
+                agentId: item.agentId,
+                agentName: agent?.name ?? null,
+                role: item.role ?? agent?.role ?? null,
+                queuedAt: item.createdAt.toISOString(),
+                startedAt: item.startedAt?.toISOString() ?? null,
+                latest,
+              },
+            ];
           },
-        ];
-      },
-    );
+        ),
+      )
+    ).flat();
     const managers = options.managerChat
       .working()
       .flatMap(({ floorId, phase, since }): WorkingManager[] => {

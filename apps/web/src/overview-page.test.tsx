@@ -6,8 +6,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./app.tsx";
-import { eventSources } from "./event-stream.ts";
-import { elapsedText } from "./overview-page.tsx";
+import { eventSources, type EventSourceLike } from "./event-stream.ts";
+import { agoText, elapsedText, matchesQuery } from "./overview-page.tsx";
 import { createAppRouter } from "./router.tsx";
 
 // The Overview page against a stubbed server: every Agent's work and
@@ -21,6 +21,7 @@ const working = (): WorkingNow => ({
       floorName: "Web shop",
       repository: "adrianeyre/web-shop",
       issue: 4,
+      issueTitle: "Add a basket",
       stage: "needs-work",
       status: "running",
       agentId: "ada",
@@ -28,6 +29,11 @@ const working = (): WorkingNow => ({
       role: "coder",
       queuedAt: "2026-10-16T09:00:00.000Z",
       startedAt: "2026-10-16T09:01:00.000Z",
+      latest: {
+        kind: "tool",
+        text: "Bash pnpm test",
+        at: "2026-10-16T09:02:00.000Z",
+      },
     },
     {
       id: 12,
@@ -35,6 +41,7 @@ const working = (): WorkingNow => ({
       floorName: "Blog",
       repository: "adrianeyre/blog",
       issue: 9,
+      issueTitle: null,
       stage: "needs-review",
       status: "queued",
       agentId: "rex",
@@ -42,6 +49,7 @@ const working = (): WorkingNow => ({
       role: "reviewer",
       queuedAt: "2026-10-16T09:02:00.000Z",
       startedAt: null,
+      latest: null,
     },
   ],
   managers: [
@@ -108,16 +116,31 @@ function renderAt(path: string) {
   );
 }
 
+/** The live event streams the page opened, newest last. */
+let streams: (EventSourceLike & { send(data: unknown): void })[];
+
 beforeEach(() => {
   localStorage.clear();
   vi.stubGlobal("scrollTo", vi.fn());
-  vi.spyOn(eventSources, "open").mockImplementation(() => ({
-    readyState: 0,
-    onopen: null,
-    onmessage: null,
-    onerror: null,
-    close: () => undefined,
-  }));
+  streams = [];
+  vi.spyOn(eventSources, "open").mockImplementation(() => {
+    const source = {
+      readyState: 0,
+      onopen: null as EventSourceLike["onopen"],
+      onmessage: null as EventSourceLike["onmessage"],
+      onerror: null as EventSourceLike["onerror"],
+      close() {
+        source.readyState = 2;
+      },
+      send(data: unknown) {
+        source.onmessage?.(
+          new MessageEvent("message", { data: JSON.stringify(data) }),
+        );
+      },
+    };
+    streams.push(source);
+    return source;
+  });
 });
 
 afterEach(() => {
@@ -137,6 +160,22 @@ describe("how long something has gone on", () => {
     expect(since(3 * 3600)).toBe("3h");
     expect(since(3 * 3600 + 5 * 60)).toBe("3h 5m");
     expect(since(2 * 86400 + 4 * 3600)).toBe("2d 4h");
+    expect(agoText(at - 3000, at)).toBe("just now");
+    expect(agoText(at - 42_000, at)).toBe("42s ago");
+  });
+});
+
+describe("finding a row", () => {
+  it("matches its Agent, Role, Floor, issue number or title, in any case", () => {
+    const [ada, rex] = working().work;
+    if (ada === undefined || rex === undefined) {
+      throw new Error("The fixture has two pieces of work.");
+    }
+    for (const query of ["ADA", "coder", "web", "#4", "4", "basket", "pnpm"]) {
+      expect(matchesQuery(ada, query)).toBe(true);
+    }
+    expect(matchesQuery(rex, "basket")).toBe(false);
+    expect(matchesQuery(rex, " ")).toBe(true);
   });
 });
 
@@ -154,13 +193,18 @@ describe("the Overview page", () => {
         .map((cell) => cell.textContent),
     ).toEqual(["Adacoder", "Rexreviewer"]);
     expect(
-      within(agents).getByRole("link", { name: "#4" }).getAttribute("href"),
+      within(agents)
+        .getByRole("link", { name: "#4 Add a basket" })
+        .getAttribute("href"),
     ).toBe("https://github.com/adrianeyre/web-shop/issues/4");
     const managers = screen.getByRole("table", { name: "Managers answering" });
     expect(within(managers).getByText("Writing a reply")).toBeDefined();
-    expect(
-      screen.getAllByRole("definition").map((count) => count.textContent),
-    ).toEqual(["1", "1", "1"]);
+    const counts = screen.getByRole("group", {
+      name: "Counts, and filters by status",
+    });
+    expect(counts.textContent).toContain("Agents working1");
+    expect(counts.textContent).toContain("Queued1");
+    expect(counts.textContent).toContain("Managers answering1");
 
     await userEvent.selectOptions(screen.getByLabelText("Floor"), "blog");
     expect(
@@ -168,7 +212,9 @@ describe("the Overview page", () => {
         .getAllByRole("rowheader")
         .map((cell) => cell.textContent),
     ).toEqual(["Rexreviewer"]);
-    expect(screen.getByText("No Manager is answering.")).toBeDefined();
+    expect(
+      screen.getByText("No Manager is answering among those shown."),
+    ).toBeDefined();
   });
 
   it("stops one piece of work once the Owner confirms, the rest carrying on", async () => {
@@ -214,6 +260,82 @@ describe("the Overview page", () => {
     await userEvent.click(screen.getByRole("button", { name: "Stop" }));
     expect(await screen.findByText("Max had already finished.")).toBeDefined();
     expect(await screen.findByText("No Manager is answering.")).toBeDefined();
+  });
+
+  it("shows each issue's title and what its sandbox did last, as it happens", async () => {
+    stubServer();
+    renderAt("/overview");
+    const agents = await screen.findByRole("table", { name: "Agents' work" });
+    expect(
+      within(agents).getByRole("link", { name: "#4 Add a basket" }),
+    ).toBeDefined();
+    expect(
+      within(agents).getByText("Bash pnpm test", { exact: false }),
+    ).toBeDefined();
+    expect(
+      within(agents)
+        .getByRole("link", { name: /^Watch/ })
+        .getAttribute("href"),
+    ).toBe("/floors/web-shop/agents/ada");
+    // A queued piece of work has nothing to watch.
+    expect(
+      within(agents).queryByRole("link", { name: /Watch Rex/ }),
+    ).toBeNull();
+
+    const stream = streams.at(-1);
+    stream?.onopen?.(new Event("open"));
+    stream?.send({
+      id: 50,
+      occurredAt: new Date().toISOString(),
+      event: {
+        type: "sandbox.text",
+        version: 1,
+        floorId: "web-shop",
+        agentId: "ada",
+        issue: 4,
+        sandboxId: "sbx-1",
+        text: "Totting up the basket.",
+      },
+    });
+    expect(
+      await within(agents).findByText("Totting up the basket."),
+    ).toBeDefined();
+    expect(await screen.findByText("Live")).toBeDefined();
+  });
+
+  it("finds, and filters by status, keeping both in its address", async () => {
+    stubServer();
+    renderAt("/overview?status=queued");
+    const agents = await screen.findByRole("table", { name: "Agents' work" });
+    expect(
+      within(agents)
+        .getAllByRole("rowheader")
+        .map((cell) => cell.textContent),
+    ).toEqual(["Rexreviewer"]);
+    // Managers are not work: they are not shown by status.
+    expect(
+      screen.queryByRole("table", { name: "Managers answering" }),
+    ).toBeNull();
+    const queued = screen.getByRole("button", { name: /^Queued/ });
+    expect(queued.getAttribute("aria-pressed")).toBe("true");
+
+    await userEvent.click(queued);
+    expect(
+      await screen.findByRole("table", { name: "Managers answering" }),
+    ).toBeDefined();
+
+    await userEvent.type(screen.getByLabelText("Find"), "nobody");
+    expect(
+      await screen.findByText("Nothing matches these filters."),
+    ).toBeDefined();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Clear the filters" }),
+    );
+    expect(
+      within(screen.getByRole("table", { name: "Agents' work" }))
+        .getAllByRole("rowheader")
+        .map((cell) => cell.textContent),
+    ).toEqual(["Adacoder", "Rexreviewer"]);
   });
 
   it("is in the navigation, after the Office", async () => {
