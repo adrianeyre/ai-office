@@ -1,7 +1,11 @@
 import { fileURLToPath } from "node:url";
 
 import type { OfficeEvent } from "@ai-office/events/schema";
-import { agentListSchema, sessionResponseSchema } from "@ai-office/shared";
+import {
+  agentListSchema,
+  sessionResponseSchema,
+  type WorkingNow,
+} from "@ai-office/shared";
 import type { Page } from "@playwright/test";
 
 import { testAction } from "../support/control.ts";
@@ -150,6 +154,62 @@ test("the README's screenshots", async ({ office, page }) => {
   ).toBeVisible();
   await page.waitForTimeout(6_000);
   await shoot(page, "office-floor");
+
+  // The Overview, at a busy moment: the stand-in sandbox runner ends each
+  // task at once, so the page is given one, of the Floor's own team.
+  const manager = team.find(({ role }) => role === "manager");
+  const reviewer = team.find(({ role }) => role === "reviewer");
+  const minutesAgo = (minutes: number) =>
+    new Date(Date.now() - minutes * 60_000).toISOString();
+  const busy: WorkingNow = {
+    work: [
+      {
+        id: 1,
+        floorId: "web-shop",
+        floorName: "web-shop",
+        repository: "adrianeyre/web-shop",
+        issue: 1,
+        stage: "needs-work",
+        status: "running",
+        agentId: coder.id,
+        agentName: coder.name,
+        role: "coder",
+        queuedAt: minutesAgo(14),
+        startedAt: minutesAgo(13),
+      },
+      {
+        id: 2,
+        floorId: "web-shop",
+        floorName: "web-shop",
+        repository: "adrianeyre/web-shop",
+        issue: 2,
+        stage: "needs-review",
+        status: "queued",
+        agentId: reviewer?.id ?? null,
+        agentName: reviewer?.name ?? null,
+        role: "reviewer",
+        queuedAt: minutesAgo(3),
+        startedAt: null,
+      },
+    ],
+    managers: [
+      {
+        floorId: "web-shop",
+        floorName: "web-shop",
+        agentId: manager?.id ?? null,
+        agentName: manager?.name ?? "The Manager",
+        phase: "writing",
+        since: minutesAgo(1),
+      },
+    ],
+  };
+  await page.route("**/api/working-now", (route) =>
+    route.fulfill({ json: busy }),
+  );
+  await page.goto("/overview");
+  await expect(page.getByRole("table", { name: "Agents' work" })).toBeVisible();
+  await shoot(page, "overview");
+  await page.unroute("**/api/working-now");
 
   await page.goto("/notices");
   await expect(

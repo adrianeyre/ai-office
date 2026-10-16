@@ -263,6 +263,15 @@ export interface ManagerChatHistory {
   readonly pending: PendingReply[];
 }
 
+/** A Floor's Manager at work: what it answers, how, and since when. */
+export interface ManagerWorking {
+  readonly floorId: string;
+  /** The Owner's message it answers. */
+  readonly replyTo: number;
+  readonly phase: "writing" | "acting" | "busy";
+  readonly since: Date;
+}
+
 export interface ManagerChat {
   /** The Floor's Manager, its latest messages, and a reply being written. */
   history(floorId: string, limit?: number): Promise<ManagerChatHistory>;
@@ -293,6 +302,11 @@ export interface ManagerChat {
     floorId: string,
     listener: (update: ManagerChatUpdate) => void,
   ): { readonly pending: PendingReply[]; unsubscribe(): void };
+  /**
+   * What each Floor's Manager is doing now, if anything: writing a reply,
+   * carrying out a request, or otherwise busy (a compaction, a report).
+   */
+  working(): ManagerWorking[];
   /**
    * Ends what the Manager of a Floor removed is doing: the reply it is
    * writing, or the request it is carrying out (research, fact-finding, a
@@ -366,6 +380,8 @@ interface Answering {
   text: string;
   readonly controller: AbortController;
   phase: "writing" | "acting" | "busy";
+  /** When the Manager started on it. */
+  readonly since: Date;
   /** Whether the Owner's next message interrupted it. */
   interrupted: boolean;
   /** Settles once the answer is kept and the Floor let go. */
@@ -2236,6 +2252,7 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
       text: "",
       controller,
       phase: "busy",
+      since: now(),
       interrupted: false,
       done: Promise.resolve(),
     };
@@ -3137,6 +3154,20 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
     tasksChanged(floorId) {
       publish(floorId, { type: "tasks" });
     },
+
+    working: () =>
+      [...busy].flatMap(([floorId, answering]) =>
+        answering == null
+          ? []
+          : [
+              {
+                floorId,
+                replyTo: answering.replyTo,
+                phase: answering.phase,
+                since: answering.since,
+              },
+            ],
+      ),
 
     async end(floorId) {
       const answering = busy.get(floorId);

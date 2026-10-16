@@ -23,6 +23,7 @@ import {
   LogOut,
   Menu,
   Network,
+  Radar,
   Settings,
   SquareTerminal,
   UserCog,
@@ -54,6 +55,7 @@ import { StartupVersionCheck } from "./version-check.tsx";
 const navigation: readonly {
   to:
     | "/"
+    | "/overview"
     | "/notices"
     | "/activity"
     | "/terminal"
@@ -69,6 +71,7 @@ const navigation: readonly {
   icon: LucideIcon;
 }[] = [
   { to: "/", label: "Office", icon: Building2 },
+  { to: "/overview", label: "Overview", icon: Radar },
   { to: "/notices", label: "Notices", icon: ClipboardList },
   { to: "/activity", label: "Activity", icon: Activity },
   { to: "/terminal", label: "Terminal", icon: SquareTerminal },

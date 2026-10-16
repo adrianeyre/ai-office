@@ -143,6 +143,7 @@ describe("the app layout", () => {
       links.map((link) => [link.textContent, link.getAttribute("href")]),
     ).toEqual([
       ["Office", "/"],
+      ["Overview", "/overview"],
       ["Notices", "/notices"],
       ["Activity", "/activity"],
       ["Terminal", "/terminal"],
@@ -273,15 +274,15 @@ describe("the app layout", () => {
         .map((link) => link.textContent);
     within(nav).getByRole("link", { name: "Office" }).focus();
     await userEvent.keyboard("{Alt>}{ArrowDown}{/Alt}");
-    expect(labels().slice(0, 3)).toEqual(["Notices", "Office", "Activity"]);
+    expect(labels().slice(0, 3)).toEqual(["Overview", "Office", "Notices"]);
     expect(within(nav).getByRole("status").textContent).toBe(
-      "Office moved to place 2 of 12.",
+      "Office moved to place 2 of 13.",
     );
 
     const admin = within(nav).getByRole("link", {
       name: "General Settings",
     });
-    const notices = within(nav).getByRole("link", { name: "Notices" });
+    const overview = within(nav).getByRole("link", { name: "Overview" });
     const data = new Map<string, string>();
     const dataTransfer = {
       setData: (type: string, value: string) => data.set(type, value),
@@ -290,19 +291,22 @@ describe("the app layout", () => {
       dropEffect: "",
     };
     fireEvent.dragStart(admin.closest("li") as HTMLElement, { dataTransfer });
-    fireEvent.dragOver(notices.closest("li") as HTMLElement, { dataTransfer });
-    fireEvent.drop(notices.closest("li") as HTMLElement, { dataTransfer });
+    fireEvent.dragOver(overview.closest("li") as HTMLElement, {
+      dataTransfer,
+    });
+    fireEvent.drop(overview.closest("li") as HTMLElement, { dataTransfer });
     expect(labels().slice(0, 3)).toEqual([
       "General Settings",
-      "Notices",
+      "Overview",
       "Office",
     ]);
     expect(
       JSON.parse(localStorage.getItem("ai-office:navigation-order") ?? "[]"),
     ).toEqual([
       "/general-settings",
-      "/notices",
+      "/overview",
       "/",
+      "/notices",
       "/activity",
       "/terminal",
       "/gateway",
