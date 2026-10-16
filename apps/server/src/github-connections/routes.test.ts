@@ -141,7 +141,7 @@ describe("GitHub connections", () => {
     );
     expect(refused.statusCode).toBe(400);
     expect(apiErrorSchema.parse(refused.json()).problems).toEqual([
-      "That is not a GitHub access token.",
+      "The read-only access token is not a GitHub access token.",
     ]);
     expect(refused.body).not.toContain("hunter2");
     const app = await call(setup, "POST", "/api/github/connections/apps", {
