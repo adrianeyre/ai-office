@@ -12,6 +12,10 @@ import { Link } from "@tanstack/react-router";
 import {
   BookOpen,
   ChartColumn,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Code,
   Lock,
   Megaphone,
@@ -19,6 +23,7 @@ import {
   Palette,
   Pencil,
   PenLine,
+  Search,
   Server,
   ShoppingBag,
   Smartphone,
@@ -37,7 +42,9 @@ import {
   CardTitle,
 } from "@/components/ui/card.tsx";
 import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
 import { LoadingMessage } from "@/components/ui/spinner.tsx";
+import { cn, selectClass } from "@/lib/utils.ts";
 
 import { postJson, readApiError, sendJson } from "./api.ts";
 import {
@@ -46,6 +53,13 @@ import {
   floorTemplatesQuery,
   installedRepositoriesQuery,
 } from "./floors.ts";
+import {
+  browse,
+  ownersOf,
+  pageNumbers,
+  pageSizes,
+  type PageSize,
+} from "./repository-browser.ts";
 import { sessionQuery } from "./session.ts";
 
 /** How each Floor Template's icon is drawn. */
@@ -239,6 +253,315 @@ function RepositoryRow({
         </p>
       )}
     </li>
+  );
+}
+
+/**
+ * The pages of a list of repositories: first, previous, the page numbers
+ * near the one shown, next and last, and how many a page shows.
+ */
+function Pagination({
+  page,
+  pageCount,
+  pageSize,
+  showPageSize,
+  onPage,
+  onPageSize,
+}: {
+  page: number;
+  pageCount: number;
+  pageSize: PageSize;
+  /** Whether there are enough to choose how many a page shows. */
+  showPageSize: boolean;
+  onPage: (page: number) => void;
+  onPageSize: (pageSize: PageSize) => void;
+}) {
+  const pageSizeId = useId();
+  const first = page === 1;
+  const last = page === pageCount;
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      {pageCount > 1 ? (
+        <nav aria-label="Repository pages">
+          <ul className="flex flex-wrap items-center gap-1">
+            <li>
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="First page"
+                title="First page"
+                disabled={first}
+                onClick={() => {
+                  onPage(1);
+                }}
+              >
+                <ChevronsLeft aria-hidden />
+              </Button>
+            </li>
+            <li>
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="Previous page"
+                title="Previous page"
+                disabled={first}
+                onClick={() => {
+                  onPage(page - 1);
+                }}
+              >
+                <ChevronLeft aria-hidden />
+              </Button>
+            </li>
+            {pageNumbers(page, pageCount).map((number, index) =>
+              number === "gap" ? (
+                <li
+                  // Gaps have no number of their own; where they are does.
+                  key={`gap-${String(index)}`}
+                  aria-hidden
+                  className="hidden px-1 text-sm text-muted-foreground sm:block"
+                >
+                  …
+                </li>
+              ) : (
+                <li
+                  key={number}
+                  className={number === page ? undefined : "hidden sm:block"}
+                >
+                  <Button
+                    size="icon"
+                    variant={number === page ? "outline" : "ghost"}
+                    aria-label={`Page ${String(number)}`}
+                    aria-current={number === page ? "page" : undefined}
+                    onClick={() => {
+                      onPage(number);
+                    }}
+                  >
+                    {number}
+                  </Button>
+                </li>
+              ),
+            )}
+            <li>
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="Next page"
+                title="Next page"
+                disabled={last}
+                onClick={() => {
+                  onPage(page + 1);
+                }}
+              >
+                <ChevronRight aria-hidden />
+              </Button>
+            </li>
+            <li>
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="Last page"
+                title="Last page"
+                disabled={last}
+                onClick={() => {
+                  onPage(pageCount);
+                }}
+              >
+                <ChevronsRight aria-hidden />
+              </Button>
+            </li>
+            <li className="px-1 text-sm text-muted-foreground sm:hidden">
+              of {pageCount}
+            </li>
+          </ul>
+        </nav>
+      ) : (
+        <span />
+      )}
+      {showPageSize && (
+        <div className="flex items-center gap-2 text-sm">
+          <Label htmlFor={pageSizeId} className="font-normal">
+            Per page
+          </Label>
+          <select
+            id={pageSizeId}
+            className={cn(selectClass, "w-20")}
+            value={pageSize}
+            onChange={(event) => {
+              onPageSize(Number(event.target.value) as PageSize);
+            }}
+          >
+            {pageSizes.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The repositories that can become Floors, a page at a time: found by
+ * typing any part of a name, and narrowed to one GitHub organisation or
+ * user when they belong to several. An access token can reach hundreds.
+ */
+function RepositoryBrowser({
+  repositories,
+  template,
+  ready,
+  csrfToken,
+  onAdded,
+}: {
+  repositories: InstalledRepository[];
+  template: string | undefined;
+  ready: boolean;
+  csrfToken: string | undefined;
+  onAdded: () => Promise<void>;
+}) {
+  const [query, setQuery] = useState("");
+  const [owner, setOwner] = useState<string>();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSize>(pageSizes[0]);
+  const searchId = useId();
+  const ownerId = useId();
+  const top = useRef<HTMLDivElement>(null);
+
+  const owners = ownersOf(repositories);
+  // An owner no longer among them, its last one gone, is every owner.
+  const chosenOwner = owners.some((each) => each.owner === owner)
+    ? owner
+    : undefined;
+  const shown = browse(repositories, {
+    query,
+    owner: chosenOwner,
+    page,
+    pageSize,
+  });
+  const filtered = query.trim() !== "" || chosenOwner !== undefined;
+
+  const clear = () => {
+    setQuery("");
+    setOwner(undefined);
+    setPage(1);
+  };
+  const toPage = (next: number) => {
+    setPage(next);
+    // The new page starts where the old one did, the controls in view.
+    top.current?.scrollIntoView({ block: "nearest" });
+  };
+
+  return (
+    <div ref={top} className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+        <div className="space-y-1">
+          <Label htmlFor={searchId}>Find a repository</Label>
+          <div className="relative">
+            <Search
+              aria-hidden
+              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              id={searchId}
+              type="search"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="Start typing its name"
+              className="pl-9"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setPage(1);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Escape" && query !== "") {
+                  event.preventDefault();
+                  setQuery("");
+                  setPage(1);
+                }
+              }}
+            />
+          </div>
+        </div>
+        {owners.length > 1 && (
+          <div className="space-y-1">
+            <Label htmlFor={ownerId}>GitHub organisation</Label>
+            <select
+              id={ownerId}
+              className={cn(selectClass, "sm:w-56")}
+              value={chosenOwner ?? ""}
+              onChange={(event) => {
+                setOwner(
+                  event.target.value === "" ? undefined : event.target.value,
+                );
+                setPage(1);
+              }}
+            >
+              <option value="">
+                Every organisation ({repositories.length})
+              </option>
+              {owners.map(({ owner: each, count }) => (
+                <option key={each} value={each}>
+                  {each} ({count})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      <p role="status" className="text-sm text-muted-foreground">
+        {shown.total === 0
+          ? "No repository matches."
+          : `Showing ${String(shown.from)}–${String(shown.to)} of ${String(shown.total)} ${shown.total === 1 ? "repository" : "repositories"}${filtered ? ` (of ${String(repositories.length)})` : ""}.`}
+      </p>
+
+      {shown.total === 0 ? (
+        <div className="space-y-2 rounded-md border border-dashed p-4 text-sm">
+          <p>
+            {/* Only a search finds none: every owner offered has some. */}
+            No repository
+            {chosenOwner === undefined ? "" : ` of ${chosenOwner}`} has “
+            {query.trim()}” in its name. Check the spelling
+            {chosenOwner === undefined
+              ? "."
+              : ", or look through every organisation’s."}
+          </p>
+          <Button size="sm" variant="outline" onClick={clear}>
+            Clear the search
+          </Button>
+        </div>
+      ) : (
+        <ul
+          aria-label="Repositories the App is installed on"
+          className="divide-y"
+        >
+          {shown.items.map((repository) => (
+            <RepositoryRow
+              key={repository.fullName}
+              repository={repository}
+              template={template}
+              ready={ready}
+              csrfToken={csrfToken}
+              onAdded={onAdded}
+            />
+          ))}
+        </ul>
+      )}
+
+      <Pagination
+        page={shown.page}
+        pageCount={shown.pageCount}
+        pageSize={pageSize}
+        showPageSize={shown.total > pageSizes[0]}
+        onPage={toPage}
+        onPageSize={(size) => {
+          setPageSize(size);
+          setPage(1);
+        }}
+      />
+    </div>
   );
 }
 
@@ -556,21 +879,13 @@ export function FloorsCard() {
             </p>
           )}
           {repositories.data !== undefined && repositories.data.length > 0 && (
-            <ul
-              aria-label="Repositories the App is installed on"
-              className="divide-y"
-            >
-              {repositories.data.map((repository) => (
-                <RepositoryRow
-                  key={repository.fullName}
-                  repository={repository}
-                  template={chosen ?? templates.data?.defaultTemplate}
-                  ready={!templates.isPending}
-                  csrfToken={session?.csrfToken}
-                  onAdded={onAdded}
-                />
-              ))}
-            </ul>
+            <RepositoryBrowser
+              repositories={repositories.data}
+              template={chosen ?? templates.data?.defaultTemplate}
+              ready={!templates.isPending}
+              csrfToken={session?.csrfToken}
+              onAdded={onAdded}
+            />
           )}
         </section>
       </CardContent>
