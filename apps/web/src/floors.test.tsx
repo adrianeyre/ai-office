@@ -658,6 +658,101 @@ describe("the Floors in Floor Settings", () => {
     });
   });
 
+  it("finds a repository among many: typed, by organisation, a page at a time", async () => {
+    stubServer({
+      repositories: Array.from({ length: 60 }, (_, index) =>
+        repository(
+          `${index < 40 ? "acme" : "adrianeyre"}/repo-${String(index + 1).padStart(2, "0")}`,
+        ),
+      ),
+    });
+    renderAt("/floor-settings");
+    const floors = await card("Floors");
+    const repositories = await floors.findByRole("list", {
+      name: "Repositories the App is installed on",
+    });
+    const names = () =>
+      within(
+        floors.getByRole("list", {
+          name: "Repositories the App is installed on",
+        }),
+      )
+        .getAllByRole("link")
+        .map((link) => link.textContent);
+    const status = () => floors.getByRole("status").textContent;
+
+    // A page at a time.
+    expect(within(repositories).getAllByRole("listitem")).toHaveLength(25);
+    expect(status()).toBe("Showing 1–25 of 60 repositories.");
+    const pages = floors.getByRole("navigation", { name: "Repository pages" });
+    expect(
+      within(pages)
+        .getByRole("button", { name: "Page 1" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
+    expect(
+      within(pages).getByRole<HTMLButtonElement>("button", {
+        name: "Previous page",
+      }).disabled,
+    ).toBe(true);
+    await userEvent.click(
+      within(pages).getByRole("button", { name: "Next page" }),
+    );
+    expect(status()).toBe("Showing 26–50 of 60 repositories.");
+    expect(names()[0]).toBe("acme/repo-26");
+    await userEvent.click(
+      within(pages).getByRole("button", { name: "Last page" }),
+    );
+    expect(status()).toBe("Showing 51–60 of 60 repositories.");
+    expect(
+      within(pages).getByRole<HTMLButtonElement>("button", {
+        name: "Next page",
+      }).disabled,
+    ).toBe(true);
+    await userEvent.selectOptions(floors.getByLabelText("Per page"), "100");
+    expect(status()).toBe("Showing 1–60 of 60 repositories.");
+    expect(
+      floors.queryByRole("navigation", { name: "Repository pages" }),
+    ).toBeNull();
+
+    // One organisation's.
+    const organisation = floors.getByLabelText("GitHub organisation");
+    expect(
+      within(organisation)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["Every organisation (60)", "acme (40)", "adrianeyre (20)"]);
+    await userEvent.selectOptions(organisation, "adrianeyre");
+    expect(status()).toBe("Showing 1–20 of 20 repositories (of 60).");
+
+    // Typed, within it.
+    const search = floors.getByLabelText("Find a repository");
+    await userEvent.type(search, "REPO-5");
+    expect(names()).toEqual([
+      "adrianeyre/repo-50",
+      "adrianeyre/repo-51",
+      "adrianeyre/repo-52",
+      "adrianeyre/repo-53",
+      "adrianeyre/repo-54",
+      "adrianeyre/repo-55",
+      "adrianeyre/repo-56",
+      "adrianeyre/repo-57",
+      "adrianeyre/repo-58",
+      "adrianeyre/repo-59",
+    ]);
+    await userEvent.clear(search);
+    await userEvent.type(search, "repo-07");
+    expect(status()).toBe("No repository matches.");
+    expect(
+      floors.getByText(/No repository of adrianeyre has “repo-07” in its name/),
+    ).toBeDefined();
+    await userEvent.click(
+      floors.getByRole("button", { name: "Clear the search" }),
+    );
+    expect(status()).toBe("Showing 1–60 of 60 repositories.");
+    expect((search as HTMLInputElement).value).toBe("");
+  });
+
   it("picks the Floor Template a new Floor starts from, showing each one's starting team (PRD FR-97)", async () => {
     const { calls } = stubServer({
       floors: [
