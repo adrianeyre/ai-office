@@ -1421,3 +1421,12 @@ export {
   type SeasonalEventSettings,
   type SeasonalExtraId,
 } from "./seasonal-events.ts";
+export {
+  workingAgentSchema,
+  workingManagerSchema,
+  workingNowErrorCodes,
+  workingNowSchema,
+  type WorkingAgent,
+  type WorkingManager,
+  type WorkingNow,
+} from "./working-now.ts";

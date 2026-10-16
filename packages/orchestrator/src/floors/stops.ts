@@ -3,7 +3,7 @@ import type { EventBus } from "@ai-office/events";
 import { eq } from "drizzle-orm";
 
 import type { WorkQueue } from "../work/queue.ts";
-import type { WorkQueueStore } from "../work/store.ts";
+import type { WorkItem, WorkQueueStore } from "../work/store.ts";
 
 // "Stop everything" from the Meeting Room: the Owner stops a whole Floor.
 // Its running work is interrupted and goes back in the queue for the same
@@ -82,6 +82,12 @@ export interface FloorStops {
    * has ended.
    */
   end(floorId: string): Promise<void>;
+  /**
+   * Cancels one piece of work, the Owner's choice: interrupted, its
+   * sandbox stopped, if it is running; never started if it is queued.
+   * False when it is neither, as it ended meanwhile or never was.
+   */
+  cancel(workId: number): Promise<boolean>;
 }
 
 export interface FloorStopsOptions {
@@ -98,6 +104,13 @@ export function createFloorStops(options: FloorStopsOptions): FloorStops {
   const { store, events } = options;
   const now = options.now ?? (() => new Date());
   const stops = new Map<string, Date>();
+  const cancel = async (item: WorkItem): Promise<boolean> => {
+    if (item.status === "running") {
+      return options.queue().interrupt(item.id);
+    }
+    await options.work.end(item.id, "cancelled", now());
+    return true;
+  };
   return {
     async start() {
       for (const { floorId, stoppedAt } of await store.list()) {
@@ -137,20 +150,18 @@ export function createFloorStops(options: FloorStopsOptions): FloorStops {
       const items = (await options.work.active()).filter(
         (item) => item.floorId === floorId,
       );
-      await Promise.all(
-        items.map(async (item) => {
-          if (item.status === "queued") {
-            // None is claimed meanwhile: no work starts on a Floor removed.
-            await options.work.end(item.id, "cancelled", now());
-          } else {
-            await options.queue().interrupt(item.id);
-          }
-        }),
-      );
+      // None is claimed meanwhile: no work starts on a Floor removed.
+      await Promise.all(items.map((item) => cancel(item)));
       // A Floor removed is not stopped any more: it is gone.
       if (stops.delete(floorId)) {
         await store.remove(floorId);
       }
+    },
+    async cancel(workId) {
+      const item = (await options.work.active()).find(
+        ({ id }) => id === workId,
+      );
+      return item === undefined ? false : cancel(item);
     },
   };
 }

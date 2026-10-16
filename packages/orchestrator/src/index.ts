@@ -659,6 +659,7 @@ export {
   GrillingError,
   ManagerChatError,
   type ManagerChat,
+  type ManagerWorking,
   type ManagerChatHistory,
   type ManagerChatOptions,
   type ManagerChatUpdate,

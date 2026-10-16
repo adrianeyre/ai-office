@@ -55,6 +55,7 @@ import { liftLocation } from "./scene/lift.ts";
 import { useLiftStore } from "./scene/lift-store.ts";
 import { SetupPage } from "./setup-page.tsx";
 import { TerminalPage } from "./terminal-page.tsx";
+import { OverviewPage } from "./overview-page.tsx";
 import { WhiteboardPage } from "./whiteboard.tsx";
 
 // Code-based routes. The setup and login pages stand alone; every other page
@@ -556,6 +557,13 @@ const activityRoute = createRoute({
   },
 });
 
+const workingNowRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/overview",
+  staticData: { title: "Overview" },
+  component: OverviewPage,
+});
+
 /** The request history's search: its filters. */
 const gatewaySearchSchema = z.object({
   q: z.string().min(1).optional().catch(undefined),
@@ -676,6 +684,7 @@ const routeTree = rootRoute.addChildren([
     officeRoute,
     noticesRoute,
     activityRoute,
+    workingNowRoute,
     terminalRoute,
     adminRoute,
     oldAdminRoute,

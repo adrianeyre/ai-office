@@ -148,6 +148,7 @@ import { registerEventStream } from "./events/stream.ts";
 import { registerFloorTemplateRoutes } from "./floor-templates/routes.ts";
 import { registerBranchRoutes } from "./branches/routes.ts";
 import { registerFloorRoutes } from "./floors/routes.ts";
+import { registerWorkingNowRoutes } from "./working-now/routes.ts";
 import { gatewayEntry } from "./gateway-entry.ts";
 import { keepAgentKeys } from "./gateway-keys/agent-keys.ts";
 import { createKeyGuesses } from "./gateway-keys/key-guesses.ts";
@@ -1156,6 +1157,13 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
         "Agents without a Gateway Key could not be given one.",
       );
     }
+  });
+  registerWorkingNowRoutes(app, {
+    floors: stores.floors,
+    agents: workingAgents,
+    work,
+    stops: floorStops,
+    managerChat,
   });
   // A Floor removed (archived) stops all it was doing, not only what it
   // would start: its Agents' work and sandboxes, its Manager's reply or
