@@ -367,8 +367,9 @@ function AddAccessTokenForm({
           {...register("token")}
         />
         <p id="github-token-hint" className="text-xs text-muted-foreground">
-          Reads and writes the repositories&apos; contents, issues and pull
-          requests, and reads their checks.
+          A fine-grained or classic personal access token. Reads and writes the
+          repositories&apos; contents, issues and pull requests, and reads their
+          checks.
         </p>
       </div>
       <div className="space-y-2">
@@ -384,7 +385,8 @@ function AddAccessTokenForm({
           id="github-read-only-token-hint"
           className="text-xs text-muted-foreground"
         >
-          Another token, one that can only read them: it is all the Agents&apos;
+          Required: another token, one that can only read them, such as a
+          fine-grained token with read-only Contents. It is all the Agents&apos;
           sandboxes get. Both are kept encrypted and never shown again.
         </p>
       </div>

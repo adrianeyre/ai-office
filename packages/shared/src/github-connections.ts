@@ -56,11 +56,26 @@ export const githubPrivateKeySchema = z
     error: "The private key is at most 16384 characters.",
   });
 
+/** A fine-grained or classic personal access token, its problems naming the field. */
+function accessToken(missing: string, wrong: string) {
+  return z
+    .string({ error: missing })
+    .trim()
+    .min(1, { error: missing, abort: true })
+    .regex(/^[\w-]{20,255}$/, { error: wrong });
+}
+
 /** A fine-grained or classic personal access token. */
-export const githubAccessTokenSchema = z
-  .string({ error: "Give the access token." })
-  .trim()
-  .regex(/^[\w-]{20,255}$/, { error: "That is not a GitHub access token." });
+export const githubAccessTokenSchema = accessToken(
+  "Give the access token.",
+  "That is not a GitHub access token.",
+);
+
+/** The read-only partner of an access token: what sandboxes get. */
+const githubReadOnlyAccessTokenSchema = accessToken(
+  "Give a read-only access token too: sandboxes get it, never the access token.",
+  "The read-only access token is not a GitHub access token.",
+);
 
 /** The body of `POST /api/github/connections/apps`. */
 export const githubAppConnectionCreateSchema = z.strictObject({
@@ -79,7 +94,7 @@ export const githubAccessTokenConnectionCreateSchema = z
     name: name.optional(),
     token: githubAccessTokenSchema,
     /** What sandboxes get: a token that can read the repositories and change nothing. */
-    readOnlyToken: githubAccessTokenSchema,
+    readOnlyToken: githubReadOnlyAccessTokenSchema,
   })
   .refine(({ token, readOnlyToken }) => token !== readOnlyToken, {
     error:

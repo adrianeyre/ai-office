@@ -68,6 +68,53 @@ describe("adding an access token", () => {
     ).toEqual({ token: writer, readOnlyToken: reader });
   });
 
+  it("takes a classic personal access token as either", () => {
+    const classic = `ghp_${"aB3".repeat(12)}`;
+    expect(
+      githubAccessTokenConnectionCreateSchema.parse({
+        token: classic,
+        readOnlyToken: reader,
+      }),
+    ).toEqual({ token: classic, readOnlyToken: reader });
+    expect(
+      githubAccessTokenConnectionCreateSchema.parse({
+        token: writer,
+        readOnlyToken: classic,
+      }),
+    ).toEqual({ token: writer, readOnlyToken: classic });
+  });
+
+  it("says which token is missing or wrong", () => {
+    expect(
+      problems(
+        githubAccessTokenConnectionCreateSchema.safeParse({
+          token: writer,
+          readOnlyToken: " ",
+        }),
+      ),
+    ).toEqual([
+      "Give a read-only access token too: sandboxes get it, never the access token.",
+    ]);
+    expect(
+      problems(
+        githubAccessTokenConnectionCreateSchema.safeParse({ token: writer }),
+      ),
+    ).toEqual([
+      "Give a read-only access token too: sandboxes get it, never the access token.",
+    ]);
+    expect(
+      problems(
+        githubAccessTokenConnectionCreateSchema.safeParse({
+          token: "",
+          readOnlyToken: "short",
+        }),
+      ),
+    ).toEqual([
+      "Give the access token.",
+      "The read-only access token is not a GitHub access token.",
+    ]);
+  });
+
   it("refuses the same token twice, or something that is not a token", () => {
     expect(
       problems(
