@@ -716,6 +716,34 @@ describe("the AI Accounts in AI Settings", () => {
     expect(document.body.innerHTML).not.toContain("ac_the-code");
   });
 
+  it("says a ChatGPT sign-in's callback page will not load when AI Office runs on another host, and to paste its address", async () => {
+    vi.spyOn(location, "hostname").mockReturnValue(
+      "ai-office.example.internal",
+    );
+    stubServer();
+    const user = userEvent.setup();
+    const view = await card();
+    await view.findByText(/No AI Accounts yet/);
+    await user.selectOptions(
+      view.getByLabelText("Account type"),
+      "ChatGPT subscription (Plus, Pro or Business), for Codex",
+    );
+    await user.type(view.getByLabelText("Name"), "ChatGPT Plus");
+    await user.click(view.getByRole("checkbox"));
+    await user.click(view.getByRole("button", { name: "Sign in to OpenAI" }));
+    const steps = await view.findByRole("form", {
+      name: "Sign in to the subscription",
+    });
+    expect(steps.textContent).toContain("This site can't be reached");
+    expect(steps.textContent).toContain(
+      "AI Office runs on ai-office.example.internal, not this computer.",
+    );
+    expect(steps.textContent).not.toContain("this finishes by itself");
+    expect(
+      within(steps).getByLabelText("Address the sign-in ended on"),
+    ).toBeDefined();
+  });
+
   it("finishes a ChatGPT sign-in by itself once AI Office's callback has", async () => {
     const server = stubServer();
     const user = userEvent.setup();

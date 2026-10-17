@@ -66,6 +66,7 @@ import {
 } from "./api.ts";
 import { useEventStream } from "./event-stream.ts";
 import { sessionQuery } from "./session.ts";
+import { isLocalhost, location } from "./totp-settings.tsx";
 
 // The AI Accounts the AI Gateway serves Agents' model calls from (PRD
 // FR-35, FR-36): add a key-based one, an AWS Bedrock or Google Vertex AI
@@ -193,6 +194,9 @@ function LoginSteps({
   const device = login.userCode !== undefined;
   const page = signInPageOf(aiProvider);
   const address = pastesAddress(aiProvider);
+  const hostname = location.hostname();
+  // Served from another host, the callback page on localhost cannot load.
+  const onThisComputer = isLocalhost(hostname);
   /** Whether a sign-in finished on its callback was handed on. */
   const handed = useRef(false);
 
@@ -266,13 +270,23 @@ function LoginSteps({
             <code className="font-mono font-medium">{login.userCode}</code>,
             approve it, then finish signing in here before it expires.
           </li>
-        ) : address ? (
+        ) : address && onThisComputer ? (
           <li>
             Your browser then opens a page on <code>localhost:1455</code>. If AI
             Office runs on this computer, that page says you are signed in and
             this finishes by itself. If the page does not load (AI Office runs
             elsewhere), copy its whole address and paste it here, before the
             sign-in expires.
+          </li>
+        ) : address ? (
+          <li>
+            Your browser then opens a page on <code>localhost:1455</code> that
+            does not load (&ldquo;This site can&apos;t be reached&rdquo;). That
+            is expected: OpenAI only returns to <code>localhost</code>, and AI
+            Office runs on <code>{hostname}</code>, not this computer. Copy the
+            whole address from the browser&apos;s address bar (it starts{" "}
+            <code>http://localhost:1455/auth/callback?code=</code>) and paste it
+            here, before the sign-in expires.
           </li>
         ) : (
           <li>Paste the code the page shows, before it expires.</li>
