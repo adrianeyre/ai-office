@@ -1,6 +1,6 @@
 {
   "name": "ai-office",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "description": "AI Office: a 3D office where AI agents work your GitHub issues, with a built-in load balancer for AI accounts.",
   "type": "module",

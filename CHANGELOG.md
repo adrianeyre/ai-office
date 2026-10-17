@@ -1,3 +1,11 @@
+## [1.1.1](https://github.com/adrianeyre/ai-office/compare/v1.1.0...v1.1.1) (2026-10-17)
+
+### Bug Fixes
+
+* a ChatGPT sign-in on a remote AI Office says its localhost page will not load, and to paste its address ([5e0de6e](https://github.com/adrianeyre/ai-office/commit/5e0de6eb58831ee3b1877def6e5e0d8be6c01c4b))
+* **a11y:** the menu's page divider always has an aria-valuenow ([d4a55b4](https://github.com/adrianeyre/ai-office/commit/d4a55b4da5cb20e59c0575a748a043532cea9db5))
+* **security:** the Sandcastle git guard and the pen-test scripts are executable ([7890bd7](https://github.com/adrianeyre/ai-office/commit/7890bd7b1e0e371f6005bb86a7d9b121ec6cc6b9))
+
 ## [1.1.0](https://github.com/adrianeyre/ai-office/compare/v1.0.0...v1.1.0) (2026-10-17)
 
 ### Features
