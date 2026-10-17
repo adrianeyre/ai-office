@@ -739,10 +739,11 @@ test("the keyboard: the skip link, a policy dialog and an object's panel", async
   const panel = page.getByRole("dialog", { name: chosen });
   await expect(panel).toBeVisible({ timeout: 15_000 });
   await expect(panel).toBeFocused();
-  await page.keyboard.press("Tab");
-  await expect(
-    panel.getByRole("button", { name: "Close panel" }),
-  ).toBeFocused();
+  // Its header's buttons, in order: move it, fill the screen, close it.
+  for (const name of ["Move panel", "Full screen", "Close panel"]) {
+    await page.keyboard.press("Tab");
+    await expect(panel.getByRole("button", { name })).toBeFocused();
+  }
   await page.keyboard.press("Escape");
   await expect(panel).toBeHidden();
   await expect(objects.nth(1)).toBeFocused();

@@ -70,6 +70,10 @@ test("makes a proofreader Role, adds a proofreader Agent to a Floor, then edits 
     .getByRole("button", { name: "Add adrianeyre/web-shop as a Floor" })
     .click();
   await page.getByRole("link", { name: "web-shop", exact: true }).click();
+  // The Floor's Agents are in Agent Settings.
+  await page
+    .getByRole("link", { name: "Open web-shop's Agent Settings" })
+    .click();
   const add = page.getByRole("form", { name: "Add an Agent" });
   await add.getByLabel("Role").selectOption("proofreader");
   await add.getByLabel("Name").fill("Cora");

@@ -16,6 +16,8 @@ test("edit then approve a Plan on the whiteboard: the Manager replans, and work 
   office,
   page,
 }) => {
+  // It ends in the 3D Office, which is slow to load.
+  test.setTimeout(90_000);
   office.github.installRepository("adrianeyre/web-shop");
   await office.setUp();
   await signIn(page);
@@ -156,10 +158,11 @@ test("edit then approve a Plan on the whiteboard: the Manager replans, and work 
   // The meeting-room whiteboard in the 3D office shows the same Plans.
   await page.goto("/?floor=web-shop&inspect=whiteboard:web-shop");
   const panel = page.getByRole("dialog", { name: "The whiteboard" });
-  // The 3D scene loads first, so the panel's Plan can be slow under load.
+  // The 3D scene loads first, so the panel's Plan can be slow under load:
+  // over 15 s with software WebGL on a CI runner.
   await expect(
     panel.getByRole("heading", { name: "Batch 1: In progress" }),
-  ).toBeVisible({ timeout: 15_000 });
+  ).toBeVisible({ timeout: 45_000 });
   await expect(
     panel.getByRole("list", { name: "The Plan's issues, in order" }),
   ).toContainText("#3 Tidy the footer (started)");
