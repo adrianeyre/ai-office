@@ -17,7 +17,11 @@ const keysReceived: (string | undefined)[] = [];
 test.beforeEach(async () => {
   keysReceived.length = 0;
   provider = createServer((request, response) => {
-    keysReceived.push(request.headers["x-api-key"] as string | undefined);
+    // The calls the Gateway serves; adding the account also fetches its
+    // Models for the catalogue.
+    if (request.url?.startsWith("/v1/models") !== true) {
+      keysReceived.push(request.headers["x-api-key"] as string | undefined);
+    }
     request.resume();
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify({ input_tokens: 7 }));

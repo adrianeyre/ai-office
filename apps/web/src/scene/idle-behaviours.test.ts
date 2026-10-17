@@ -358,8 +358,9 @@ describe("the trip to an idle activity", () => {
         }
       }
     },
-    // Every trip from every desk: slow under a full parallel run.
-    30_000,
+    // Every trip from every desk: slow under a full parallel run, and over
+    // 30 s for 21 Agents on a slower machine.
+    120_000,
   );
 
   it("keeps the Agents at one spot apart", () => {

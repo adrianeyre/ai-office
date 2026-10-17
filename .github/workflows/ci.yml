@@ -21,7 +21,9 @@ jobs:
   check:
     name: Lint, typecheck, test
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The Sandcastle tests run every host-side git command through AI
+    # Office's guard (S1-2), a Node process each: over 20 minutes in all.
+    timeout-minutes: 40
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -59,7 +61,8 @@ jobs:
   e2e:
     name: End-to-end
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The end-to-end tests, then the scenes: over 20 minutes together.
+    timeout-minutes: 40
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -109,7 +112,7 @@ jobs:
   screenshots:
     name: Screenshots
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

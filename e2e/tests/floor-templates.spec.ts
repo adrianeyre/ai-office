@@ -55,7 +55,9 @@ test("saves a Floor as a template, then adds a new Floor from it", async ({
 
   // It is the Owner's own on the Floor Templates page, and editable.
   await save.getByRole("link", { name: "Open Web team" }).click();
-  await expect(page).toHaveURL(/\/admin\/templates\?template=web-team$/);
+  await expect(page).toHaveURL(
+    /\/general-settings\/templates\?template=web-team$/,
+  );
   const templates = page.getByRole("table", { name: "Floor Templates" });
   const row = templates.getByRole("row", { name: /Web team/ });
   await expect(row.getByRole("cell")).toHaveText([

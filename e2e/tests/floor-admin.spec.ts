@@ -34,7 +34,8 @@ test("edits each of a Floor's settings, and they are kept", async ({
   await add.getByRole("button", { name: "Add Agent" }).click();
   await expect(agents.getByRole("row", { name: /Rex/ })).toBeVisible();
   const [firstReviewer] = await agents
-    .getByRole("row", { name: /Reviewerrequired reviewer/ })
+    .getByRole("row")
+    .filter({ hasText: "required reviewer" })
     .getByRole("rowheader")
     .allTextContents();
 

@@ -191,8 +191,9 @@ test.describe("on a tablet", () => {
     office,
     page,
   }) => {
-    // Where there is no GPU, the 3D Office renders in software, slowly.
-    test.slow();
+    // Where there is no GPU, the 3D Office renders in software, slowly:
+    // over 90 s on a CI runner.
+    test.setTimeout(180_000);
     await officeWithAFloor(office, page);
     await page.goto("/");
     await expect(

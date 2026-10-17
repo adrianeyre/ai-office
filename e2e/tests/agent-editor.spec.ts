@@ -79,9 +79,8 @@ test("an Agent's new AI Provider and Model are what its next task uses", async (
   await expect(
     page.getByRole("status", { name: "Catalogue refreshed" }),
   ).toContainText("Grok (API key): 2 Models.");
+  // Its first AI Account gives Grok the first Model its catalogue lists.
   const grok = page.getByRole("form", { name: "Grok", exact: true });
-  await grok.getByLabel("Default Model").selectOption("grok-4");
-  await grok.getByRole("button", { name: "Save Grok's default" }).click();
   await expect(grok.getByText(/No default Model/)).toHaveCount(0);
   await expect(grok.getByLabel("Default Model")).toHaveValue("grok-4");
 

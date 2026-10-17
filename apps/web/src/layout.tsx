@@ -435,8 +435,11 @@ function MenuDivider({ menu }: { menu: RefObject<HTMLDivElement | null> }) {
       aria-orientation="horizontal"
       aria-label="Resize the menu's pages"
       aria-controls="navigation-pages"
-      aria-valuenow={height}
+      // A focusable separator needs a value (axe's aria-required-attr): at
+      // its own height the menu shows all its pages, the most it can.
+      aria-valuenow={height ?? menuHeights.max}
       aria-valuemin={menuHeights.min}
+      aria-valuemax={menuHeights.max}
       aria-valuetext={
         height === undefined
           ? "All the pages showing"

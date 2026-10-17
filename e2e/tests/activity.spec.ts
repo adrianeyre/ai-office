@@ -23,9 +23,13 @@ test("the Activity Feed filters by Floor and type, and new events stream in", as
   await page.getByRole("link", { name: "Activity" }).click();
   const feed = page.getByRole("list", { name: "Activity" });
   const entries = feed.locator(":scope > li");
-  // The sign-in, then each Floor and its four Agents.
-  await expect(entries).toHaveCount(11);
+  // The Owner's password set, the sign-in, then each Floor and its four
+  // Agents.
+  await expect(entries).toHaveCount(12);
   await expect(entries.last()).toContainText(
+    "Security settings changed: ownerPasswords.firstSet.",
+  );
+  await expect(entries.nth(-2)).toContainText(
     "The Owner signed in from 127.0.0.1.",
   );
   await expect(entries.first()).toContainText("joined as QA");
@@ -105,13 +109,15 @@ test("the Activity Feed loads older events as it scrolls", async ({
   await expect(entries).toHaveCount(50);
   await expect(entries.first()).toContainText("setting120");
   // Scrolling to the bottom loads older events, a page at a time, until
-  // there are none left: the sign-in, and every one published.
+  // there are none left: the Owner's password set, the sign-in, and every
+  // one published.
   await entries.last().scrollIntoViewIfNeeded();
   await expect.poll(() => entries.count()).toBeGreaterThanOrEqual(100);
   await expect(async () => {
     await entries.last().scrollIntoViewIfNeeded();
-    await expect(entries).toHaveCount(121, { timeout: 1000 });
+    await expect(entries).toHaveCount(122, { timeout: 1000 });
   }).toPass();
   await expect(page.getByText("That is everything.")).toBeVisible();
-  await expect(entries.last()).toContainText("The Owner signed in");
+  await expect(entries.last()).toContainText("ownerPasswords.firstSet");
+  await expect(entries.nth(-2)).toContainText("The Owner signed in");
 });

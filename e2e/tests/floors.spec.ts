@@ -99,6 +99,8 @@ test("adds a Floor from the Floor Template picked", async ({ page }) => {
   await expect(
     page.getByText("It started from the Blank Floor Template."),
   ).toBeVisible();
+  // Its Agents are in Agent Settings.
+  await page.goto("/agent-settings?floor=blog");
   const blogAgents = page.getByRole("table", { name: "Agents on blog" });
   await expect(blogAgents.getByRole("row", { name: /Manager/ })).toHaveCount(1);
   await expect(blogAgents.locator("tbody tr")).toHaveCount(1);
@@ -109,6 +111,7 @@ test("adds a Floor from the Floor Template picked", async ({ page }) => {
   await expect(
     page.getByText("It started from the Development Floor Template."),
   ).toBeVisible();
+  await page.goto("/agent-settings?floor=web-shop");
   const webShopAgents = page.getByRole("table", { name: "Agents on web-shop" });
   await expect(webShopAgents.locator("tbody tr")).toHaveCount(4);
   for (const role of ["Manager", "Coder", "Reviewer", "QA"]) {

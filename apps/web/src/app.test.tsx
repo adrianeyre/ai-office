@@ -273,6 +273,8 @@ describe("the app layout", () => {
     const aside = document.getElementById("navigation");
     const pages = document.getElementById("navigation-pages");
     expect(line.getAttribute("aria-valuetext")).toBe("All the pages showing");
+    // A focusable separator always has a value: all its pages, the most.
+    expect(line.getAttribute("aria-valuenow")).toBe("1600");
     expect(aside?.style.getPropertyValue("--menu-height")).toBe("");
     expect(line.className).toContain("mt-auto");
 
