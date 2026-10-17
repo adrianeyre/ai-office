@@ -295,9 +295,18 @@ describe("W1-5: what the Agent writes in a commit's metadata", () => {
     ).toBe("feat: a basket\n\nAgent: Ada (coder, Claude claude-opus-5-5)");
     // Unchanged, and decided so (issue #297): the author date is the
     // Agent's, as for every commit the App makes again.
+    // Compared as an instant: Git 2.55 writes UTC as `Z`, older Git `+00:00`.
     expect(
-      await gitIn(remote, "show", "--no-patch", "--format=%aI", published.sha),
-    ).toBe("2001-01-01T00:00:00+00:00");
+      new Date(
+        await gitIn(
+          remote,
+          "show",
+          "--no-patch",
+          "--format=%aI",
+          published.sha,
+        ),
+      ).toISOString(),
+    ).toBe("2001-01-01T00:00:00.000Z");
   });
 
   it("W1-5: a sign-off or review trailer naming the Owner, or anyone, is dropped too, in every commit pushed, and the Agent's own trailer is written once", async () => {

@@ -44,6 +44,11 @@ import {
 const credential = "console-account-key-7d1e4b9a3c5f0e2d8b6a";
 const otherCredential = "console-account-key-0a9b8c7d6e5f4a3b2c1d";
 
+// The accounts' clock, a second a tick from a whole second today. The
+// routes read the real clock (their usage history is the last 7 days), so
+// a fixed date here would fall out of that window as time passes.
+const clockStart = Math.floor(Date.now() / 1000) * 1000;
+
 interface Setup {
   readonly server: FastifyInstance;
   readonly owner: SignedIn;
@@ -65,7 +70,7 @@ async function setUp(store: AiAccountStore, bus: EventBus): Promise<Setup> {
     onCredential: (value) => {
       redactor.register(value);
     },
-    now: () => new Date(Date.UTC(2026, 9, 9, 12, 0, tick++)),
+    now: () => new Date(clockStart + 1000 * tick++),
   });
   const server = await buildApp({
     logger: createLogger({
@@ -164,8 +169,8 @@ const cases: Case[] = [
         extraUsage: null,
         rateLimits: null,
         balance: null,
-        createdAt: "2026-10-09T12:00:00.000Z",
-        updatedAt: "2026-10-09T12:00:00.000Z",
+        createdAt: new Date(clockStart).toISOString(),
+        updatedAt: new Date(clockStart).toISOString(),
       });
 
       const stored = await setup.store.get(added.id);
