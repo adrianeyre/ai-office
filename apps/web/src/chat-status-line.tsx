@@ -148,7 +148,11 @@ function WindowFigure({
         <span className="text-xs text-muted-foreground">{account}</span>
       ) : (
         <span
-          title={`${account}: resets ${new Date(state.resetsAt).toLocaleString()}`}
+          title={
+            state.resetsAt === null
+              ? `${account}: not started`
+              : `${account}: resets ${new Date(state.resetsAt).toLocaleString()}`
+          }
           className="block"
         >
           <UsageBar

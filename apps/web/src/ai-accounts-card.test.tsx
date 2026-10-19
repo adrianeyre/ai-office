@@ -913,6 +913,31 @@ describe("the AI Accounts in AI Settings", () => {
     }
   });
 
+  it("shows a usage window no request has started as 0%, not started", async () => {
+    stubServer([
+      {
+        ...max,
+        reauthenticationNeeded: false,
+        usage: {
+          fiveHour: { utilization: 0, resetsAt: null },
+          weekly: { utilization: 3, resetsAt: "2099-10-22T16:00:00.000Z" },
+        },
+      },
+    ]);
+    const view = await card();
+    const row = await view.findByRole("listitem", { name: "Claude Max" });
+    const usage = within(row).getByRole("list", {
+      name: "Claude Max's usage",
+    });
+    expect(usage.textContent).toContain("5-hour:0%, not started");
+    expect(usage.textContent).toContain("Weekly:3%, resets");
+    expect(
+      within(row)
+        .getByRole("meter", { name: "5-hour window used" })
+        .getAttribute("aria-valuetext"),
+    ).toBe("0% used");
+  });
+
   it("shows usage windows and their history, sets pause thresholds, and force-resets", async () => {
     const limited: AiAccount = {
       ...max,

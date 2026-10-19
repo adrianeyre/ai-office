@@ -840,21 +840,27 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
       const before = last as Record<string, number | Date | null> | undefined;
       const utilization = before?.[utilizationKey] as number | null;
       const resetsAt = before?.[resetsAtKey] as Date | null;
+      // A window not running is kept as one that reset now, once: until a
+      // request starts the next, nothing of it is used.
+      if (reading.resetsAt === null && resetsAt !== null && resetsAt <= at) {
+        continue;
+      }
+      const readingResetsAt = reading.resetsAt ?? at;
       if (
         utilization !== null &&
         resetsAt !== null &&
         Math.floor(utilization) === Math.floor(reading.utilization) &&
-        Math.abs(resetsAt.getTime() - reading.resetsAt.getTime()) < 1000
+        Math.abs(resetsAt.getTime() - readingResetsAt.getTime()) < 1000
       ) {
         continue;
       }
       changes[utilizationKey] = reading.utilization;
-      changes[resetsAtKey] = reading.resetsAt;
+      changes[resetsAtKey] = readingResetsAt;
       readings.push({
         aiAccountId: id,
         window,
         utilization: reading.utilization,
-        resetsAt: reading.resetsAt,
+        resetsAt: readingResetsAt,
         observedAt: at,
       });
     }
@@ -1666,7 +1672,7 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
           windows: reset.map(([window]) => window),
           served,
           resetsAt: served
-            ? (answer?.usage.five_hour?.resetsAt.toISOString() ?? null)
+            ? (answer?.usage.five_hour?.resetsAt?.toISOString() ?? null)
             : null,
         });
       }

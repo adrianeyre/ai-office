@@ -669,11 +669,15 @@ export const usageWindowLabels: Record<UsageWindow, string> = {
   weekly: "Weekly",
 };
 
-/** How much of a window is used (a percentage), and when it resets. */
+/**
+ * How much of a window is used (a percentage), and when it resets: null
+ * while none is running (it has reset, and no request has started the
+ * next), so nothing of it is used.
+ */
 export const usageWindowStateSchema = z.object({
   /** 0 to 100, or more once the AI Provider lets it go over. */
   utilization: z.number().min(0),
-  resetsAt: z.iso.datetime({ offset: true }),
+  resetsAt: z.iso.datetime({ offset: true }).nullable(),
 });
 export type UsageWindowState = z.infer<typeof usageWindowStateSchema>;
 

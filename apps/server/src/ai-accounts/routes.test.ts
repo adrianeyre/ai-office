@@ -357,6 +357,16 @@ const cases: Case[] = [
         },
       ]);
 
+      // Once it resets, no window is running until a request starts one.
+      await setup.accounts.report(
+        account,
+        { kind: "served" },
+        { five_hour: { utilization: 85, resetsAt: new Date(Date.now() - 1) } },
+      );
+      expect((await list(setup))[0]).toMatchObject({
+        usage: { fiveHour: { utilization: 0, resetsAt: null }, weekly: null },
+        limitReason: null,
+      });
       const reset = await request(setup, "POST", `${url}/reset-limits`);
       expect(reset.statusCode).toBe(200);
       expect(aiAccountSchema.parse(reset.json())).toMatchObject({
