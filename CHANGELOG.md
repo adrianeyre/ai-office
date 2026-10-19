@@ -1,3 +1,9 @@
+## [1.2.0](https://github.com/adrianeyre/ai-office/compare/v1.1.2...v1.2.0) (2026-10-19)
+
+### Features
+
+* Gemini subscriptions through Google sign-in, and coding-plan keys for Z.ai, MiniMax, Kimi and Qwen ([00d8219](https://github.com/adrianeyre/ai-office/commit/00d8219b91aed525160713264f2f494867f59e0d))
+
 ## [1.1.2](https://github.com/adrianeyre/ai-office/compare/v1.1.1...v1.1.2) (2026-10-19)
 
 ### Bug Fixes
