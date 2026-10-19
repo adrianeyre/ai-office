@@ -1,3 +1,9 @@
+## [1.1.2](https://github.com/adrianeyre/ai-office/compare/v1.1.1...v1.1.2) (2026-10-19)
+
+### Bug Fixes
+
+* a Claude subscription's 5-hour usage shows again when no window is running ([0298b04](https://github.com/adrianeyre/ai-office/commit/0298b0465a8a13b6c7746d91a3536c51693484ac))
+
 ## [1.1.1](https://github.com/adrianeyre/ai-office/compare/v1.1.0...v1.1.1) (2026-10-17)
 
 ### Bug Fixes
