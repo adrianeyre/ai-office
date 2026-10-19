@@ -569,6 +569,54 @@ const cases: Case[] = [
     },
   ],
   [
+    "keeps a five-hour window no request has started as one that reset, once",
+    async (setup) => {
+      const { account } = await addSubscription(setup);
+      const listed = async () =>
+        (await setup.accounts.list()).find(({ id }) => id === account.id);
+      const history = async () =>
+        setup.accounts.usageHistory(account.id, {
+          since: new Date(0),
+          limit: 10,
+        });
+      // What Claude's usage endpoint answers while no window is running.
+      setup.oauth.usage = {
+        five_hour: { utilization: 0, resets_at: null },
+        seven_day: { utilization: 3, resets_at: "2026-10-14T09:00:00Z" },
+      };
+
+      setup.at(minute);
+      await setup.accounts.refreshUsage();
+      expect(await listed()).toMatchObject({
+        fiveHourUtilization: 0,
+        fiveHourResetsAt: new Date(start + minute),
+        weeklyUtilization: 3,
+      });
+      expect(await history()).toHaveLength(2);
+
+      // Read again, it has nothing new to keep.
+      setup.at(6 * minute);
+      await setup.accounts.refreshUsage();
+      expect((await listed())?.fiveHourResetsAt).toEqual(
+        new Date(start + minute),
+      );
+      expect(await history()).toHaveLength(2);
+
+      // A running window that the endpoint says has ended is over now.
+      setup.oauth.usage = {
+        five_hour: { utilization: 40, resets_at: "2026-10-09T15:00:00Z" },
+      };
+      await setup.accounts.refreshUsage();
+      setup.oauth.usage = { five_hour: { utilization: 0, resets_at: null } };
+      setup.at(11 * minute);
+      await setup.accounts.refreshUsage();
+      expect(await listed()).toMatchObject({
+        fiveHourUtilization: 0,
+        fiveHourResetsAt: new Date(start + 11 * minute),
+      });
+    },
+  ],
+  [
     "refreshes an expiring token before reading usage, and skips one to sign in again",
     async (setup) => {
       const { account } = await addSubscription(setup);

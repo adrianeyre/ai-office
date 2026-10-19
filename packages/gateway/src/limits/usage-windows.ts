@@ -21,10 +21,14 @@ import type { UsageWindow } from "@ai-office/shared";
 // report none that fit: xAI's and OpenAI's `x-ratelimit-*` headers count
 // requests and tokens a minute, not a plan's windows.
 
-/** A window's share used, in percent, and when it resets. */
+/**
+ * A window's share used, in percent, and when it resets: null when no
+ * window is running (a Claude subscription's usage endpoint says so of a
+ * five-hour window no request has started), so none can be counted yet.
+ */
 export interface WindowReading {
   readonly utilization: number;
-  readonly resetsAt: Date;
+  readonly resetsAt: Date | null;
 }
 
 export type UsageWindowReadings = Partial<Record<UsageWindow, WindowReading>>;
@@ -136,8 +140,10 @@ function codexWindowsOf(headers: Headers, now: Date): UsageWindowReadings {
 // A Claude subscription's usage endpoint (`/api/oauth/usage`, what Claude
 // Code's `/usage` shows) reports the same windows without a request having
 // to be made through the account: `five_hour` and `seven_day`, each with
-// its share used in percent and when it resets (RFC 3339). Newer answers
-// may carry them only in `limits`, as `session` and `weekly_all`.
+// its share used in percent and when it resets (RFC 3339), or a reset of
+// null while no window is running (since October 2026, its five-hour one
+// until a request starts it). Newer answers may carry them only in
+// `limits`, as `session` and `weekly_all`.
 // Anthropic does not document it either.
 //
 // A ChatGPT subscription's usage endpoint (`/backend-api/wham/usage`, what
@@ -158,7 +164,10 @@ const recordOf = (value: unknown): Record<string, unknown> | undefined =>
     ? (value as Record<string, unknown>)
     : undefined;
 
-/** A window's reading from its share used (percent) and reset time. */
+/**
+ * A window's reading from its share used (percent) and reset time; a
+ * reset of null is a window not running.
+ */
 const readingOf = (
   utilization: unknown,
   resetsAt: unknown,
@@ -167,9 +176,12 @@ const readingOf = (
     typeof utilization !== "number" ||
     !Number.isFinite(utilization) ||
     utilization < 0 ||
-    typeof resetsAt !== "string"
+    (typeof resetsAt !== "string" && resetsAt !== null)
   ) {
     return undefined;
+  }
+  if (resetsAt === null) {
+    return { utilization: Math.round(utilization * 10) / 10, resetsAt: null };
   }
   const at = new Date(resetsAt);
   return Number.isNaN(at.getTime())

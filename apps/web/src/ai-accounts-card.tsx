@@ -417,13 +417,17 @@ export function useNow(): Date {
 
 /**
  * How far through a window `now` is, as a percentage: where an even pace
- * would have its usage. Undefined once the window has reset unreported.
+ * would have its usage. Undefined while none is running, or once the
+ * window has reset unreported.
  */
 const paceOf = (
   window: UsageWindow,
   state: UsageWindowState,
   now: Date,
 ): number | undefined => {
+  if (state.resetsAt === null) {
+    return undefined;
+  }
   const length = usageWindowLengthsMs[window];
   const left = new Date(state.resetsAt).getTime() - now.getTime();
   if (left <= 0) {
@@ -529,8 +533,10 @@ function UsageSummary({ account }: { account: AiAccount }) {
                   <span className="ml-1">not reported</span>
                 ) : (
                   <span className="ml-1 tabular-nums">
-                    {percent(state.utilization)}, resets{" "}
-                    {new Date(state.resetsAt).toLocaleString()}
+                    {percent(state.utilization)},{" "}
+                    {state.resetsAt === null
+                      ? "not started"
+                      : `resets ${new Date(state.resetsAt).toLocaleString()}`}
                   </span>
                 )}
               </span>
@@ -1102,8 +1108,8 @@ function AccountRow({
     );
   const resettable =
     account.limitReason !== null ||
-    account.usage.fiveHour !== null ||
-    account.usage.weekly !== null;
+    (account.usage.fiveHour?.resetsAt ?? null) !== null ||
+    (account.usage.weekly?.resetsAt ?? null) !== null;
 
   const status = accountStatusOf(account);
 

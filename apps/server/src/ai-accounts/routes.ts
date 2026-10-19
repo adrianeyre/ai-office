@@ -84,7 +84,7 @@ export const aiAccountBody = (
       limitedUntil: limit?.until.toISOString() ?? null,
     };
   })(),
-  // A window that has reset since it was reported is not shown.
+  // A window that has reset since it was reported is not running.
   usage: {
     fiveHour: windowBody(
       account.fiveHourUtilization,
@@ -127,15 +127,20 @@ const rateLimitsBody = (
   };
 };
 
-/** A usage window as the API sends it, while it has not reset. */
+/**
+ * A usage window as the API sends it: one that has reset is not running,
+ * and nothing of it is used until a request starts the next.
+ */
 const windowBody = (
   utilization: number | null,
   resetsAt: Date | null,
   now: Date,
 ): UsageWindowState | null =>
-  utilization === null || resetsAt === null || resetsAt <= now
+  utilization === null || resetsAt === null
     ? null
-    : { utilization, resetsAt: resetsAt.toISOString() };
+    : resetsAt <= now
+      ? { utilization: 0, resetsAt: null }
+      : { utilization, resetsAt: resetsAt.toISOString() };
 
 /** How far back an account's usage history goes, and how much of it. */
 const usageHistoryDays = 7;

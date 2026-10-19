@@ -295,10 +295,36 @@ describe("usage windows from a subscription's usage endpoint", () => {
     ).toEqual({});
   });
 
-  it("leave out a window with no reset time, or anything malformed", () => {
+  it("read a window with no reset time as one not running", () => {
+    // What Claude's usage endpoint answers before a request starts the
+    // five-hour window.
+    const notRunning = {
+      five_hour: { utilization: 0, resetsAt: null },
+      weekly: {
+        utilization: 3,
+        resetsAt: new Date("2026-10-22T16:00:00.000Z"),
+      },
+    };
     expect(
       usageWindowsOfBody({
-        five_hour: { utilization: 0, resets_at: null },
+        five_hour: { utilization: 0.0, resets_at: null },
+        seven_day: { utilization: 3, resets_at: "2026-10-22T16:00:00Z" },
+      }),
+    ).toEqual(notRunning);
+    expect(
+      usageWindowsOfBody({
+        limits: [
+          { kind: "session", percent: 0, resets_at: null },
+          { kind: "weekly_all", percent: 3, resets_at: "2026-10-22T16:00:00Z" },
+        ],
+      }),
+    ).toEqual(notRunning);
+  });
+
+  it("leave out anything malformed", () => {
+    expect(
+      usageWindowsOfBody({
+        five_hour: { utilization: 0 },
         seven_day: { utilization: "40", resets_at: "2026-10-12T09:00:00Z" },
       }),
     ).toEqual({});
