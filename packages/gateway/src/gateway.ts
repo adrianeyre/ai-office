@@ -85,6 +85,12 @@ import {
   responsesStreamFromMessages,
   responsesToMessages,
 } from "./translate/responses.ts";
+import {
+  chatStreamFromCodeAssist,
+  chatToCodeAssist,
+  codeAssistPath,
+  codeAssistToChat,
+} from "./translate/gemini.ts";
 import { SseReader } from "./translate/sse.ts";
 import {
   StreamUsageReader,
@@ -95,10 +101,11 @@ import {
 import { noWork, type AgentWork } from "./work.ts";
 
 /**
- * The API an AI Account speaks: Anthropic Messages, or OpenAI's Chat
- * Completions and Responses.
+ * The API an AI Account speaks: Anthropic Messages, OpenAI's Chat
+ * Completions and Responses, or Gemini's own through Google's Code Assist
+ * API (a Gemini subscription's).
  */
-export type ApiFormat = "anthropic" | "openai";
+export type ApiFormat = "anthropic" | "openai" | "gemini";
 
 /** An AI Account, ready to forward a request to. */
 export interface GatewayAccount {
@@ -139,6 +146,11 @@ export interface GatewayAccount {
    * its credentials, in place of `apiKey`.
    */
   readonly cloud?: CloudSigner;
+  /**
+   * A Gemini subscription's Code Assist project, which each of its
+   * requests names; absent while it is not known.
+   */
+  readonly codeAssistProject?: string;
 }
 
 /**
@@ -858,6 +870,9 @@ function planFor(
   context: TranslationContext,
 ): Plan {
   const { format, path } = endpoints[endpoint];
+  if (accountFormat === "gemini") {
+    return codeAssistPlanFor(endpoint, body, context);
+  }
   if (format === accountFormat) {
     return {
       kind: "passthrough",
@@ -944,6 +959,34 @@ function planFor(
         "Decisions are not available from this AI Account.",
       );
   }
+}
+
+/**
+ * How a request reaches a Gemini subscription (Code Assist's API): only
+ * Chat Completions, opencode's, translated to Gemini's format.
+ */
+function codeAssistPlanFor(
+  endpoint: GatewayEndpoint,
+  body: Buffer,
+  context: TranslationContext,
+): Plan {
+  if (endpoint !== "chat_completions") {
+    throw new TranslationError(
+      "A Gemini subscription serves only Chat Completions.",
+    );
+  }
+  const request = chatRequestSchema.parse(parseJson(body));
+  const streamed = request.stream === true;
+  const includeUsage = request.stream_options?.include_usage === true;
+  return {
+    kind: "translate",
+    upstreamPath: codeAssistPath(streamed),
+    body: json(chatToCodeAssist(request, context.codeAssistProject)),
+    streamed,
+    whole: (upstream) => codeAssistToChat(upstream, request.model, context),
+    stream: () =>
+      chatStreamFromCodeAssist(request.model, context, { includeUsage }),
+  };
 }
 
 /** The schema an OpenAI-format endpoint's requests are checked against. */
@@ -1557,7 +1600,12 @@ export async function buildGateway(
             endpoint,
             accountFormat,
             chosen.model === undefined ? body : withModel(body, chosen.model),
-            { now: now() },
+            {
+              now: now(),
+              ...(chosen.codeAssistProject === undefined
+                ? {}
+                : { codeAssistProject: chosen.codeAssistProject }),
+            },
           );
           if (accountFormat === "anthropic") {
             route = {

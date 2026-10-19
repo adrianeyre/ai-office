@@ -413,7 +413,7 @@ const cases: Case[] = [
       expect(
         (await refused({ ...work, aiProvider: "ChatGPT" })).problems,
       ).toEqual([
-        "Only Claude, Grok, Gemini, OpenRouter, DeepSeek, Z.ai, Minimax, Kimi and Ollama API keys can be added so far.",
+        "Only Claude, Grok, Gemini, OpenRouter, DeepSeek, Z.ai, Minimax, Kimi, Qwen and Ollama API keys can be added so far.",
       ]);
       expect(
         (await refused({ ...work, accountType: "oauth" })).problems,

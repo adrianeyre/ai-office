@@ -126,13 +126,39 @@ describe("Grok AI Accounts through the API", () => {
       aiProvider: "Gemini",
       accountType: "api_key",
     });
-    // A Gemini subscription cannot be added: there is none to sign in to.
-    const subscription = await setup.post("/api/ai-accounts/oauth", {
+    // A Gemini subscription signs in as Gemini CLI's Google client, which
+    // the Owner gives with it.
+    const withoutClient = await setup.post("/api/ai-accounts/oauth", {
       name: "Gemini sub",
       aiProvider: "Gemini",
       acceptedTerms: true,
     });
-    expect(subscription.statusCode).toBe(400);
+    expect(withoutClient.statusCode).toBe(400);
+    expect(withoutClient.body).toContain(
+      "A Gemini subscription needs Gemini CLI's OAuth client ID and secret.",
+    );
+    const clientSecret = "routes-test-client-secret";
+    const subscription = await setup.post("/api/ai-accounts/oauth", {
+      name: "Gemini sub",
+      aiProvider: "Gemini",
+      acceptedTerms: true,
+      client: {
+        clientId: "routes-test.apps.googleusercontent.com",
+        clientSecret,
+      },
+    });
+    expect(subscription.statusCode).toBe(201);
+    const authorizeUrl = new URL(
+      oauthLoginSchema.parse(subscription.json()).authorizeUrl,
+    );
+    expect(authorizeUrl.origin).toBe("https://accounts.google.com");
+    expect(authorizeUrl.searchParams.get("client_id")).toBe(
+      "routes-test.apps.googleusercontent.com",
+    );
+    expect(authorizeUrl.searchParams.get("redirect_uri")).toBe(
+      "https://codeassist.google.com/authcode",
+    );
+    expect(subscription.body).not.toContain(clientSecret);
     for (const text of [added.body, setup.logs.join("\n")]) {
       expect(text).not.toContain(geminiKey);
     }
@@ -355,14 +381,14 @@ describe("Qwen, Ollama and compatible endpoints through the API", () => {
     for (const text of [done.body, setup.logs.join("\n")]) {
       expect(text).not.toContain(accessToken);
     }
-    // There is no Qwen API key to add.
+    // A Qwen API key is Alibaba Cloud Model Studio's.
     const key = await setup.post("/api/ai-accounts", {
       name: "Qwen key",
       aiProvider: "Qwen",
       accountType: "api_key",
       credential: "sk-routesTestQwen0123456789",
     });
-    expect(key.statusCode).toBe(400);
+    expect(key.statusCode).toBe(201);
   });
 
   it("adds an Ollama Cloud API key, which is never sent back or logged", async () => {

@@ -18,6 +18,8 @@ import {
   oauthLoginStatusSchema,
   platformOf,
   startOAuthLoginRequestSchema,
+  subscriptionPlanOf,
+  subscriptionPlans,
   subscriptionTermsWarnings,
   usageHistorySchema,
   usageWindowLabels,
@@ -73,8 +75,9 @@ import { isLocalhost, location } from "./totp-settings.tsx";
 // one for Claude (its region and its IAM credentials, profile or service
 // account), an endpoint (the Owner's own Ollama, or any Anthropic- or
 // OpenAI-compatible API at its URL, with a key only if it asks for one),
-// or a subscription (Claude, Grok, ChatGPT or Qwen) through its OAuth
-// login (after a warning about its terms), or from a CLI login, then
+// or a subscription (Claude, Grok, ChatGPT, Gemini or Qwen) through its
+// OAuth login (after a warning about its terms), or from a CLI login, or
+// a coding plan's key (Z.ai's, MiniMax's, Kimi's or Qwen's), then
 // rename, reprioritise,
 // pause, resume, force a Model, turn extra usage on or off (FR-41), sign in
 // again or delete it. A subscription's token health
@@ -148,7 +151,9 @@ const signInPageOf = (aiProvider: string): string =>
     ? "xAI"
     : aiProvider === "ChatGPT"
       ? "OpenAI"
-      : aiProvider;
+      : aiProvider === "Gemini"
+        ? "Google"
+        : aiProvider;
 
 /**
  * Whether its sign-in ends on its CLI's local callback (ChatGPT's
@@ -1132,8 +1137,10 @@ function AccountRow({
           <LimitBadge account={account} />
         </p>
         <p className="text-muted-foreground">
-          {kind?.label ?? `${account.aiProvider} (${account.accountType})`} ·
-          Priority {account.priority}
+          {subscriptionPlanOf(account)?.label ??
+            kind?.label ??
+            `${account.aiProvider} (${account.accountType})`}{" "}
+          · Priority {account.priority}
           {account.endpointUrl !== null && (
             <>
               {" "}
@@ -1344,6 +1351,9 @@ interface AddValues {
   acceptedTerms: boolean;
   /** For a subscription that can be imported: sign in, or import. */
   how: "sign_in" | "import";
+  /** Gemini's: Gemini CLI's Google OAuth client, which it signs in as. */
+  clientId: string;
+  clientSecret: string;
   /** An imported CLI login's file. */
   login: string;
 }
@@ -1364,7 +1374,16 @@ const emptyAddValues: AddValues = {
   acceptedTerms: false,
   how: "sign_in",
   login: "",
+  clientId: "",
+  clientSecret: "",
 };
+
+/**
+ * Where the Owner copies Gemini CLI's Google OAuth client from, which a
+ * Gemini subscription signs in as: AI Office's code does not hold it.
+ */
+const geminiClientSource =
+  "https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/code_assist/oauth2.ts";
 
 /** What the Owner is told about a kind's endpoint URL. */
 const endpointHintOf = (kind: (typeof aiAccountKinds)[number]): string =>
@@ -1385,7 +1404,11 @@ const termsWarningOf = (aiProvider: string): string | undefined =>
 /** Where each AI Provider's CLI keeps its login, for an import. */
 const importableLogins: Partial<Record<string, string>> = {
   Grok: "~/.grok/auth.json",
+  Gemini: "~/.gemini/oauth_creds.json",
 };
+
+/** The form's value for a coding plan, beside the kinds' indexes. */
+const planValue = (index: number): string => `plan:${String(index)}`;
 
 /**
  * Adds a key-based account (the key is cleared once it is saved), or a
@@ -1409,9 +1432,19 @@ function AddForm({
     control,
     formState: { isSubmitting },
   } = useForm<AddValues>({ defaultValues: emptyAddValues });
+  const chosen = useWatch({ control, name: "kind" });
+  // A coding plan is its AI Provider's API key, at the plan's API.
+  const plan = chosen.startsWith("plan:")
+    ? subscriptionPlans[Number(chosen.slice("plan:".length))]
+    : undefined;
   const kind =
-    aiAccountKinds[Number(useWatch({ control, name: "kind" }))] ??
-    aiAccountKinds[0];
+    (plan === undefined
+      ? aiAccountKinds[Number(chosen)]
+      : aiAccountKinds.find(
+          (each) =>
+            each.aiProvider === plan.aiProvider &&
+            each.accountType === "api_key",
+        )) ?? aiAccountKinds[0];
   const subscription = kind.accountType === "oauth";
   /** The Owner's own Ollama, or a compatible endpoint: a key only if asked. */
   const endpoint = kind.accountType === "endpoint";
@@ -1423,6 +1456,17 @@ function AddForm({
   const how = useWatch({ control, name: "how" });
   const importing = importable !== undefined && how === "import";
   const signInTo = signInPageOf(kind.aiProvider);
+  /** A Gemini subscription: the Owner gives Gemini CLI's Google client. */
+  const needsClient = subscription && kind.aiProvider === "Gemini";
+  const clientOf = (values: AddValues) =>
+    needsClient
+      ? {
+          client: {
+            clientId: values.clientId.trim(),
+            clientSecret: values.clientSecret.trim(),
+          },
+        }
+      : {};
 
   const onSubmit = async (values: AddValues) => {
     setAdded(undefined);
@@ -1432,6 +1476,7 @@ function AddForm({
         aiProvider: kind.aiProvider,
         acceptedTerms: values.acceptedTerms,
         login: values.login,
+        ...clientOf(values),
       });
       if (!parsed.success) {
         setProblems(parsed.error.issues.map(({ message }) => message));
@@ -1461,6 +1506,7 @@ function AddForm({
         name: values.name,
         aiProvider: kind.aiProvider,
         acceptedTerms: values.acceptedTerms,
+        ...clientOf(values),
       });
       if (!parsed.success) {
         setProblems(parsed.error.issues.map(({ message }) => message));
@@ -1479,7 +1525,8 @@ function AddForm({
       setLogin(oauthLoginSchema.parse(await response.json()));
       return;
     }
-    const endpointUrl = values.endpointUrl.trim();
+    const endpointUrl =
+      plan === undefined ? values.endpointUrl.trim() : (plan.endpointUrl ?? "");
     const optional = (value: string) =>
       value.trim() === "" ? null : value.trim();
     const common = {
@@ -1562,6 +1609,13 @@ function AddForm({
                   {option.label}
                 </option>
               ))}
+              <optgroup label="Subscription plans, with the plan's key">
+                {subscriptionPlans.map((option, index) => (
+                  <option key={option.label} value={planValue(index)}>
+                    {option.label}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </Field>
           <Field id="ai-account-name" label="Name">
@@ -1614,7 +1668,9 @@ function AddForm({
               hint={
                 endpoint
                   ? "Optional: only if the endpoint asks for one. Stored encrypted, and never shown again, here or anywhere."
-                  : "Stored encrypted. It is never shown again, here or anywhere."
+                  : plan !== undefined
+                    ? `The plan's own key, from ${plan.keyFrom}. Stored encrypted; never shown again, here or anywhere.`
+                    : "Stored encrypted. It is never shown again, here or anywhere."
               }
             >
               <Input
@@ -1627,7 +1683,7 @@ function AddForm({
               />
             </Field>
           )}
-          {!subscription && (
+          {!subscription && plan === undefined && (
             <Field
               id="ai-account-endpoint"
               label={
@@ -1743,6 +1799,11 @@ function AddForm({
             />
           </Field>
         )}
+        {plan !== undefined && (
+          <p role="note" aria-label="The plan" className="text-sm">
+            {plan.terms}
+          </p>
+        )}
         {subscription && (
           <div className="space-y-3">
             <div
@@ -1768,6 +1829,51 @@ function AddForm({
                   Import an existing {kind.aiProvider} CLI login
                 </label>
               </fieldset>
+            )}
+            {needsClient && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <p
+                  id="ai-account-client-hint"
+                  className="text-xs text-muted-foreground sm:col-span-2"
+                >
+                  A Gemini subscription signs in as Gemini CLI&apos;s Google
+                  client. Copy its OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET from{" "}
+                  <a
+                    href={geminiClientSource}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="underline underline-offset-4"
+                  >
+                    Gemini CLI&apos;s source
+                  </a>
+                  . They are kept, encrypted, with this account only.
+                </p>
+                <Field id="ai-account-client-id" label="Gemini CLI client ID">
+                  <Input
+                    id="ai-account-client-id"
+                    autoComplete="off"
+                    spellCheck={false}
+                    disabled={login !== undefined}
+                    placeholder="….apps.googleusercontent.com"
+                    aria-describedby="ai-account-client-hint"
+                    {...register("clientId")}
+                  />
+                </Field>
+                <Field
+                  id="ai-account-client-secret"
+                  label="Gemini CLI client secret"
+                >
+                  <Input
+                    id="ai-account-client-secret"
+                    type="password"
+                    autoComplete="off"
+                    spellCheck={false}
+                    disabled={login !== undefined}
+                    aria-describedby="ai-account-client-hint"
+                    {...register("clientSecret")}
+                  />
+                </Field>
+              </div>
             )}
             {importing && (
               <Field
@@ -1887,12 +1993,14 @@ export function AiAccountsCard({
           active account with the lowest priority number first. Sandboxes never
           hold their keys. Each request goes to an account of its Model&apos;s
           AI Provider. A subscription serves only its AI Provider&apos;s agent
-          tool (Claude Code for Claude, Codex for ChatGPT, opencode for Grok and
-          Qwen), and its token is refreshed before it expires. An AWS Bedrock or
-          Google Vertex AI account serves Claude Models in its region, signed
-          with its own credentials. An Anthropic- or OpenAI-compatible endpoint
-          is sent any Model asked of it, and those no AI Provider claims before
-          any other account. An account its AI Provider says is rate-limited or
+          tool (Claude Code for Claude, Codex for ChatGPT, opencode for Grok,
+          Gemini and Qwen), and its token is refreshed before it expires. A
+          coding plan (Z.ai&apos;s, MiniMax&apos;s, Kimi&apos;s or Qwen&apos;s)
+          is added with the plan&apos;s own key. An AWS Bedrock or Google Vertex
+          AI account serves Claude Models in its region, signed with its own
+          credentials. An Anthropic- or OpenAI-compatible endpoint is sent any
+          Model asked of it, and those no AI Provider claims before any other
+          account. An account its AI Provider says is rate-limited or
           overloaded, or that keeps failing, is left alone until it can serve
           again.
         </CardDescription>

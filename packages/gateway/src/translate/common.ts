@@ -28,6 +28,8 @@ export class TranslationError extends Error {
 export interface TranslationContext {
   /** When the response was made, for `created` and `created_at`. */
   readonly now: Date;
+  /** The Code Assist project a Gemini subscription's requests name. */
+  readonly codeAssistProject?: string;
 }
 
 /**

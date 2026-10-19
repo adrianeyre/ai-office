@@ -1582,6 +1582,48 @@ describe("the AI Accounts in AI Settings", () => {
     });
   });
 
+  it.each([
+    ["Z.ai GLM Coding Plan key", "Z.ai", "https://api.z.ai/api/coding/paas/v4"],
+    ["MiniMax Token Plan key (M Plan)", "Minimax", null],
+    [
+      "Kimi for Coding key (Kimi Code membership)",
+      "Kimi",
+      "https://api.kimi.ai/coding",
+    ],
+    [
+      "Qwen Coding Plan key (Alibaba Cloud Model Studio)",
+      "Qwen",
+      "https://coding-intl.dashscope.aliyuncs.com",
+    ],
+  ])(
+    "adds the subscription plan “%s”, as its key at the plan's API",
+    async (label, aiProvider, endpointUrl) => {
+      const { sent } = stubServer();
+      const user = userEvent.setup();
+      const view = await card();
+      await user.selectOptions(
+        await view.findByLabelText("Account type"),
+        label,
+      );
+      // The plan's API is its own: there is no endpoint to give.
+      expect(view.queryByLabelText("Custom endpoint URL")).toBeNull();
+      expect(view.getByRole("note", { name: "The plan" })).toBeTruthy();
+      await user.type(view.getByLabelText("Name"), aiProvider);
+      await user.type(view.getByLabelText("API key"), "sk-planKey0123456789");
+      await user.click(view.getByRole("button", { name: "Add AI Account" }));
+      await waitFor(() => {
+        expect(sent).toHaveLength(1);
+      });
+      expect(sent[0]?.body).toEqual({
+        name: aiProvider,
+        aiProvider,
+        accountType: "api_key",
+        credential: "sk-planKey0123456789",
+        endpointUrl,
+      });
+    },
+  );
+
   it("adds an Ollama Cloud API key", async () => {
     const { sent } = stubServer();
     const user = userEvent.setup();
@@ -1961,6 +2003,63 @@ describe("the AI Accounts in AI Settings", () => {
     expect(
       (await view.findByRole("listitem", { name: "Grok CLI" })).textContent,
     ).toContain("Serves only opencode");
+  });
+
+  it("signs a Gemini subscription in with Google, or imports Gemini CLI's login", async () => {
+    const { sent } = stubServer();
+    const user = userEvent.setup();
+    const view = await card();
+    await user.selectOptions(
+      await view.findByLabelText("Account type"),
+      "Gemini subscription (Google AI Pro or Ultra), Google sign-in",
+    );
+    expect(
+      view.getByRole("note", { name: "The AI Provider's terms" }).textContent,
+    ).toContain("Gemini CLI's own Google client");
+    expect(
+      view.getByLabelText("Import an existing Gemini CLI login"),
+    ).toBeTruthy();
+    await user.type(view.getByLabelText("Name"), "Gemini Pro");
+    await user.click(
+      view.getByLabelText(
+        "I have read this, and will use the subscription only through opencode.",
+      ),
+    );
+    // Without Gemini CLI's client, it does not start.
+    await user.click(view.getByRole("button", { name: "Sign in to Google" }));
+    expect((await view.findByRole("alert")).textContent).toContain(
+      "Enter Gemini CLI's OAuth client secret.",
+    );
+    expect(sent).toHaveLength(0);
+    expect(
+      view
+        .getByRole("link", { name: "Gemini CLI's source" })
+        .getAttribute("href"),
+    ).toContain("google-gemini/gemini-cli");
+    await user.type(
+      view.getByLabelText("Gemini CLI client ID"),
+      "web-test.apps.googleusercontent.com",
+    );
+    await user.type(
+      view.getByLabelText("Gemini CLI client secret"),
+      "web-test-secret",
+    );
+    await user.click(view.getByRole("button", { name: "Sign in to Google" }));
+    await waitFor(() => {
+      expect(sent).toHaveLength(1);
+    });
+    expect(sent[0]).toMatchObject({
+      url: "/api/ai-accounts/oauth",
+      body: {
+        name: "Gemini Pro",
+        aiProvider: "Gemini",
+        acceptedTerms: true,
+        client: {
+          clientId: "web-test.apps.googleusercontent.com",
+          clientSecret: "web-test-secret",
+        },
+      },
+    });
   });
 
   it("signs a subscription in again, brought up by a Notice's link", async () => {

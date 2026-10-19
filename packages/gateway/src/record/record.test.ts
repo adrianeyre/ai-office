@@ -368,7 +368,7 @@ describe("recordingOf", () => {
     });
     expect(recordingOf("Gemini")).toEqual({
       format: "chat_completions",
-      subscriptionTool: null,
+      subscriptionTool: "opencode",
     });
     expect(recordingOf("ChatGPT")).toEqual({
       format: null,
