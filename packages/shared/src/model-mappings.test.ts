@@ -183,11 +183,11 @@ describe("a model mapping", () => {
     expect(
       problem({
         from: "opus",
-        to: "gemini-2.5-pro",
-        aiProvider: "Gemini",
+        to: "deepseek-v4-pro",
+        aiProvider: "DeepSeek",
         accountType: "oauth",
       }),
-    ).toBe("There is no Gemini account of that type.");
+    ).toBe("There is no DeepSeek account of that type.");
     expect(
       problem({
         from: "claude-opus-5-5",

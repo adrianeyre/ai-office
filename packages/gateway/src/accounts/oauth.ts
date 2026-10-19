@@ -5,7 +5,8 @@ import { createHash, randomBytes } from "node:crypto";
 // - the authorization code flow with PKCE (RFC 7636): the Owner opens the
 //   authorization URL, signs in, and pastes back the code the AI
 //   Provider's page shows (Claude), or the address its sign-in ends on,
-//   which holds the code (ChatGPT), and AI Office exchanges it for tokens;
+//   which holds the code (ChatGPT), or the code Google's page shows
+//   (Gemini), and AI Office exchanges it for tokens;
 // - or the device authorization flow (RFC 8628): AI Office asks for a
 //   device code, the Owner approves its user code on the AI Provider's
 //   page, and AI Office then asks for the tokens (xAI), proving the login
@@ -27,6 +28,11 @@ export interface OAuthProvider {
   /** The page that shows the Owner the code to paste back. */
   readonly redirectUri: string;
   readonly clientId: string;
+  /**
+   * An installed app's client secret, which its token requests send too
+   * (Google's); not a secret, as the CLI ships it.
+   */
+  readonly clientSecret?: string;
   readonly scopes: readonly string[];
   /** What else the authorization URL asks, as the AI Provider's CLI does. */
   readonly authorizeParams?: Readonly<Record<string, string>>;
@@ -177,6 +183,40 @@ export const qwenOAuth: OAuthProvider = {
   betas: [],
 };
 
+/** An OAuth client: its ID, and an installed app's secret. */
+export interface OAuthClient {
+  readonly clientId: string;
+  readonly clientSecret: string;
+}
+
+/**
+ * Gemini subscriptions sign in as Gemini CLI's "Sign in with Google" does
+ * without a browser on its machine (its installed-app client, with PKCE):
+ * Google's page shows a code to paste back. The client is Gemini CLI's,
+ * which the Owner gives with each Gemini account, as an installed app's
+ * secret is not a secret but is kept out of this code. Google does not document these
+ * for other tools; they are what Gemini CLI uses. Its access tokens last
+ * an hour.
+ */
+export const googleOAuth = (client: OAuthClient): OAuthProvider => ({
+  authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+  tokenUrl: "https://oauth2.googleapis.com/token",
+  tokenFormat: "form",
+  redirectUri: "https://codeassist.google.com/authcode",
+  clientId: client.clientId,
+  clientSecret: client.clientSecret,
+  scopes: [
+    "https://www.googleapis.com/auth/cloud-platform",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+  ],
+  // A refresh token comes only with offline access, and only when asked
+  // for consent again.
+  authorizeParams: { access_type: "offline", prompt: "consent" },
+  exchangeState: false,
+  betas: [],
+});
+
 /** A login's tokens. */
 export interface OAuthTokens {
   readonly accessToken: string;
@@ -302,7 +342,13 @@ async function requestTokens(
 ): Promise<OAuthTokens> {
   let response: Response;
   try {
-    const fields = { ...body, client_id: provider.clientId };
+    const fields = {
+      ...body,
+      client_id: provider.clientId,
+      ...(provider.clientSecret === undefined
+        ? {}
+        : { client_secret: provider.clientSecret }),
+    };
     response = await options.fetch(provider.tokenUrl, {
       method: "POST",
       headers: {
@@ -524,7 +570,13 @@ export const pollDeviceLogin = (
 /** Field names a CLI's login file may use for each token. */
 const accessTokenFields = ["access_token", "accessToken"];
 const refreshTokenFields = ["refresh_token", "refreshToken"];
-const expiryFields = ["expires_at", "expiresAt", "expiry", "expires"];
+const expiryFields = [
+  "expires_at",
+  "expiresAt",
+  "expiry",
+  "expires",
+  "expiry_date",
+];
 
 /** When a JWT expires, from its `exp` claim; undefined for any other token. */
 function jwtExpiry(token: string): Date | undefined {
@@ -550,7 +602,7 @@ function expiryOf(value: unknown): Date | undefined {
 
 /**
  * The tokens in a CLI's login file (such as the Grok CLI's
- * `~/.grok/auth.json`): the first object, at any depth, holding both an
+ * `~/.grok/auth.json`, or Gemini CLI's `~/.gemini/oauth_creds.json`): the first object, at any depth, holding both an
  * access and a refresh token. Its expiry is its own field, or the access
  * token's `exp` claim; with neither it is taken as expiring now, so it is
  * refreshed at once. Undefined when the file holds no such tokens.

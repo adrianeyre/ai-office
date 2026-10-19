@@ -69,6 +69,8 @@ export {
   anthropicOAuth,
   authorizationUrl,
   chatgptAccountIdOf,
+  googleOAuth,
+  type OAuthClient,
   OAuthError,
   openaiOAuth,
   pastedCode,

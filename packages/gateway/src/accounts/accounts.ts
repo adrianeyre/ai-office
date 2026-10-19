@@ -27,6 +27,7 @@ import {
   aiProviderTakes,
   kindServes,
   servesAnyModel,
+  subscriptionPlanOf,
   aliasedModel,
   mappedModel,
   modelSentTo,
@@ -81,10 +82,12 @@ import {
   usageWindowsOfBody,
   type UsageWindowReadings,
 } from "../limits/usage-windows.ts";
+import { CodeAssistError, codeAssistProject } from "./code-assist.ts";
 import {
   anthropicOAuth,
   authorizationUrl,
   exchangeCode,
+  googleOAuth,
   OAuthError,
   openaiOAuth,
   pastedCode,
@@ -96,6 +99,7 @@ import {
   tokensInLoginFile,
   xaiOAuth,
   type Fetch,
+  type OAuthClient,
   type OAuthProvider,
   type OAuthTokens,
 } from "./oauth.ts";
@@ -338,8 +342,9 @@ export interface AiAccountsOptions {
   /** Claude subscriptions' OAuth login; Anthropic's by default. */
   readonly oauth?: OAuthProvider;
   /**
-   * Other AI Providers' OAuth logins: xAI's for Grok and OpenAI's for
-   * ChatGPT, by default.
+   * Other AI Providers' OAuth logins: xAI's for Grok, OpenAI's for
+   * ChatGPT, Qwen's, and Google's for Gemini (as the Google client each
+   * Gemini account was given), by default.
    */
   readonly oauthProviders?: Readonly<Record<string, OAuthProvider>>;
   /**
@@ -347,6 +352,16 @@ export interface AiAccountsOptions {
    * `fetch` by default.
    */
   readonly fetch?: Fetch;
+  /**
+   * Where Gemini subscriptions reach Google's Code Assist API; Google's by
+   * default.
+   */
+  readonly codeAssistUrl?: string;
+  /**
+   * How long to wait, as a Gemini subscription's Code Assist setup waits
+   * between asking after it; `setTimeout` by default.
+   */
+  readonly sleep?: (ms: number) => Promise<void>;
   /** How long a started login may take; 15 minutes by default. */
   readonly loginTtlMs?: number;
   /**
@@ -394,6 +409,12 @@ export interface AiAccountsOptions {
 /** The context a credential is sealed with: it opens only in its own row. */
 export const credentialContext = (id: string): string =>
   `ai_account.credential:${id}`;
+
+/**
+ * What a refresh token sealed with its Google client (a Gemini
+ * account's) starts with: no refresh token does.
+ */
+const withClient = "aio-oauth-client:";
 
 /** The context a refresh token is sealed with. */
 export const refreshTokenContext = (id: string): string =>
@@ -564,6 +585,8 @@ interface PendingLogin {
   readonly verifier: string;
   /** A device login's code, which the Owner approves. */
   readonly deviceCode?: string;
+  /** Gemini's: the Google client it signs in as. */
+  readonly client?: OAuthClient;
   readonly expiresAt: Date;
   /** A new account's settings, or the account signing in again. */
   readonly target:
@@ -582,6 +605,26 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
     Qwen: qwenOAuth,
     ...options.oauthProviders,
   };
+  /**
+   * Each Gemini subscription's Code Assist project, which its requests
+   * name. Kept in memory: after a restart, it is looked up again.
+   */
+  const codeAssistProjects = new Map<string, string>();
+  /** Whether an account's requests go to Google's Code Assist API. */
+  const reachesCodeAssist = (account: AiAccountRecord): boolean =>
+    aiAccountKindOf(account)?.apiFormat === "gemini";
+  /** The Code Assist project `accessToken`'s Google account is set up with. */
+  const lookUpCodeAssistProject = (
+    account: Pick<AiAccountRecord, "endpointUrl">,
+    accessToken: string,
+  ): Promise<string> =>
+    codeAssistProject(accessToken, {
+      fetch: fetchTokens,
+      ...((account.endpointUrl ?? options.codeAssistUrl) === undefined
+        ? {}
+        : { baseUrl: account.endpointUrl ?? options.codeAssistUrl }),
+      ...(options.sleep === undefined ? {} : { sleep: options.sleep }),
+    });
   /** An AI Provider's OAuth login. */
   const oauthFor = (aiProvider: string): OAuthProvider => {
     const provider = oauthProviders[aiProvider];
@@ -592,6 +635,25 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
       );
     }
     return provider;
+  };
+  /**
+   * An AI Provider's OAuth login, as `client` where it signs in as the
+   * client the Owner gave (Gemini's, as Gemini CLI's Google client).
+   */
+  const oauthAs = (
+    aiProvider: string,
+    client: OAuthClient | undefined,
+  ): OAuthProvider => {
+    if (aiProvider !== "Gemini") {
+      return oauthFor(aiProvider);
+    }
+    if (client === undefined) {
+      throw new AiAccountError(
+        aiAccountErrorCodes.notOAuthAccount,
+        "A Gemini subscription needs Gemini CLI's OAuth client ID and secret.",
+      );
+    }
+    return { ...(oauthProviders["Gemini"] ?? googleOAuth(client)), ...client };
   };
   const fetchTokens = options.fetch ?? fetch;
   const loginTtlMs = options.loginTtlMs ?? 15 * 60 * 1000;
@@ -913,18 +975,45 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
     await store.update(id, { rateLimits, updatedAt: at });
   };
 
-  /** The sealed form of a login's tokens, for `id`'s row. */
-  const sealed = (id: string, tokens: OAuthTokens) => {
+  /**
+   * The sealed form of a login's tokens, for `id`'s row: a Gemini
+   * account's refresh token with the Google client it refreshes as.
+   */
+  const sealed = (id: string, tokens: OAuthTokens, client?: OAuthClient) => {
     tell(tokens.accessToken);
     tell(tokens.refreshToken);
     return {
       credential: encryptor.encrypt(tokens.accessToken, credentialContext(id)),
       refreshToken: encryptor.encrypt(
-        tokens.refreshToken,
+        client === undefined
+          ? tokens.refreshToken
+          : `${withClient}${JSON.stringify({ refreshToken: tokens.refreshToken, ...client })}`,
         refreshTokenContext(id),
       ),
       tokenExpiresAt: tokens.expiresAt,
     };
+  };
+
+  /** An OAuth account's refresh token opened, and the client it is for. */
+  const openRefreshToken = (
+    account: Pick<AiAccountRecord, "id" | "refreshToken">,
+  ): { refreshToken: string; client?: OAuthClient } | undefined => {
+    if (account.refreshToken === null) {
+      return undefined;
+    }
+    const text = encryptor.decrypt(
+      account.refreshToken,
+      refreshTokenContext(account.id),
+    );
+    if (!text.startsWith(withClient)) {
+      tell(text);
+      return { refreshToken: text };
+    }
+    const { refreshToken, clientId, clientSecret } = JSON.parse(
+      text.slice(withClient.length),
+    ) as { refreshToken: string; clientId: string; clientSecret: string };
+    tell(refreshToken);
+    return { refreshToken, client: { clientId, clientSecret } };
   };
 
   /**
@@ -958,18 +1047,18 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
     }
     const done = (async (): Promise<"refreshed" | "not_due"> => {
       const account = await store.get(id);
-      if (account?.refreshToken == null || !due(account)) {
+      const opened =
+        account === undefined || !due(account)
+          ? undefined
+          : openRefreshToken(account);
+      if (account === undefined || opened === undefined) {
         return "not_due";
       }
-      const refreshToken = encryptor.decrypt(
-        account.refreshToken,
-        refreshTokenContext(id),
-      );
-      tell(refreshToken);
+      const { refreshToken, client } = opened;
       let tokens: OAuthTokens;
       try {
         tokens = await refreshTokens(
-          oauthFor(account.aiProvider),
+          oauthAs(account.aiProvider, client),
           refreshToken,
           {
             fetch: fetchTokens,
@@ -990,7 +1079,7 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
         throw error;
       }
       const updated = await store.update(id, {
-        ...sealed(id, tokens),
+        ...sealed(id, tokens, client),
         ...apiUrlChange(account, tokens),
         reauthenticationNeeded: false,
         updatedAt: now(),
@@ -1047,20 +1136,26 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
       apiKey,
       baseUrl:
         account.endpointUrl ??
+        (kind?.apiFormat === "gemini" ? options.codeAssistUrl : undefined) ??
         kind?.defaultEndpointUrl ??
         "https://api.anthropic.com",
       apiFormat: kind?.apiFormat ?? "anthropic",
-      apiPath: kind?.apiPath ?? "/v1",
+      // A coding plan's API may start its paths elsewhere (Z.ai's).
+      apiPath: subscriptionPlanOf(account)?.apiPath ?? kind?.apiPath ?? "/v1",
       ...(kind !== undefined && "bearerToo" in kind
         ? { authorization: "both" as const }
         : {}),
+      ...(() => {
+        const project = codeAssistProjects.get(account.id);
+        return project === undefined ? {} : { codeAssistProject: project };
+      })(),
       ...(account.accountType === "oauth"
         ? (() => {
-            const oauth = oauthFor(account.aiProvider);
-            const headers = oauth.requestHeaders?.(apiKey) ?? {};
+            const oauth = oauthProviders[account.aiProvider];
+            const headers = oauth?.requestHeaders?.(apiKey) ?? {};
             return {
               authorization: "bearer" as const,
-              betas: oauth.betas,
+              betas: oauth?.betas ?? [],
               ...(Object.keys(headers).length > 0 ? { headers } : {}),
             };
           })()
@@ -1175,6 +1270,7 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
 
     async startLogin(login) {
       let aiProvider: string;
+      let client: OAuthClient | undefined;
       if ("accountId" in login) {
         const account = await store.get(login.accountId);
         if (account === undefined) {
@@ -1187,6 +1283,7 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
           );
         }
         aiProvider = account.aiProvider;
+        client = openRefreshToken(account)?.client;
       } else {
         if (
           (await store.list()).some((account) => account.name === login.name)
@@ -1194,8 +1291,9 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
           throw nameTaken(login.name);
         }
         aiProvider = login.aiProvider;
+        client = login.client;
       }
-      const oauth = oauthFor(aiProvider);
+      const oauth = oauthAs(aiProvider, client);
       // Logins that were never finished go.
       for (const [id, pending] of logins) {
         if (pending.expiresAt <= now()) {
@@ -1233,6 +1331,7 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
           aiProvider,
           state,
           verifier,
+          ...(client === undefined ? {} : { client }),
           deviceCode: device.deviceCode,
           expiresAt,
           target,
@@ -1245,7 +1344,14 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
         };
       }
       const expiresAt = new Date(now().getTime() + loginTtlMs);
-      logins.set(loginId, { aiProvider, state, verifier, expiresAt, target });
+      logins.set(loginId, {
+        aiProvider,
+        state,
+        verifier,
+        ...(client === undefined ? {} : { client }),
+        expiresAt,
+        target,
+      });
       return {
         loginId,
         authorizeUrl: authorizationUrl(oauth, { challenge, state }),
@@ -1309,7 +1415,7 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
 
     async completeLogin(loginId, pasted) {
       const login = pendingLogin(loginId);
-      const oauth = oauthFor(login.aiProvider);
+      const oauth = oauthAs(login.aiProvider, login.client);
       let tokens: OAuthTokens;
       try {
         if (login.deviceCode !== undefined) {
@@ -1366,11 +1472,38 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
         throw error;
       }
       logins.delete(loginId);
+      // A Gemini login serves only through its Code Assist project: one
+      // that has none cannot serve, so it is not added.
+      let project: string | undefined;
+      if (
+        aiAccountKindOf({ aiProvider: login.aiProvider, accountType: "oauth" })
+          ?.apiFormat === "gemini"
+      ) {
+        tell(tokens.accessToken);
+        try {
+          project = await lookUpCodeAssistProject(
+            { endpointUrl: null },
+            tokens.accessToken,
+          );
+        } catch (error) {
+          if (error instanceof CodeAssistError) {
+            throw new AiAccountError(
+              aiAccountErrorCodes.oauthUnavailable,
+              error.message,
+              { cause: error },
+            );
+          }
+          throw error;
+        }
+      }
       const at = now();
       const { target } = login;
       if (target.kind === "reauthenticate") {
+        if (project !== undefined) {
+          codeAssistProjects.set(target.accountId, project);
+        }
         const updated = await store.update(target.accountId, {
-          ...sealed(target.accountId, tokens),
+          ...sealed(target.accountId, tokens, login.client),
           ...apiUrlChange(await store.get(target.accountId), tokens),
           reauthenticationNeeded: false,
           updatedAt: at,
@@ -1388,7 +1521,7 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
         name: target.request.name,
         accountType: "oauth",
         aiProvider: target.request.aiProvider,
-        ...sealed(id, tokens),
+        ...sealed(id, tokens, login.client),
         endpointUrl: tokens.apiUrl ?? null,
         ...noCloud,
         priority: target.request.priority ?? lastPriority(await store.list()),
@@ -1404,6 +1537,9 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
       if ((await store.add(account)) === "name_taken") {
         throw nameTaken(account.name);
       }
+      if (project !== undefined) {
+        codeAssistProjects.set(id, project);
+      }
       await changed(["aiAccounts.added"]);
       await tellHealth(account);
       return { account: info(account), added: true };
@@ -1417,7 +1553,7 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
           "That login holds no access and refresh token: paste the whole login file.",
         );
       }
-      oauthFor(request.aiProvider);
+      oauthAs(request.aiProvider, request.client);
       const at = now();
       const id = newId();
       const account: AiAccountRecord = {
@@ -1425,7 +1561,7 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
         name: request.name,
         accountType: "oauth",
         aiProvider: request.aiProvider,
-        ...sealed(id, tokens),
+        ...sealed(id, tokens, request.client),
         endpointUrl: null,
         ...noCloud,
         priority: request.priority ?? lastPriority(await store.list()),
@@ -1964,12 +2100,7 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
           ),
           ...(account.refreshToken === null
             ? []
-            : [
-                encryptor.decrypt(
-                  account.refreshToken,
-                  refreshTokenContext(account.id),
-                ),
-              ]),
+            : [openRefreshToken(account)?.refreshToken ?? ""]),
         ];
         for (const credential of credentials) {
           tell(credential);
@@ -2264,6 +2395,34 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
         ? undefined
         : chosenWith(chosen, sentTo(chosen));
     },
+  };
+  // A Gemini subscription chosen before its Code Assist project is known
+  // (after a restart, or an imported login) looks it up first; one that
+  // cannot is sent as it is, and Code Assist's answer says why.
+  const selectAccount = aiAccounts.select.bind(aiAccounts);
+  aiAccounts.select = async (request) => {
+    const chosen = await selectAccount(request);
+    if (
+      chosen?.id == null ||
+      chosen.codeAssistProject !== undefined ||
+      chosen.cloud !== undefined
+    ) {
+      return chosen;
+    }
+    const account = await store.get(chosen.id);
+    if (account === undefined || !reachesCodeAssist(account)) {
+      return chosen;
+    }
+    try {
+      const project = await lookUpCodeAssistProject(account, chosen.apiKey);
+      codeAssistProjects.set(account.id, project);
+      return { ...chosen, codeAssistProject: project };
+    } catch (error) {
+      if (error instanceof CodeAssistError) {
+        return chosen;
+      }
+      throw error;
+    }
   };
   return aiAccounts;
 }

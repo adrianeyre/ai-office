@@ -412,7 +412,8 @@ FR-36); none come from the environment. So far an account is one of:
 - a **Claude subscription** (Pro or Max), added through its OAuth login;
 - an **xAI API key** or a **Grok subscription**, for the Grok AI Provider
   (below);
-- a **Gemini API key**, for the Gemini AI Provider (below);
+- a **Gemini API key** or a **Gemini subscription** (Google AI Pro or
+  Ultra, through Google's sign-in), for the Gemini AI Provider (below);
 - a **ChatGPT subscription**, for the ChatGPT AI Provider, added through
   OpenAI's OAuth login (below);
 - an **AWS Bedrock** or **Google Vertex AI** account, for Claude Models
@@ -420,7 +421,10 @@ FR-36); none come from the environment. So far an account is one of:
 - an **OpenRouter**, **DeepSeek**, **Z.ai**, **MiniMax** or **Kimi** API
   key, each for the AI Provider of that name (below);
 - a **Qwen sign-in** (Qwen Code's free tier), for the Qwen AI Provider,
-  added through Qwen's device login (below);
+  added through Qwen's device login, or a **Qwen API key** (Alibaba Cloud
+  Model Studio) (below);
+- a **coding plan's key**: Z.ai's GLM Coding Plan, MiniMax's Token Plan,
+  Kimi for Coding or Alibaba's Qwen Coding Plan (below);
 - the Owner's own **Ollama** server, or an **Ollama Cloud** API key, for the
   Ollama AI Provider (below);
 - an **Anthropic-compatible** or **OpenAI-compatible endpoint** at a URL
@@ -1112,6 +1116,66 @@ with `"aiProvider":"Qwen"`, then `POST /api/ai-accounts/oauth/:loginId`).
 - **Limits.** Its free quota running out (`429 insufficient_quota`) holds
   the account back for 60 seconds, as Qwen says nothing of when it comes
   back.
+
+#### Gemini subscriptions
+
+A **Gemini subscription** is a Google AI Pro or Ultra plan (or, for a
+Google account without one, Gemini Code Assist's free tier), for the Gemini
+AI Provider (PRD FR-35). It is added in **Add an AI Account** after a
+warning about its terms, by signing in as Gemini CLI's "Sign in with
+Google" does without a browser on its machine: Gemini CLI's installed-app
+client and a PKCE challenge, asking for offline access. The Owner gives
+that client in the same form, its ID and secret copied from Gemini CLI's
+source (`packages/core/src/code_assist/oauth2.ts`): an installed app's
+secret is not a secret, but AI Office's code does not hold it. It is
+sealed with the account's refresh token, which it refreshes as, never sent
+back, and reused when the account signs in again. Google's page shows a
+code, which the Owner pastes back (`POST /api/ai-accounts/oauth` with
+`"aiProvider":"Gemini"`, then `POST /api/ai-accounts/oauth/:loginId`). Or
+the Owner imports Gemini CLI's own login, `~/.gemini/oauth_creds.json`.
+
+- **Where it is reached.** Google's Code Assist API
+  (`https://cloudcode-pa.googleapis.com/v1internal`), where Gemini CLI's
+  Google sign-in sends its requests. Each request names the Code Assist
+  project the Google account is set up with: the sign-in looks it up
+  (`:loadCodeAssist`), setting the account up to its default tier
+  (`:onboardUser`) if it never has been, and is refused with Google's
+  reason when the account cannot use it. The project is kept in memory,
+  and looked up again after a restart.
+- **What it serves.** Only opencode's Chat Completions (the Gemini AI
+  Provider runs opencode in sandboxes), translated to Gemini's own format
+  (`:generateContent`, or `:streamGenerateContent?alt=sse` when streamed)
+  with the access token as a bearer token; the answers come back as Chat
+  Completions, thoughts as `reasoning_content`. Gemini signs the thoughts
+  behind each function call; the Gateway keeps the newest signatures in
+  memory and sends each back with its call, and a call it has none for
+  with the placeholder Google documents for history it did not make.
+  Never Claude Code's Messages, another tool's requests, or Responses.
+- **Tokens** are sealed, refreshed ahead of expiry (Google's last an
+  hour), never shown, and kept out of sandboxes, as every subscription's
+  are.
+- **Its Models.** Code Assist lists none, so the catalogue holds the ones
+  Gemini CLI names (`gemini-3.1-pro-preview`, `gemini-3-pro-preview`,
+  `gemini-3.5-flash`, `gemini-3.1-flash-lite`, `gemini-2.5-pro`). Its
+  limits are the plan's; Code Assist reports no usage windows.
+
+#### Coding plans
+
+Some AI Providers sell their subscription as a key: a coding plan's key
+serves the plan's Models within its limits, at the plan's own API. It is
+added in **Add an AI Account** under **Subscription plans**, as its AI
+Provider's API key with the plan's API as its endpoint
+(`{"accountType":"api_key","endpointUrl":…}`), and is shown as the plan:
+
+| Plan | AI Provider | Its API |
+| --- | --- | --- |
+| Z.ai GLM Coding Plan | Z.ai | `https://api.z.ai/api/coding/paas/v4` |
+| MiniMax Token Plan (M Plan) | Minimax | MiniMax's usual API |
+| Kimi for Coding | Kimi | `https://api.kimi.ai/coding/v1` |
+| Qwen Coding Plan (Alibaba Cloud Model Studio) | Qwen | `https://coding-intl.dashscope.aliyuncs.com/v1` |
+
+Ollama Cloud's plans are its usual API key; DeepSeek and OpenRouter sell
+none.
 
 #### Ollama and Ollama Cloud accounts
 

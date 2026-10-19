@@ -397,13 +397,13 @@ describe("OpenRouter, DeepSeek, Z.ai, Minimax and Kimi API keys", () => {
       });
     }
     const refused = addAiAccountRequestSchema.safeParse({
-      name: "Qwen",
-      aiProvider: "Qwen",
+      name: "ChatGPT",
+      aiProvider: "ChatGPT",
       accountType: "api_key",
       credential: "sk-test-0123456789",
     });
     expect(refused.error?.issues.map(({ message }) => message)).toEqual([
-      "Only Claude, Grok, Gemini, OpenRouter, DeepSeek, Z.ai, Minimax, Kimi and Ollama API keys can be added so far.",
+      "Only Claude, Grok, Gemini, OpenRouter, DeepSeek, Z.ai, Minimax, Kimi, Qwen and Ollama API keys can be added so far.",
     ]);
   });
 });

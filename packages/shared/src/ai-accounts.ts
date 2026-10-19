@@ -45,7 +45,9 @@ export const ollamaEndpointUrl = "http://localhost:11434";
  * passed through or translated, unless it names the ones it can
  * (`serves`): Gemini's has no Responses API, and nothing translates to
  * Chat Completions from it; a ChatGPT subscription serves Codex's
- * Responses only, at ChatGPT's own Codex backend. Each lists its Models
+ * Responses only, at ChatGPT's own Codex backend; a Gemini subscription
+ * serves opencode's Chat Completions only, translated to Google's Code
+ * Assist API (`apiFormat` `gemini`). Each lists its Models
  * at `modelsPath` (FR-41). A kind whose AI Provider lets it go on past its
  * plan's limits, billed as extra usage, says so (`extraUsage`; FR-41): a
  * Claude subscription. A cloud platform's account (`platform`) reaches
@@ -56,7 +58,9 @@ export const ollamaEndpointUrl = "http://localhost:11434";
  * OpenAI's formats, each to its own API; none counts tokens. Z.ai's API
  * lists no Models, so its documented ones are its catalogue
  * (`documentedModels`). Qwen's sign-in is Qwen Code's free one, at the
- * API its login names. Ollama is the Owner's own server (no key) or Ollama
+ * API its login names; its API key is Alibaba Cloud Model Studio's. An
+ * AI Provider's subscription that is sold as a key (a coding plan) is
+ * that AI Provider's API key at the plan's own API (`subscriptionPlans`). Ollama is the Owner's own server (no key) or Ollama
  * Cloud (a key). An Anthropic- or OpenAI-compatible endpoint has no
  * address of its own (`defaultEndpointUrl` null): the Owner gives it, and
  * it is sent any Model asked of it (`anyModel`), since only the Owner
@@ -131,6 +135,51 @@ export const aiAccountKinds = [
     serves: ["chat_completions", "messages"],
   },
   {
+    // A Google AI Pro or Ultra plan (or Gemini Code Assist's free tier),
+    // through Google's Code Assist API, as Gemini CLI's Google sign-in
+    // reaches it: Gemini's own format, wrapped with the Code Assist
+    // project the login is onboarded to.
+    aiProvider: "Gemini",
+    accountType: "oauth",
+    label: "Gemini subscription (Google AI Pro or Ultra), Google sign-in",
+    defaultEndpointUrl: "https://cloudcode-pa.googleapis.com",
+    apiFormat: "gemini",
+    // Its methods are `/v1internal:<method>`, after no path of its own.
+    apiPath: "",
+    servesOnly: "opencode",
+    signIn: "pkce",
+    serves: ["chat_completions"],
+    modelsPath: null,
+    // As Gemini CLI names the Models its Google sign-in serves, 2026-10-19.
+    documentedModels: [
+      {
+        model: "gemini-3.1-pro-preview",
+        displayName: "Gemini 3.1 Pro (preview)",
+        contextWindow: 1_048_576,
+      },
+      {
+        model: "gemini-3-pro-preview",
+        displayName: "Gemini 3 Pro (preview)",
+        contextWindow: 1_048_576,
+      },
+      {
+        model: "gemini-3.5-flash",
+        displayName: "Gemini 3.5 Flash",
+        contextWindow: 1_048_576,
+      },
+      {
+        model: "gemini-3.1-flash-lite",
+        displayName: "Gemini 3.1 Flash-Lite",
+        contextWindow: 1_048_576,
+      },
+      {
+        model: "gemini-2.5-pro",
+        displayName: "Gemini 2.5 Pro",
+        contextWindow: 1_048_576,
+      },
+    ],
+  },
+  {
     // Claude in Amazon Bedrock: the Messages API, signed with SigV4.
     aiProvider: "Claude",
     accountType: "bedrock",
@@ -188,7 +237,8 @@ export const aiAccountKinds = [
     serves: ["chat_completions", "responses", "messages"],
   },
   {
-    // Z.ai's pay-as-you-go API, not its Coding Plan's.
+    // Z.ai's pay-as-you-go API; its GLM Coding Plan's is in
+    // `subscriptionPlans`.
     aiProvider: "Z.ai",
     accountType: "api_key",
     label: "Z.ai API key",
@@ -276,6 +326,19 @@ export const aiAccountKinds = [
     ],
   },
   {
+    // Alibaba Cloud Model Studio's international API (DashScope), in
+    // OpenAI's format; its Coding Plan's is in `subscriptionPlans`.
+    aiProvider: "Qwen",
+    accountType: "api_key",
+    label: "Qwen API key (Alibaba Cloud Model Studio)",
+    defaultEndpointUrl: "https://dashscope-intl.aliyuncs.com/compatible-mode",
+    apiFormat: "openai",
+    apiPath: "/v1",
+    servesOnly: null,
+    signIn: null,
+    serves: ["chat_completions", "messages"],
+  },
+  {
     // The Owner's own Ollama server, through its OpenAI-compatible API.
     aiProvider: "Ollama",
     accountType: "endpoint",
@@ -337,7 +400,7 @@ export const aiAccountKinds = [
   label: string;
   /** Its AI Provider's own API; null where the Owner must give one. */
   defaultEndpointUrl: string | null;
-  apiFormat: "anthropic" | "openai";
+  apiFormat: "anthropic" | "openai" | "gemini";
   apiPath: string;
   servesOnly: AgentTool | null;
   signIn: "pkce" | "device" | null;
@@ -473,6 +536,8 @@ export const subscriptionTermsWarnings = {
   Grok: "A Grok subscription signs in with xAI's own CLI client, which xAI does not document for other tools, and xAI may restrict it. AI Office uses this account only for requests from opencode (the agent tool for Grok), unchanged, never for other tools or translated requests. Use an xAI API key for anything else.",
   ChatGPT:
     "OpenAI's terms allow a ChatGPT subscription to be used for coding only through Codex, and its usage limits are those of your plan. AI Office signs in as Codex does, and uses this account only for Codex's Responses requests (your Agents' sandboxes, or your own Codex with a Gateway Key), passed on unchanged, never for other tools or for translated requests. Use an API key for anything else.",
+  Gemini:
+    "A Gemini subscription signs in with Gemini CLI's own Google client and reaches Google's Code Assist API, which Google does not document for other tools, and Google may restrict it. Its usage limits are those of your Google AI plan (Pro or Ultra; a Google account without one gets Gemini Code Assist's free tier). AI Office uses this account only for requests from opencode (the agent tool for Gemini), never for other tools. Use a Gemini API key for anything else.",
   Qwen: "A Qwen sign-in is Qwen Code's own (its OAuth client at chat.qwen.ai), which Qwen does not document for other tools, and Qwen may restrict it. Its free tier allows a limited number of requests a minute and a day. AI Office uses this account only for requests from opencode (the agent tool for Qwen), unchanged, never for other tools or translated requests.",
 } as const satisfies Record<SubscriptionProvider, string>;
 
@@ -481,6 +546,7 @@ export const subscriptionProviders = [
   "Claude",
   "Grok",
   "ChatGPT",
+  "Gemini",
   "Qwen",
 ] as const;
 export type SubscriptionProvider = (typeof subscriptionProviders)[number];
@@ -495,8 +561,87 @@ export const apiKeyProviders = [
   "Z.ai",
   "Minimax",
   "Kimi",
+  "Qwen",
   "Ollama",
 ] as const;
+
+/**
+ * An AI Provider's subscription that is sold as an API key (a coding
+ * plan): the plan's key, added as that AI Provider's API key at the
+ * plan's own API (`endpointUrl`, null for the AI Provider's usual one;
+ * `apiPath` in place of the kind's, where its paths start elsewhere),
+ * which serves the plan's Models within its limits. Each is offered
+ * beside its AI Provider's pay-as-you-go key, and an account at its
+ * `endpointUrl` is told as the plan.
+ */
+export interface SubscriptionPlan {
+  readonly aiProvider: (typeof apiKeyProviders)[number];
+  readonly label: string;
+  readonly endpointUrl: string | null;
+  readonly apiPath?: string;
+  /** Where the Owner makes the plan's key. */
+  readonly keyFrom: string;
+  /** What the Owner is told about using the plan from AI Office. */
+  readonly terms: string;
+}
+
+/**
+ * The coding plans, as their AI Providers document them for third-party
+ * tools such as opencode, 2026-10-19. A Gemini, Claude, ChatGPT, Grok or
+ * Qwen Code subscription signs in instead (`subscriptionProviders`);
+ * Ollama Cloud's plans are its usual API key; DeepSeek and OpenRouter
+ * sell none.
+ */
+export const subscriptionPlans = [
+  {
+    aiProvider: "Z.ai",
+    label: "Z.ai GLM Coding Plan key",
+    endpointUrl: "https://api.z.ai/api/coding/paas/v4",
+    apiPath: "",
+    keyFrom: "z.ai: Personal Coding Plan, Plan Overview",
+    terms:
+      "A GLM Coding Plan's key serves the plan's GLM Models within its limits, and only at the plan's own API; it is not a Z.ai API key, nor one the plan's limits are billed to.",
+  },
+  {
+    aiProvider: "Minimax",
+    label: "MiniMax Token Plan key (M Plan)",
+    endpointUrl: null,
+    keyFrom: "platform.minimax.io: Console, Plan (a key starting sk-cp-)",
+    terms:
+      "A MiniMax plan's subscription key serves the plan's Models within its limits, at MiniMax's usual API.",
+  },
+  {
+    aiProvider: "Kimi",
+    label: "Kimi for Coding key (Kimi Code membership)",
+    endpointUrl: "https://api.kimi.ai/coding",
+    keyFrom: "kimi.com/code/console",
+    terms:
+      "A Kimi for Coding key serves the Models your membership includes (such as k3 and kimi-for-coding) within its limits, and only at Kimi Code's own API. Kimi asks that coding tools not disguise themselves: AI Office passes on opencode's own requests.",
+  },
+  {
+    aiProvider: "Qwen",
+    label: "Qwen Coding Plan key (Alibaba Cloud Model Studio)",
+    endpointUrl: "https://coding-intl.dashscope.aliyuncs.com",
+    keyFrom: "Alibaba Cloud Model Studio: Coding Plan (a key starting sk-sp-)",
+    terms:
+      "Alibaba allows a Coding Plan's key only in interactive coding tools, not in scripts or backends, and only the plan's own Models (such as qwen3.7-plus). AI Office uses it for your Agents' opencode.",
+  },
+] as const satisfies readonly SubscriptionPlan[];
+
+/** The coding plan an API key account is for, by its endpoint; or none. */
+export const subscriptionPlanOf = (account: {
+  readonly aiProvider: string;
+  readonly accountType: string;
+  readonly endpointUrl: string | null;
+}): SubscriptionPlan | undefined =>
+  account.accountType !== "api_key"
+    ? undefined
+    : subscriptionPlans.find(
+        (plan) =>
+          plan.aiProvider === account.aiProvider &&
+          plan.endpointUrl !== null &&
+          plan.endpointUrl === account.endpointUrl?.replace(/\/+$/, ""),
+      );
 
 /**
  * The AI Providers whose endpoints can be added: the Owner's own Ollama
@@ -810,7 +955,7 @@ const apiKeyAccountSchema = z.strictObject({
   name,
   aiProvider: z.enum(apiKeyProviders, {
     error:
-      "Only Claude, Grok, Gemini, OpenRouter, DeepSeek, Z.ai, Minimax, Kimi and Ollama API keys can be added so far.",
+      "Only Claude, Grok, Gemini, OpenRouter, DeepSeek, Z.ai, Minimax, Kimi, Qwen and Ollama API keys can be added so far.",
   }),
   accountType: z.literal("api_key"),
   /** The API key. Stored encrypted; never sent back. */
@@ -1185,18 +1330,55 @@ export const aiAccountListSchema = z.object({
  * The body of `POST /api/ai-accounts/oauth`: starts adding a subscription
  * account through the AI Provider's OAuth login (PKCE).
  */
-export const startOAuthLoginRequestSchema = z.strictObject({
-  name,
-  aiProvider: z.enum(subscriptionProviders, {
-    error: `Only ${subscriptionProviders.join(", ")} subscriptions can be added so far.`,
-  }),
-  /** Absent: after every other account. */
-  priority: priority.optional(),
-  /** The Owner has read `subscriptionTermsWarning`. */
-  acceptedTerms: z.literal(true, {
-    error: "Confirm you have read the AI Provider's terms for subscriptions.",
-  }),
+/**
+ * Gemini CLI's Google OAuth client, which a Gemini subscription signs in
+ * and refreshes as: its installed-app ID and secret, as Gemini CLI's
+ * source publishes them (`packages/core/src/code_assist/oauth2.ts`). The
+ * Owner gives it with the account, as AI Office's code does not hold it;
+ * it is sealed with the account's refresh token and never sent back.
+ */
+export const oauthClientSchema = z.strictObject({
+  clientId: z
+    .string({ error: "Enter Gemini CLI's OAuth client ID." })
+    .trim()
+    .regex(/^[\w-]{1,200}\.apps\.googleusercontent\.com$/, {
+      error: "Gemini CLI's OAuth client ID ends .apps.googleusercontent.com.",
+    }),
+  clientSecret: z
+    .string({ error: "Enter Gemini CLI's OAuth client secret." })
+    .trim()
+    .regex(/^[\w-]{1,200}$/, {
+      error: "Enter Gemini CLI's OAuth client secret.",
+    }),
 });
+export type OAuthClient = z.infer<typeof oauthClientSchema>;
+
+/** A Gemini subscription names the Google client it signs in as. */
+const clientForGemini = (request: {
+  readonly aiProvider: string;
+  readonly client?: unknown;
+}): boolean => request.aiProvider !== "Gemini" || request.client !== undefined;
+const clientForGeminiProblem = {
+  path: ["client"],
+  error: "A Gemini subscription needs Gemini CLI's OAuth client ID and secret.",
+};
+
+export const startOAuthLoginRequestSchema = z
+  .strictObject({
+    name,
+    aiProvider: z.enum(subscriptionProviders, {
+      error: `Only ${subscriptionProviders.join(", ")} subscriptions can be added so far.`,
+    }),
+    /** Absent: after every other account. */
+    priority: priority.optional(),
+    /** The Owner has read `subscriptionTermsWarning`. */
+    acceptedTerms: z.literal(true, {
+      error: "Confirm you have read the AI Provider's terms for subscriptions.",
+    }),
+    /** Gemini's alone: the Google client it signs in as. */
+    client: oauthClientSchema.optional(),
+  })
+  .refine(clientForGemini, clientForGeminiProblem);
 export type StartOAuthLoginRequest = z.infer<
   typeof startOAuthLoginRequestSchema
 >;
@@ -1251,24 +1433,28 @@ export const completeOAuthLoginRequestSchema = z.strictObject({
  * `~/.grok/auth.json`. Its tokens are stored encrypted; nothing else of
  * it is kept.
  */
-export const importOAuthLoginRequestSchema = z.strictObject({
-  name,
-  aiProvider: z.literal("Grok", {
-    error: "Only a Grok CLI login can be imported so far.",
-  }),
-  /** Absent: after every other account. */
-  priority: priority.optional(),
-  /** The Owner has read the AI Provider's terms warning. */
-  acceptedTerms: z.literal(true, {
-    error: "Confirm you have read the AI Provider's terms for subscriptions.",
-  }),
-  /** The login file's contents, as JSON text. */
-  login: z
-    .string({ error: "Paste the contents of the login file." })
-    .trim()
-    .min(2, { error: "Paste the contents of the login file." })
-    .max(65_536, { error: "That is too long for a login file." }),
-});
+export const importOAuthLoginRequestSchema = z
+  .strictObject({
+    name,
+    aiProvider: z.enum(["Grok", "Gemini"], {
+      error: "Only a Grok or Gemini CLI login can be imported so far.",
+    }),
+    /** Absent: after every other account. */
+    priority: priority.optional(),
+    /** The Owner has read the AI Provider's terms warning. */
+    acceptedTerms: z.literal(true, {
+      error: "Confirm you have read the AI Provider's terms for subscriptions.",
+    }),
+    /** The login file's contents, as JSON text. */
+    login: z
+      .string({ error: "Paste the contents of the login file." })
+      .trim()
+      .min(2, { error: "Paste the contents of the login file." })
+      .max(65_536, { error: "That is too long for a login file." }),
+    /** Gemini's alone: the Google client its tokens refresh as. */
+    client: oauthClientSchema.optional(),
+  })
+  .refine(clientForGemini, clientForGeminiProblem);
 export type ImportOAuthLoginRequest = z.infer<
   typeof importOAuthLoginRequestSchema
 >;
