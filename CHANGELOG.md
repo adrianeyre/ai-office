@@ -1,3 +1,9 @@
+## [1.4.1](https://github.com/adrianeyre/ai-office/compare/v1.4.0...v1.4.1) (2026-10-20)
+
+### Bug Fixes
+
+* **dev:** run pnpm dev on Windows with the sandbox directory in Docker Desktop's VM ([9395526](https://github.com/adrianeyre/ai-office/commit/9395526d24f58edd0bb6aaaf16957e44f145808c))
+
 ## [1.4.0](https://github.com/adrianeyre/ai-office/compare/v1.3.0...v1.4.0) (2026-10-20)
 
 ### Features
