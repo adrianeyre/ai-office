@@ -1,3 +1,10 @@
+## [1.3.0](https://github.com/adrianeyre/ai-office/compare/v1.2.0...v1.3.0) (2026-10-20)
+
+### Features
+
+* **dev:** run every pnpm dev service in Docker, at ai-office.localhost ([2bae9cd](https://github.com/adrianeyre/ai-office/commit/2bae9cd67af2da08b7b460a0881b8b75b0811ce1))
+* **sandcastle:** forward the env of ~/.claude/settings.json into the sandbox ([8c5f005](https://github.com/adrianeyre/ai-office/commit/8c5f005b4275dbbd62d69003e662b24ef850b14a))
+
 ## [1.2.0](https://github.com/adrianeyre/ai-office/compare/v1.1.2...v1.2.0) (2026-10-19)
 
 ### Features
