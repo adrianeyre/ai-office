@@ -64,7 +64,31 @@ describe("pnpm dev's environment for compose", () => {
       AI_OFFICE_DEV_GID: "1019",
       AI_OFFICE_DEV_DOCKER_GID: "999",
       AI_OFFICE_DEV_SANDBOX_DIR: "/home/someone/.ai-office/dev-sandboxes",
+      AI_OFFICE_DEV_CADDY_DIR: "/home/someone/.ai-office/dev-caddy",
+      AI_OFFICE_DEV_PUBLIC_URL: "https://ai-office.localhost",
     });
+  });
+
+  it("names the HTTPS port in the public address only when it is not 443", () => {
+    const publicUrl = (env: Record<string, string>) =>
+      devEnvironment(env, user, 999, "/home/someone")[
+        "AI_OFFICE_DEV_PUBLIC_URL"
+      ];
+    expect(publicUrl({ AI_OFFICE_DEV_HTTPS_PORT: "" })).toBe(
+      "https://ai-office.localhost",
+    );
+    expect(publicUrl({ AI_OFFICE_DEV_HTTPS_PORT: "443" })).toBe(
+      "https://ai-office.localhost",
+    );
+    expect(publicUrl({ AI_OFFICE_DEV_HTTPS_PORT: "3443" })).toBe(
+      "https://ai-office.localhost:3443",
+    );
+    expect(
+      publicUrl({
+        AI_OFFICE_DEV_HTTPS_PORT: "3443",
+        AI_OFFICE_DEV_PUBLIC_URL: "https://ai-office.localhost",
+      }),
+    ).toBe("https://ai-office.localhost");
   });
 
   it("never runs it as root, and takes group 0 where the socket is not found", () => {

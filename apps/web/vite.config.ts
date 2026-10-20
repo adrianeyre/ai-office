@@ -17,7 +17,7 @@ const { version } = JSON.parse(
 /**
  * index.html's absolute URLs (link previews, canonical) are filled in by the
  * server from PUBLIC_URL; in `pnpm dev`, Vite fills them in with its own
- * (docker-compose.dev.yml gives it PUBLIC_URL, http://ai-office.localhost:3045).
+ * (docker-compose.dev.yml gives it PUBLIC_URL, https://ai-office.localhost).
  */
 function devPageUrls(publicUrl: string | undefined): Plugin {
   return {
@@ -57,11 +57,25 @@ export default defineConfig(({ mode }) => {
   // clients with http://localhost:3045/v1. Bodies and server-sent events
   // pass through as they are; the Gateway Key is all that authorises them.
   const proxied = ["/api", "/health", "/v1/"];
+  // Behind docker-compose.dev.yml's HTTPS proxy, the page is at PUBLIC_URL,
+  // so the hot reload's WebSocket goes there too, not to Vite's own port.
+  const publicUrl = process.env["PUBLIC_URL"];
+  const hmr =
+    publicUrl === undefined || publicUrl === ""
+      ? undefined
+      : (() => {
+          const url = new URL(publicUrl);
+          const secure = url.protocol === "https:";
+          return {
+            protocol: secure ? "wss" : "ws",
+            clientPort: Number(url.port || (secure ? 443 : 80)),
+          };
+        })();
   return {
     plugins: [
       react(),
       tailwindcss(),
-      devPageUrls(process.env["PUBLIC_URL"]),
+      devPageUrls(publicUrl),
       // While the server starts or restarts, these wait for it rather
       // than fail.
       waitForServer({ target: server, paths: proxied }),
@@ -74,6 +88,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3045,
       strictPort: true,
+      ...(hmr === undefined ? {} : { hmr }),
       proxy: Object.fromEntries(proxied.map((path) => [path, toServer])),
     },
     test: {

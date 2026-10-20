@@ -1,9 +1,12 @@
 # AI Office for development, every service in Docker: `pnpm dev`
 # (docker/dev.ts) runs it in the foreground, and Ctrl+C stops it. The web
-# app is at http://ai-office.localhost:3045 (AI_OFFICE_DEV_PORT), which
+# app is at https://ai-office.localhost (AI_OFFICE_DEV_PUBLIC_URL), which
 # serves its /api and the AI Gateway's /v1 paths too, as the app does
 # under docker-compose.yml.
 #
+# - `proxy` is Caddy, serving HTTPS on 443 (AI_OFFICE_DEV_HTTPS_PORT) with a
+#   certificate from its own local CA, and redirecting HTTP on 80
+#   (AI_OFFICE_DEV_HTTP_PORT) to it (docker/dev/Caddyfile).
 # - `web` is Vite, which reloads the web app on change and proxies /api,
 #   /health and /v1 to `server`.
 # - `server` is the server and the AI Gateway, restarted on change (`node
@@ -31,9 +34,10 @@
 # touching it: its own project (`ai-office-dev`), volumes and sandbox
 # network (`ai-office-dev-sandboxes`, so each stack's server finds its own
 # relay and sweeps only its own sandboxes' networks), and its own sandbox
-# directory. Only the published ports can clash: give AI_OFFICE_DEV_PORT
-# and AI_OFFICE_DEV_OAUTH_PORT other values in .env when the other stack
-# has 3045 and 1455.
+# directory. Only the published ports can clash: give
+# AI_OFFICE_DEV_HTTPS_PORT, AI_OFFICE_DEV_HTTP_PORT and
+# AI_OFFICE_DEV_OAUTH_PORT other values in .env when something else on this
+# machine has 443, 80 or 1455.
 name: ai-office-dev
 
 x-dev: &dev
@@ -111,10 +115,10 @@ services:
       DATABASE_URL: postgres://ai_office:${POSTGRES_PASSWORD:-devpassword}@postgres:5432/ai_office
       HOST: 0.0.0.0
       PORT: "3046"
-      # Vite's port is published to the host's loopback only: what tells
-      # the server it is not served beyond this machine.
+      # `proxy` is published to the host's loopback only: what tells the
+      # server it is not served beyond this machine.
       PUBLISHED_ADDRESS: 127.0.0.1
-      PUBLIC_URL: http://ai-office.localhost:${AI_OFFICE_DEV_PORT:-3045}
+      PUBLIC_URL: ${AI_OFFICE_DEV_PUBLIC_URL:-https://ai-office.localhost}
       # The AI Gateway's own port, for the sandboxes only, through the
       # sandbox relay (server:3047); never published.
       GATEWAY_HOST: 0.0.0.0
@@ -162,8 +166,8 @@ services:
     depends_on:
       deps:
         condition: service_completed_successfully
-    # On the port it is published on, so the page's address and Vite's
-    # hot reload agree.
+    # Behind `proxy`, so not published: its hot reload connects to the
+    # public address (PUBLIC_URL), which `proxy` passes on.
     command:
       - pnpm
       - --filter
@@ -172,14 +176,42 @@ services:
       - vite
       - --host
       - 0.0.0.0
-      - --port
-      - ${AI_OFFICE_DEV_PORT:-3045}
     environment:
       AI_OFFICE_SERVER_URL: http://server:3046
-      PUBLIC_URL: http://ai-office.localhost:${AI_OFFICE_DEV_PORT:-3045}
+      PUBLIC_URL: ${AI_OFFICE_DEV_PUBLIC_URL:-https://ai-office.localhost}
+    expose:
+      - "3045"
+    networks:
+      - default
+    restart: unless-stopped
+
+  # The one entry point: the web app, /api and the AI Gateway's /v1, over
+  # HTTPS. Its local CA and certificates are kept in
+  # AI_OFFICE_DEV_CADDY_DIR, so the root you trust survives restarts.
+  proxy:
+    image: caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+    user: ${AI_OFFICE_DEV_UID:-1000}:${AI_OFFICE_DEV_GID:-1000}
+    depends_on:
+      - web
+    environment:
+      AI_OFFICE_DEV_PUBLIC_URL: ${AI_OFFICE_DEV_PUBLIC_URL:-https://ai-office.localhost}
+      XDG_DATA_HOME: /data
+      XDG_CONFIG_HOME: /data/config
     ports:
-      # The one entry point: the web app, /api and the AI Gateway's /v1.
-      - 127.0.0.1:${AI_OFFICE_DEV_PORT:-3045}:${AI_OFFICE_DEV_PORT:-3045}
+      - 127.0.0.1:${AI_OFFICE_DEV_HTTPS_PORT:-443}:8443
+      - 127.0.0.1:${AI_OFFICE_DEV_HTTP_PORT:-80}:8080
+    volumes:
+      - ./docker/dev/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${AI_OFFICE_DEV_CADDY_DIR:-${HOME}/.ai-office/dev-caddy}:/data
+    # The image's caddy carries the file capability to bind low ports, which
+    # Linux refuses to run without it in the bounding set; it is not used,
+    # as Caddy listens on 8443 and 8080.
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
     networks:
       - default
     restart: unless-stopped
