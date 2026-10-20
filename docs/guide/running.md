@@ -67,15 +67,14 @@ pnpm install
 
 ### 3. Start Docker
 
-`pnpm dev` runs every service in Docker, so make sure Docker is running: on
-Windows and macOS, open Docker Desktop and wait until it says the engine is
-running. `docker info` should answer without an error.
+Postgres runs in Docker, and `pnpm dev` starts it for you. Make sure Docker is
+running: on Windows and macOS, open Docker Desktop and wait until it says the
+engine is running. `docker info` should answer without an error.
 
 The development database is the `postgres` service in
-`docker-compose.dev.yml`, published on `127.0.0.1:3048` so the tests and
-`pnpm db:schema` reach it from the host. Use `pnpm db:up` to start it on its
-own and `pnpm db:down` to stop it. Its data stays in a Docker volume between
-runs, until `pnpm db:reset`.
+`docker-compose.dev.yml`, published on `127.0.0.1:3048`. Use `pnpm db:up` to
+start it on its own and `pnpm db:down` to stop it. Its data stays in a Docker
+volume between runs.
 
 ### 4. Create `.env`
 
@@ -91,8 +90,7 @@ Copy-Item .env.example .env
 cp .env.example .env
 ```
 
-That's all you need for development (`pnpm dev` copies it for you if there
-is no `.env`). `.env.example` already has working
+That's all you need for development. `.env.example` already has working
 values: the development Postgres from step 3 (port 3048, password
 `devpassword`), the ports in the table above, and sample `SESSION_SECRET` and
 `ENCRYPTION_KEY` values.
@@ -159,65 +157,22 @@ unreadable.
 pnpm dev
 ```
 
-`pnpm dev` (`docker/dev.ts`) builds any sandbox image not built yet, then
-runs the development stack, `docker-compose.dev.yml`, in the foreground,
-prefixing each output line with its service; Ctrl+C stops it all
-(`pnpm dev:down` stops one left running). Nothing runs on the host but
-Docker, and the repository is bind-mounted, so editing a file is all it
-takes:
+`pnpm dev` first starts the development Postgres and waits for it to be ready
+(`pnpm db:up`). It then applies the database schema (`pnpm db:schema`,
+which reads `DATABASE_URL` from `.env`). If either step
+fails, it stops and prints why. For example, it can't start Postgres while
+Docker isn't running. It then runs two processes side by side, prefixing each
+output line with its package name:
 
-- `deps` installs the workspace's dependencies inside Docker, into volumes
-  of their own, so your own `node_modules` (if any) is never used or
-  touched, then exits;
-- `postgres`, the development database (above);
-- `server`, the server and AI Gateway, which applies the schema as it
-  starts and restarts when its code changes (`node --watch`);
-- `web`, the web app's Vite dev server with hot reload, which proxies
+- the server, on port 3046, restarting when its code changes (`node --watch`);
+- the web app's Vite dev server on port 3045, with hot reload, which proxies
   `/api`, `/health` and the AI Gateway's `/v1` to the server. Vite is often
   ready before the server, and the server restarts on every change: while
   it is not listening, these requests wait for it (up to 30 seconds, saying
   "Waiting for AI Office's server" once) rather than fail, so a page left
-  open carries on once it is back;
-- `sandbox-relay`, Agents' sandboxes' way to the AI Gateway (step 6);
-- `proxy`, Caddy, serving it all over HTTPS on port 443, and redirecting
-  HTTP on port 80 to it (`docker/dev/Caddyfile`).
+  open carries on once it is back.
 
-The server and Vite run as your own user, so files they write are yours,
-and the server starts Agents' sandboxes with your Docker (it is given the
-socket, and the group that owns it).
-
-Open https://ai-office.localhost (browsers send every `*.localhost` name to
-this machine). Its certificate is from Caddy's own local CA, which the first
-run makes in `~/.ai-office/dev-caddy` (`AI_OFFICE_DEV_CADDY_DIR`) and keeps.
-Trust its root once, `caddy/pki/authorities/local/root.crt` there (copy it
-to the machine your browser runs on, if that is another one):
-
-- **macOS:** `sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain root.crt`
-- **Windows:** `certutil -addstore -f ROOT root.crt` (as administrator)
-- **Linux:** `sudo cp root.crt /usr/local/share/ca-certificates/ai-office-dev.crt && sudo update-ca-certificates`;
-  Firefox keeps its own store (Settings → Certificates → Import)
-- **Node tools** (Claude Code with `ANTHROPIC_BASE_URL=https://ai-office.localhost`):
-  `NODE_EXTRA_CA_CERTS=<path to root.crt>`
-
-If something else on this machine has port 443, 80 or 1455 (a reverse
-proxy, or a `docker compose` AI Office), set `AI_OFFICE_DEV_HTTPS_PORT`,
-`AI_OFFICE_DEV_HTTP_PORT` and `AI_OFFICE_DEV_OAUTH_PORT` in `.env` to free
-ports; the address is then https://ai-office.localhost:<that port>. When
-your browser reaches the stack through a forwarded port of its own (443 on
-your laptop to 3443 on a server, say), set `AI_OFFICE_DEV_PUBLIC_URL` to the
-address it opens. The development stack is
-otherwise apart from it, with a project, volumes, sandbox network
-(`ai-office-dev-sandboxes`) and sandbox directory
-(`~/.ai-office/dev-sandboxes`) of its own. On Windows the sandbox directory
-is `/home/ai-office/dev-sandboxes`, in Docker Desktop's Linux VM: a Windows
-folder shared into the VM is root's there and cannot be given to the
-server's user, so `pnpm dev` refuses a `C:\…` `AI_OFFICE_DEV_SANDBOX_DIR`,
-and gives the VM's directory to that user first (`sandbox-dir` in
-`docker-compose.dev.yml`). Setting the first password from
-the browser takes the one-time setup token, as under compose, because the
-server sees the proxy's container rather than this machine's loopback:
-`docker compose -f docker-compose.dev.yml exec server cat <file>`, with the
-file the server logs as it starts. On first run you are
+Open http://localhost:3045. On first run you are
 sent to `/setup` to create the Owner password. It is stored, as an Argon2id
 hash, in the `owner` table in Postgres, so from then on you sign in with it
 at `/login`, across restarts (see [First run](#first-run-the-setup-screen)). If the server prints "its
@@ -240,16 +195,19 @@ once all of it is in place:
   (older `.env.example`s had `http://host.docker.internal:3047`, which a
   sandbox cannot even look up, so the agent tool retried for minutes and
   failed with `EAI_AGAIN`), AI Office uses the relay's address instead and
-  says so as it starts. `pnpm dev` starts the **sandbox relay**
-  (`docker-compose.dev.yml`) on the `ai-office-dev-sandboxes` network, which
+  says so as it starts. `pnpm dev` starts the **sandbox relay** (`pnpm db:up`,
+  `docker-compose.dev.yml`) on the `ai-office-sandboxes` network, which
   has no route out. Each sandbox is started on a network of its own, as
   closed, which AI Office joins the relay to and removes after it, so the
   relay is the one other thing a sandbox reaches. The relay forwards
-  port 3047 to the AI Gateway in the `server` container, and relays HTTPS
-  to the hosts `SANDBOX_EGRESS_HOSTS` names and to nothing else (see
-  [Sandboxes](issue-pipeline.md#sandboxes)). `pnpm dev` sets the server's
-  `SANDBOX_GATEWAY_URL`, `SANDBOX_NETWORK`, `SANDBOX_WORK_DIR` and
-  `GATEWAY_HOST` itself, whatever `.env` says.
+  port 3047 to the AI Gateway on this machine, and relays HTTPS to the
+  hosts `SANDBOX_EGRESS_HOSTS` names and to nothing else (see
+  [Sandboxes](issue-pipeline.md#sandboxes)). On Linux, set `GATEWAY_HOST`
+  to the address of the `docker0` bridge (`ip -4 addr show docker0`,
+  usually `172.17.0.1`), where the relay reaches it: the default,
+  `127.0.0.1`, cannot be reached from containers. Don't use `0.0.0.0`,
+  which would offer the Gateway to your whole network. Docker Desktop
+  (Windows and macOS) reaches the default as it is.
 - `SANDBOX_EGRESS_HOSTS` names the hosts Agents need, such as
   `registry.npmjs.org` for a Floor whose setup command runs
   `npm install`, and `api.github.com` for `gh`. `.env.example` lists
