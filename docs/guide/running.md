@@ -208,7 +208,12 @@ your laptop to 3443 on a server, say), set `AI_OFFICE_DEV_PUBLIC_URL` to the
 address it opens. The development stack is
 otherwise apart from it, with a project, volumes, sandbox network
 (`ai-office-dev-sandboxes`) and sandbox directory
-(`~/.ai-office/dev-sandboxes`) of its own. Setting the first password from
+(`~/.ai-office/dev-sandboxes`) of its own. On Windows the sandbox directory
+is `/home/ai-office/dev-sandboxes`, in Docker Desktop's Linux VM: a Windows
+folder shared into the VM is root's there and cannot be given to the
+server's user, so `pnpm dev` refuses a `C:\…` `AI_OFFICE_DEV_SANDBOX_DIR`,
+and gives the VM's directory to that user first (`sandbox-dir` in
+`docker-compose.dev.yml`). Setting the first password from
 the browser takes the one-time setup token, as under compose, because the
 server sees the proxy's container rather than this machine's loopback:
 `docker compose -f docker-compose.dev.yml exec server cat <file>`, with the
