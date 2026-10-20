@@ -1,3 +1,11 @@
+## [1.4.2](https://github.com/adrianeyre/ai-office/compare/v1.4.1...v1.4.2) (2026-10-20)
+
+### Reverts
+
+* Revert "feat(dev): run every pnpm dev service in Docker, at ai-office.localhost" ([1cd5886](https://github.com/adrianeyre/ai-office/commit/1cd588608329ff5c868d7e5cb45dcceacfc28fa2))
+* Revert "feat(dev): serve pnpm dev over HTTPS at https://ai-office.localhost" ([3f1366e](https://github.com/adrianeyre/ai-office/commit/3f1366e04f8390dd05087aa71ec20185fd927fd3))
+* Revert "fix(dev): run pnpm dev on Windows with the sandbox directory in Docker Desktop's VM" ([e1c712c](https://github.com/adrianeyre/ai-office/commit/e1c712c24a0cfa9c74c8534412ab9e53c1805902))
+
 ## [1.4.1](https://github.com/adrianeyre/ai-office/compare/v1.4.0...v1.4.1) (2026-10-20)
 
 ### Bug Fixes
