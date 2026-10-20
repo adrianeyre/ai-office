@@ -42,7 +42,7 @@ pnpm install
 
 | Command          | What it does                                             |
 | ---------------- | -------------------------------------------------------- |
-| `pnpm dev`       | Runs the whole of AI Office for development in Docker (`docker-compose.dev.yml`): Postgres, the server (restarts on change, schema applied as it starts), Vite (hot reload), the sandbox relay and an HTTPS proxy, at https://ai-office.localhost, after building any sandbox image not built yet; Ctrl+C stops it. See [Running in development](docs/guide/running.md#running-in-development) |
+| `pnpm dev`       | Runs the whole of AI Office for development in Docker (`docker-compose.dev.yml`): Postgres, the server (restarts on change, schema applied as it starts), Vite (hot reload) and the sandbox relay, at http://ai-office.localhost:3045, after building any sandbox image not built yet; Ctrl+C stops it. See [Running in development](docs/guide/running.md#running-in-development) |
 | `pnpm dev:down` | Stops a development stack left running (`docker compose -f docker-compose.dev.yml stop`) |
 | `pnpm lint`      | ESLint (type-aware) and a Prettier check                 |
 | `pnpm typecheck` | `tsc` for the root config and every workspace package    |
@@ -59,9 +59,9 @@ pnpm install
 | `pnpm sandbox:ensure` | Builds only the sandbox images not built yet; `pnpm dev` runs it first |
 | `docker compose up --build` | Runs the whole AI Office in Docker: the app, Postgres, and Agents' and the Manager chat's sandboxes, started from inside the app (build the sandbox images first, as above); see [Running with docker compose](docs/guide/running.md#running-ai-office-with-docker-compose) |
 
-AI Office has one address: `https://ai-office.localhost` in `pnpm dev`
-(trust its local CA once, as [Running in development](docs/guide/running.md#running-in-development)
-says) and `http://localhost:3045` under compose. It serves the web app, its `/api`, and the AI Gateway at `/v1`.
+AI Office has one address: `http://ai-office.localhost:3045` in `pnpm dev`
+(`AI_OFFICE_DEV_PORT` changes the port) and `http://localhost:3045` under
+compose. It serves the web app, its `/api`, and the AI Gateway at `/v1`.
 Point your own tools at it with a Gateway Key from **API Key Management**:
 Claude Code with `ANTHROPIC_BASE_URL=http://localhost:3045`, Codex and
 other OpenAI clients with `http://localhost:3045/v1` (see

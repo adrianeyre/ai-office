@@ -178,39 +178,21 @@ takes:
   it is not listening, these requests wait for it (up to 30 seconds, saying
   "Waiting for AI Office's server" once) rather than fail, so a page left
   open carries on once it is back;
-- `sandbox-relay`, Agents' sandboxes' way to the AI Gateway (step 6);
-- `proxy`, Caddy, serving it all over HTTPS on port 443, and redirecting
-  HTTP on port 80 to it (`docker/dev/Caddyfile`).
+- `sandbox-relay`, Agents' sandboxes' way to the AI Gateway (step 6).
 
 The server and Vite run as your own user, so files they write are yours,
 and the server starts Agents' sandboxes with your Docker (it is given the
 socket, and the group that owns it).
 
-Open https://ai-office.localhost (browsers send every `*.localhost` name to
-this machine). Its certificate is from Caddy's own local CA, which the first
-run makes in `~/.ai-office/dev-caddy` (`AI_OFFICE_DEV_CADDY_DIR`) and keeps.
-Trust its root once, `caddy/pki/authorities/local/root.crt` there (copy it
-to the machine your browser runs on, if that is another one):
-
-- **macOS:** `sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain root.crt`
-- **Windows:** `certutil -addstore -f ROOT root.crt` (as administrator)
-- **Linux:** `sudo cp root.crt /usr/local/share/ca-certificates/ai-office-dev.crt && sudo update-ca-certificates`;
-  Firefox keeps its own store (Settings → Certificates → Import)
-- **Node tools** (Claude Code with `ANTHROPIC_BASE_URL=https://ai-office.localhost`):
-  `NODE_EXTRA_CA_CERTS=<path to root.crt>`
-
-If something else on this machine has port 443, 80 or 1455 (a reverse
-proxy, or a `docker compose` AI Office), set `AI_OFFICE_DEV_HTTPS_PORT`,
-`AI_OFFICE_DEV_HTTP_PORT` and `AI_OFFICE_DEV_OAUTH_PORT` in `.env` to free
-ports; the address is then https://ai-office.localhost:<that port>. When
-your browser reaches the stack through a forwarded port of its own (443 on
-your laptop to 3443 on a server, say), set `AI_OFFICE_DEV_PUBLIC_URL` to the
-address it opens. The development stack is
+Open http://ai-office.localhost:3045 (browsers send every `*.localhost` name
+to this machine). If another stack has port 3045 or 1455 on this machine (a
+`docker compose` AI Office, say), set `AI_OFFICE_DEV_PORT` and
+`AI_OFFICE_DEV_OAUTH_PORT` in `.env` to free ports: the development stack is
 otherwise apart from it, with a project, volumes, sandbox network
 (`ai-office-dev-sandboxes`) and sandbox directory
 (`~/.ai-office/dev-sandboxes`) of its own. Setting the first password from
 the browser takes the one-time setup token, as under compose, because the
-server sees the proxy's container rather than this machine's loopback:
+server sees Vite's container rather than this machine's loopback:
 `docker compose -f docker-compose.dev.yml exec server cat <file>`, with the
 file the server logs as it starts. On first run you are
 sent to `/setup` to create the Owner password. It is stored, as an Argon2id
