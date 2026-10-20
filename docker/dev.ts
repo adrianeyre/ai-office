@@ -7,7 +7,7 @@
 import { spawn } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, statSync } from "node:fs";
 import { homedir, userInfo } from "node:os";
-import { join } from "node:path";
+import { join, posix, win32 } from "node:path";
 
 const root = join(import.meta.dirname, "..");
 
@@ -27,18 +27,36 @@ export const workspaceNodeModules = [
 ] as const;
 
 /**
+ * Where the sandboxes' work directory is on Windows when
+ * AI_OFFICE_DEV_SANDBOX_DIR is not set: in Docker Desktop's Linux VM, as
+ * docs/guide/running.md has it for docker-compose.yml. A Windows folder,
+ * shared into the VM, will not do: it is root's there, and cannot be given
+ * to the server's user, so the server refuses it.
+ */
+export const windowsSandboxDir = "/home/ai-office/dev-sandboxes";
+
+/** Whether `path` is a Windows one, such as C:\Users\me or \\server\share. */
+export const isWindowsPath = (path: string): boolean =>
+  /^(?:[A-Za-z]:|\\)/.test(path);
+
+/**
  * The variables docker-compose.dev.yml takes from `pnpm dev`: the user
  * and group the server and Vite run as, the group that owns Docker's
  * socket, the sandboxes' work directory, the HTTPS proxy's directory and
  * the public address, https://ai-office.localhost with the HTTPS port unless
- * it is 443. A value already set wins.
+ * it is 443. A value already set wins. The sandbox directory is at the same
+ * path in the server's container as for the Docker daemon, which
+ * bind-mounts it into the sandboxes: ~/.ai-office/dev-sandboxes, or on
+ * Windows windowsSandboxDir.
  */
 export function devEnvironment(
   env: Readonly<Record<string, string | undefined>>,
   user: { readonly uid: number; readonly gid: number },
   dockerSocketGid: number | undefined,
   home: string,
+  platform: NodeJS.Platform,
 ): Record<string, string> {
+  const { join } = platform === "win32" ? win32 : posix;
   // Root has no business owning an Agent's files: the images' default, as
   // docker/sandbox-build.ts has it.
   const uid = user.uid > 0 ? user.uid : 1000;
@@ -57,7 +75,9 @@ export function devEnvironment(
     ),
     AI_OFFICE_DEV_SANDBOX_DIR: value(
       "AI_OFFICE_DEV_SANDBOX_DIR",
-      join(home, ".ai-office", "dev-sandboxes"),
+      platform === "win32"
+        ? windowsSandboxDir
+        : join(home, ".ai-office", "dev-sandboxes"),
     ),
     AI_OFFICE_DEV_CADDY_DIR: value(
       "AI_OFFICE_DEV_CADDY_DIR",
@@ -107,14 +127,25 @@ if (import.meta.main) {
     userInfo(),
     dockerSocketGid,
     homedir(),
+    process.platform,
   );
   const env = { ...process.env, ...dev };
+  const compose = ["compose", "--file", "docker-compose.dev.yml"];
+  const sandboxes = dev["AI_OFFICE_DEV_SANDBOX_DIR"] ?? "";
 
-  // Made here, as this user: Docker would make them as root.
-  mkdirSync(dev["AI_OFFICE_DEV_SANDBOX_DIR"] ?? "", {
-    recursive: true,
-    mode: 0o700,
-  });
+  // Made here, as this user: Docker would make them as root. On Windows,
+  // the sandbox directory is in Docker Desktop's VM, so sandbox-dir makes
+  // it there, as root, and gives it to the server's user.
+  const windows = process.platform === "win32";
+  if (windows && isWindowsPath(sandboxes)) {
+    console.error(
+      `AI_OFFICE_DEV_SANDBOX_DIR is ${sandboxes}, a Windows folder, which Docker Desktop shares into its VM as root's, so the server cannot take it for Agents' clones. Set a Linux-style path, a directory in Docker Desktop's VM, or leave it empty for ${windowsSandboxDir}.`,
+    );
+    process.exit(1);
+  }
+  if (!windows) {
+    mkdirSync(sandboxes, { recursive: true, mode: 0o700 });
+  }
   for (const path of workspaceNodeModules) {
     mkdirSync(join(root, path), { recursive: true });
   }
@@ -135,18 +166,16 @@ if (import.meta.main) {
         ...env,
       },
     ],
-    [
-      "docker",
-      [
-        "compose",
-        "--file",
-        "docker-compose.dev.yml",
-        "up",
-        "--build",
-        "--remove-orphans",
-      ],
-      env,
-    ],
+    ...(windows
+      ? [
+          [
+            "docker",
+            [...compose, "run", "--rm", "sandbox-dir"],
+            env,
+          ] satisfies [string, string[], NodeJS.ProcessEnv],
+        ]
+      : []),
+    ["docker", [...compose, "up", "--build", "--remove-orphans"], env],
   ];
   for (const [command, args, stepEnv] of steps) {
     const code = await run(command, args, stepEnv);
