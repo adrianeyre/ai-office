@@ -28,8 +28,7 @@
 # user fit the clones the server makes. The server starts Agents' sandboxes
 # with the host's Docker (the socket below; docker/dev.ts sets
 # AI_OFFICE_DEV_DOCKER_GID to its group), in AI_OFFICE_DEV_SANDBOX_DIR, which
-# is at the same path inside as on the Docker host: on Windows, Docker
-# Desktop's VM (`sandbox-dir`, below).
+# is at the same path inside as on the host.
 #
 # It runs beside a docker-compose.yml stack on the same machine without
 # touching it: its own project (`ai-office-dev`), volumes and sandbox
@@ -216,52 +215,6 @@ services:
     networks:
       - default
     restart: unless-stopped
-
-  # On Windows only, `pnpm dev` runs this first (`docker compose run`; the
-  # profile keeps `up` from starting it): AI_OFFICE_DEV_SANDBOX_DIR is a
-  # path in Docker Desktop's VM there, which Docker makes as root, so this
-  # gives it to the user the server runs as, as docker-compose.yml's
-  # sandbox-dir does for the app, with the same script. (Elsewhere,
-  # docker/dev.ts makes it on the host as that user.)
-  sandbox-dir:
-    image: alpine:3.22.6@sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8
-    profiles:
-      - sandbox-dir
-    user: root
-    command:
-      - sh
-      - -c
-      - |
-        set -eu
-        dir=$$SANDBOX_WORK_DIR
-        refuse() {
-          echo "sandbox-dir: $$dir $$1, so it is not taken for the sandboxes' clones. Remove it, or set AI_OFFICE_DEV_SANDBOX_DIR to a directory of the server's own." >&2
-          exit 1
-        }
-        if test -h "$$dir"; then
-          refuse "is a symbolic link"
-        elif [ ! -e "$$dir" ]; then
-          mkdir "$$dir"
-        elif [ ! -d "$$dir" ]; then
-          refuse "is not a directory"
-        else
-          owner=$$(stat -c %u "$$dir")
-          if [ "$$owner" = 0 ] && [ -n "$$(ls -A "$$dir")" ]; then
-            refuse "is root's and not empty"
-          elif [ "$$owner" != 0 ] && [ "$$owner" != "$$APP_UID" ]; then
-            refuse "belongs to UID $$owner"
-          fi
-        fi
-        chown -h "$$APP_UID:$$APP_GID" "$$dir"
-        chmod 0700 "$$dir"
-    environment:
-      SANDBOX_WORK_DIR: ${AI_OFFICE_DEV_SANDBOX_DIR:-${HOME}/.ai-office/dev-sandboxes}
-      APP_UID: ${AI_OFFICE_DEV_UID:-1000}
-      APP_GID: ${AI_OFFICE_DEV_GID:-1000}
-    volumes:
-      - ${AI_OFFICE_DEV_SANDBOX_DIR:-${HOME}/.ai-office/dev-sandboxes}:${AI_OFFICE_DEV_SANDBOX_DIR:-${HOME}/.ai-office/dev-sandboxes}
-    network_mode: none
-    restart: "no"
 
   sandbox-relay:
     image: node:26.10.0-slim@sha256:930557a230abacbc3f4fd9b8648abf8f4bee1e17cb72195dcdfb2f709bc85b33

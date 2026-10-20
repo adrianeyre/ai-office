@@ -7,12 +7,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 
-import {
-  devEnvironment,
-  isWindowsPath,
-  windowsSandboxDir,
-  workspaceNodeModules,
-} from "./dev.ts";
+import { devEnvironment, workspaceNodeModules } from "./dev.ts";
 
 const root = join(import.meta.dirname, "..");
 const read = (path: string) => readFile(join(root, path), "utf8");
@@ -64,7 +59,7 @@ describe("pnpm dev's environment for compose", () => {
   const user = { uid: 1017, gid: 1019 };
 
   it("runs the stack as the user running it, with the Docker socket's group and a sandbox directory in their home", () => {
-    expect(devEnvironment({}, user, 999, "/home/someone", "linux")).toEqual({
+    expect(devEnvironment({}, user, 999, "/home/someone")).toEqual({
       AI_OFFICE_DEV_UID: "1017",
       AI_OFFICE_DEV_GID: "1019",
       AI_OFFICE_DEV_DOCKER_GID: "999",
@@ -76,7 +71,7 @@ describe("pnpm dev's environment for compose", () => {
 
   it("names the HTTPS port in the public address only when it is not 443", () => {
     const publicUrl = (env: Record<string, string>) =>
-      devEnvironment(env, user, 999, "/home/someone", "linux")[
+      devEnvironment(env, user, 999, "/home/someone")[
         "AI_OFFICE_DEV_PUBLIC_URL"
       ];
     expect(publicUrl({ AI_OFFICE_DEV_HTTPS_PORT: "" })).toBe(
@@ -97,9 +92,7 @@ describe("pnpm dev's environment for compose", () => {
   });
 
   it("never runs it as root, and takes group 0 where the socket is not found", () => {
-    expect(
-      devEnvironment({}, { uid: 0, gid: 0 }, undefined, "/root", "linux"),
-    ).toEqual(
+    expect(devEnvironment({}, { uid: 0, gid: 0 }, undefined, "/root")).toEqual(
       expect.objectContaining({
         AI_OFFICE_DEV_UID: "1000",
         AI_OFFICE_DEV_GID: "1000",
@@ -115,68 +108,12 @@ describe("pnpm dev's environment for compose", () => {
         user,
         999,
         "/home/someone",
-        "linux",
       ),
     ).toEqual(
       expect.objectContaining({
         AI_OFFICE_DEV_UID: "1017",
         AI_OFFICE_DEV_SANDBOX_DIR: "/srv/clones",
       }),
-    );
-  });
-
-  it("on Windows, puts the sandbox directory in Docker Desktop's VM, as a Windows folder is root's there, and keeps one already set", () => {
-    const home = "C:\\Users\\someone";
-    expect(devEnvironment({}, user, undefined, home, "win32")).toEqual(
-      expect.objectContaining({
-        AI_OFFICE_DEV_SANDBOX_DIR: windowsSandboxDir,
-        AI_OFFICE_DEV_CADDY_DIR: "C:\\Users\\someone\\.ai-office\\dev-caddy",
-      }),
-    );
-    expect(windowsSandboxDir).toMatch(/^\/(?!tmp\/)/);
-    expect(
-      devEnvironment(
-        { AI_OFFICE_DEV_SANDBOX_DIR: "/srv/clones" },
-        user,
-        undefined,
-        home,
-        "win32",
-      )["AI_OFFICE_DEV_SANDBOX_DIR"],
-    ).toBe("/srv/clones");
-  });
-
-  it("tells a Windows folder from a Linux-style path", () => {
-    expect(isWindowsPath("C:\\Users\\someone")).toBe(true);
-    expect(isWindowsPath("d:/clones")).toBe(true);
-    expect(isWindowsPath("\\\\server\\share")).toBe(true);
-    expect(isWindowsPath(windowsSandboxDir)).toBe(false);
-    expect(isWindowsPath("/srv/clones")).toBe(false);
-  });
-});
-
-describe("pnpm dev's sandbox-dir, which makes the sandbox directory on Windows", () => {
-  const service = async (file: string) =>
-    (
-      parse(await read(file)) as {
-        services: Record<
-          string,
-          { command: string[]; profiles?: string[]; user?: string }
-        >;
-      }
-    ).services["sandbox-dir"];
-
-  it("runs docker-compose.yml's script, as root, only when `pnpm dev` asks for it", async () => {
-    const dev = await service("docker-compose.dev.yml");
-    const production = await service("docker-compose.yml");
-    expect(dev?.profiles).toEqual(["sandbox-dir"]);
-    expect(dev?.user).toBe("root");
-    expect(dev?.command.join("\n")).toBe(
-      production?.command
-        .join("\n")
-        .replace(
-          "set AI_OFFICE_SANDBOX_DIR to a directory of the app's own",
-          "set AI_OFFICE_DEV_SANDBOX_DIR to a directory of the server's own",
-        ),
     );
   });
 });
