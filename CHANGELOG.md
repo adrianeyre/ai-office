@@ -1,3 +1,9 @@
+## [1.4.0](https://github.com/adrianeyre/ai-office/compare/v1.3.0...v1.4.0) (2026-10-20)
+
+### Features
+
+* **dev:** serve pnpm dev over HTTPS at https://ai-office.localhost ([17ad8e7](https://github.com/adrianeyre/ai-office/commit/17ad8e72117c6623dad443b19d211366738d78c4))
+
 ## [1.3.0](https://github.com/adrianeyre/ai-office/compare/v1.2.0...v1.3.0) (2026-10-20)
 
 ### Features
