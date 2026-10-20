@@ -42,7 +42,8 @@ pnpm install
 
 | Command          | What it does                                             |
 | ---------------- | -------------------------------------------------------- |
-| `pnpm dev`       | Starts the development Postgres (Docker), applies the schema, builds any sandbox image not built yet, then runs the server (restarts on change) and the Vite dev server together; see [Running in development](docs/guide/running.md#running-in-development) |
+| `pnpm dev`       | Runs the whole of AI Office for development in Docker (`docker-compose.dev.yml`): Postgres, the server (restarts on change, schema applied as it starts), Vite (hot reload) and the sandbox relay, at http://ai-office.localhost:3045, after building any sandbox image not built yet; Ctrl+C stops it. See [Running in development](docs/guide/running.md#running-in-development) |
+| `pnpm dev:down` | Stops a development stack left running (`docker compose -f docker-compose.dev.yml stop`) |
 | `pnpm lint`      | ESLint (type-aware) and a Prettier check                 |
 | `pnpm typecheck` | `tsc` for the root config and every workspace package    |
 | `pnpm test`      | Vitest, with each workspace package as its own project   |
@@ -50,7 +51,7 @@ pnpm install
 | `pnpm build`     | Builds every package that has a build (the web app)      |
 | `pnpm db:schema` | Apply the schema to the database at `DATABASE_URL` if it is empty, or check it is the same schema if not |
 | `pnpm db:reset` | Recreate the development Postgres, empty, and apply the schema |
-| `pnpm db:up` / `pnpm db:down` | Start / stop the development Postgres, and the sandboxes' network and sandbox relay (`docker-compose.dev.yml`) |
+| `pnpm db:up` / `pnpm db:down` | Start / stop the development Postgres on its own (`docker-compose.dev.yml`), for the tests or `pnpm db:schema` |
 | `pnpm e2e`       | Builds the web app, then runs the Playwright end-to-end tests |
 | `pnpm scenes`    | Screenshot tests of the 3D scenes in headless Chromium with software WebGL, without a GPU: the 3D Office's key scenes (see [Scene screenshot tests](#scene-screenshot-tests)) and a Floor in each 3D theme (see [the guide](docs/guide/web-app.md#screenshot-tests-of-the-3d-scenes)) |
 | `pnpm screenshots` | Builds the web app, then retakes the README's screenshots in `docs/images/` |
@@ -58,9 +59,10 @@ pnpm install
 | `pnpm sandbox:ensure` | Builds only the sandbox images not built yet; `pnpm dev` runs it first |
 | `docker compose up --build` | Runs the whole AI Office in Docker: the app, Postgres, and Agents' and the Manager chat's sandboxes, started from inside the app (build the sandbox images first, as above); see [Running with docker compose](docs/guide/running.md#running-ai-office-with-docker-compose) |
 
-AI Office has one address, `http://localhost:3045` both in `pnpm dev` and
-under compose: the web app, its `/api`, and the AI Gateway at `/v1`. Point
-your own tools at it with a Gateway Key from **API Key Management**:
+AI Office has one address: `http://ai-office.localhost:3045` in `pnpm dev`
+(`AI_OFFICE_DEV_PORT` changes the port) and `http://localhost:3045` under
+compose. It serves the web app, its `/api`, and the AI Gateway at `/v1`.
+Point your own tools at it with a Gateway Key from **API Key Management**:
 Claude Code with `ANTHROPIC_BASE_URL=http://localhost:3045`, Codex and
 other OpenAI clients with `http://localhost:3045/v1` (see
 [Gateway Keys](docs/guide/ai-gateway.md#gateway-keys)). Whatever that

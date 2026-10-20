@@ -16,14 +16,18 @@ const { version } = JSON.parse(
 
 /**
  * index.html's absolute URLs (link previews, canonical) are filled in by the
- * server from PUBLIC_URL; in `pnpm dev`, Vite fills them in with its own.
+ * server from PUBLIC_URL; in `pnpm dev`, Vite fills them in with its own
+ * (docker-compose.dev.yml gives it PUBLIC_URL, http://ai-office.localhost:3045).
  */
-function devPageUrls(): Plugin {
+function devPageUrls(publicUrl: string | undefined): Plugin {
   return {
     name: "ai-office-dev-page-urls",
     apply: "serve",
     transformIndexHtml(html, { originalUrl, server }) {
-      const origin = `http://localhost:${String(server?.config.server.port ?? 3045)}`;
+      const origin =
+        publicUrl === undefined || publicUrl === ""
+          ? `http://localhost:${String(server?.config.server.port ?? 3045)}`
+          : new URL(publicUrl).origin;
       const path = (originalUrl ?? "/").split("?", 1)[0] ?? "/";
       return html
         .replaceAll("__AI_OFFICE_PAGE_URL__", new URL(path, origin).href)
@@ -34,12 +38,15 @@ function devPageUrls(): Plugin {
 
 // `pnpm build` writes dist/, which the server serves at `/`. In `pnpm dev`,
 // Vite serves the app on 3045 and proxies the API, and the AI Gateway's
-// `/v1` paths (one entry point), to the server, which listens on the PORT
+// `/v1` paths (one entry point), to the server: AI_OFFICE_SERVER_URL, which
+// docker-compose.dev.yml sets to its `server`, or else localhost on the PORT
 // from the root .env (3046 unless set).
 export default defineConfig(({ mode }) => {
   const { PORT: port } = loadEnv(mode, repositoryRoot, "");
   // An empty PORT (as `.env.example` has it) means the default.
-  const server = `http://localhost:${port === undefined || port === "" ? "3046" : port}`;
+  const server =
+    process.env["AI_OFFICE_SERVER_URL"] ??
+    `http://localhost:${port === undefined || port === "" ? "3046" : port}`;
   // `changeOrigin: false` keeps the browser's Host header (localhost:3045),
   // so it matches the Origin of the server's same-site check; Vite's
   // string shorthand would rewrite it to the server's and every sign-in
@@ -54,7 +61,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
-      devPageUrls(),
+      devPageUrls(process.env["PUBLIC_URL"]),
       // While the server starts or restarts, these wait for it rather
       // than fail.
       waitForServer({ target: server, paths: proxied }),
