@@ -9,18 +9,53 @@
  * it adds to the blank template: a private CA is forwarded when the host reaches
  * Anthropic through one, dependencies are installed by a hook rather than baked
  * into the image, commits are merged back to the branch you launched from, and
- * the prompt is chosen at the command line.
+ * the prompt is chosen at the command line, and the `env` of your Claude Code
+ * settings (`~/.claude/settings.json`) reaches the agent as it reaches `claude`
+ * on the host.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 import { run, claudeCode } from "@ai-hero/sandcastle";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 import type { MountConfig } from "@ai-hero/sandcastle";
 
-// A private CA on the host names a file the container cannot see, so the file
-// is mounted and the variable re-pointed at where it landed.
-const hostCaCert = process.env.NODE_EXTRA_CA_CERTS;
+// The `env` block of `~/.claude/settings.json` (CLAUDE_CONFIG_DIR's, if set):
+// an API key, ANTHROPIC_BASE_URL for a gateway, custom headers and the like,
+// which `claude` applies on the host. Only string values are forwarded; a file
+// that is missing or does not parse forwards nothing. These override the keys
+// `.sandcastle/.env` names, as they do for `claude` itself.
+const claudeSettingsFile = join(
+  process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"),
+  "settings.json",
+);
+
+const readClaudeSettingsEnv = (path: string): Record<string, string> => {
+  if (!existsSync(path)) return {};
+  try {
+    const { env } = JSON.parse(readFileSync(path, "utf8")) as {
+      env?: Record<string, unknown>;
+    };
+    return Object.fromEntries(
+      Object.entries(env ?? {}).filter(
+        (entry): entry is [string, string] => typeof entry[1] === "string",
+      ),
+    );
+  } catch {
+    console.warn(`Could not read ${path}; forwarding none of its env.`);
+    return {};
+  }
+};
+
+const claudeSettingsEnv = readClaudeSettingsEnv(claudeSettingsFile);
+
+// A private CA on the host (in the shell, or in the settings above) names a
+// file the container cannot see, so the file is mounted and the variable
+// re-pointed at where it landed.
+const hostCaCert =
+  claudeSettingsEnv.NODE_EXTRA_CA_CERTS ?? process.env.NODE_EXTRA_CA_CERTS;
 const caCertInSandbox = "/home/agent/ca-certificates.pem";
 const forwardCaCert = Boolean(hostCaCert && existsSync(hostCaCert));
 
@@ -111,12 +146,19 @@ console.log(`  prompt   ${promptFile}`);
 console.log(`  issue    ${issueArg === undefined ? "none" : `#${issueArg}`}`);
 console.log(`  branch   ${targetBranch} (via merge-to-head)`);
 console.log(`  CA       ${forwardCaCert ? hostCaCert : "none forwarded"}`);
+// Names only: the values are often secrets.
+console.log(
+  `  settings ${Object.keys(claudeSettingsEnv).join(", ") || "no env"} (${claudeSettingsFile})`,
+);
 
 const result = await run({
   agent: claudeCode("claude-opus-5-5", { effort: "high" }),
   sandbox: docker({
     mounts,
-    env: forwardCaCert ? { NODE_EXTRA_CA_CERTS: caCertInSandbox } : {},
+    env: {
+      ...claudeSettingsEnv,
+      ...(forwardCaCert ? { NODE_EXTRA_CA_CERTS: caCertInSandbox } : {}),
+    },
   }),
   promptFile,
   promptArgs,

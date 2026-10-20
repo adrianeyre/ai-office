@@ -69,10 +69,20 @@ environment, add its name to `.env`.
   `Contents: write` and no `Pull requests: write`: the commits come back over
   the bind mount and a person pushes and opens the pull request.
 
+**Your Claude Code settings' `env` is forwarded too.** Every string in the
+`env` block of `~/.claude/settings.json` (under `CLAUDE_CONFIG_DIR` if you
+set it) reaches the agent as it reaches `claude` on the host, such as
+`ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL` and `ANTHROPIC_CUSTOM_HEADERS` for a
+gateway, overriding the same keys in `.sandcastle/.env`. A run prints the
+names it forwarded, never the values. An address there must be reachable
+from a container on Docker's default bridge: `localhost` is the container
+itself.
+
 If you reach Anthropic through a gateway with its own certificate authority,
-export `NODE_EXTRA_CA_CERTS` on the host as usual. `main.ts` mounts that file
-into the container and points the variable at the mounted copy. Forwarding
-the host path alone fails with `unable to verify the first certificate`.
+set `NODE_EXTRA_CA_CERTS` in those settings or export it on the host as
+usual. `main.ts` mounts that file into the container and points the variable
+at the mounted copy. Forwarding the host path alone fails with `unable to
+verify the first certificate`.
 
 ### 4. Build the image
 

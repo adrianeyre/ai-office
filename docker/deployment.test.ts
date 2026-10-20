@@ -89,15 +89,28 @@ const envExampleKeys = envExample
   .filter((line) => /^[A-Z][A-Z0-9_]*=/.test(line))
   .map((line) => line.slice(0, line.indexOf("=")));
 
-/** What compose reads from the shell itself, never from `.env`. */
-const fromTheShell = new Set(["HOME"]);
+/**
+ * What compose reads from the shell itself, never from `.env`: HOME, and
+ * what `pnpm dev` (docker/dev.ts) works out for docker-compose.dev.yml.
+ */
+const fromTheShell = new Set([
+  "HOME",
+  "AI_OFFICE_DEV_UID",
+  "AI_OFFICE_DEV_GID",
+  "AI_OFFICE_DEV_DOCKER_GID",
+]);
 
-/** The variables docker-compose.yml interpolates, like `${POSTGRES_PASSWORD:?…}`. */
+/**
+ * The variables docker-compose.yml and docker-compose.dev.yml (`pnpm dev`)
+ * interpolate, like `${POSTGRES_PASSWORD:?…}`.
+ */
 const composeVariables = [
   ...new Set(
-    [...composeText.matchAll(/\$\{([A-Z_][A-Z0-9_]*)/g)].map(
-      (match) => match[1] ?? "",
-    ),
+    [
+      ...`${composeText}\n${await read("docker-compose.dev.yml")}`.matchAll(
+        /\$\{([A-Z_][A-Z0-9_]*)/g,
+      ),
+    ].map((match) => match[1] ?? ""),
   ),
 ].filter((name) => !fromTheShell.has(name));
 
