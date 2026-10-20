@@ -1,64 +1,23 @@
-# AI Office for development, every service in Docker: `pnpm dev`
-# (docker/dev.ts) runs it in the foreground, and Ctrl+C stops it. The web
-# app is at http://ai-office.localhost:3045 (AI_OFFICE_DEV_PORT), which
-# serves its /api and the AI Gateway's /v1 paths too, as the app does
-# under docker-compose.yml.
+# Postgres for development: `pnpm dev` starts it (`pnpm db:up`) before
+# migrating, on 127.0.0.1:3048, with the credentials .env.example's
+# DATABASE_URL uses. `pnpm db:down` stops it; the data stays in the
+# `postgres-data` volume of the `ai-office-dev` project until
+# `docker compose -f docker-compose.dev.yml down --volumes`. The image is
+# docker-compose.yml's, pinned by the same digest.
 #
-# - `web` is Vite, which reloads the web app on change and proxies /api,
-#   /health and /v1 to `server`.
-# - `server` is the server and the AI Gateway, restarted on change (`node
-#   --watch`), with the schema applied as it starts.
-# - `deps` installs the workspace's dependencies first, into volumes of
-#   their own (docker/dev/Dockerfile says why).
-# - `postgres`, on 127.0.0.1:3048, with the credentials .env.example's
-#   DATABASE_URL uses, so `pnpm db:schema` and the tests reach it from the
-#   host. `pnpm db:down` stops the stack; the data stays in the
-#   `postgres-data` volume of the `ai-office-dev` project until `pnpm
-#   db:reset`. The image is docker-compose.yml's, pinned by the same digest.
-# - `sandbox-relay`, as under docker-compose.yml: the sandboxes' way to the
-#   AI Gateway (server:3047) and, through its HTTPS proxy, to the hosts
-#   SANDBOX_EGRESS_HOSTS names (docker/sandbox-relay/relay.ts).
-#
-# The sources are bind-mounted, and the server and Vite run as the user
-# that runs `pnpm dev` (AI_OFFICE_DEV_UID and AI_OFFICE_DEV_GID, which
-# docker/dev.ts sets), so the sandbox images `pnpm dev` builds for that
-# user fit the clones the server makes. The server starts Agents' sandboxes
-# with the host's Docker (the socket below; docker/dev.ts sets
-# AI_OFFICE_DEV_DOCKER_GID to its group), in AI_OFFICE_DEV_SANDBOX_DIR, which
-# is at the same path inside as on the host.
-#
-# It runs beside a docker-compose.yml stack on the same machine without
-# touching it: its own project (`ai-office-dev`), volumes and sandbox
-# network (`ai-office-dev-sandboxes`, so each stack's server finds its own
-# relay and sweeps only its own sandboxes' networks), and its own sandbox
-# directory. Only the published ports can clash: give AI_OFFICE_DEV_PORT
-# and AI_OFFICE_DEV_OAUTH_PORT other values in .env when the other stack
-# has 3045 and 1455.
+# It also starts the sandboxes' network and the sandbox relay, for AI Office
+# run outside compose (`pnpm dev`, or the server by itself): the relay is on
+# ai-office-sandboxes (SANDBOX_NETWORK's default), and each sandbox has a
+# network of its own with no route out, which AI Office joins the relay to
+# (ADR 0006). Sandboxes reach the AI Gateway on this machine as
+# http://sandbox-relay:3047 and the internet only through the relay's
+# HTTPS proxy, to the hosts
+# SANDBOX_EGRESS_HOSTS names (docker/sandbox-relay/relay.ts). The relay
+# reaches the Gateway at the host's address on Docker's bridge, so
+# GATEWAY_HOST must let it in (docs/guide/running.md). Run AI Office either
+# this way or under docker-compose.yml, not both: each has its own relay on
+# the one ai-office-sandboxes network.
 name: ai-office-dev
-
-x-dev: &dev
-  build:
-    context: .
-    dockerfile: docker/dev/Dockerfile
-  image: ai-office-dev:local
-  user: ${AI_OFFICE_DEV_UID:-1000}:${AI_OFFICE_DEV_GID:-1000}
-  init: true
-  working_dir: /app
-  volumes:
-    - .:/app
-    - pnpm-store:/pnpm-store
-    - node-modules:/app/node_modules
-    - node-modules-server:/app/apps/server/node_modules
-    - node-modules-web:/app/apps/web/node_modules
-    - node-modules-communications:/app/packages/communications/node_modules
-    - node-modules-db:/app/packages/db/node_modules
-    - node-modules-events:/app/packages/events/node_modules
-    - node-modules-gateway:/app/packages/gateway/node_modules
-    - node-modules-github:/app/packages/github/node_modules
-    - node-modules-orchestrator:/app/packages/orchestrator/node_modules
-    - node-modules-shared:/app/packages/shared/node_modules
-    - node-modules-e2e:/app/e2e/node_modules
-
 services:
   postgres:
     image: postgres:18.6-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
@@ -78,119 +37,15 @@ services:
       retries: 30
     restart: unless-stopped
 
-  # The workspace's dependencies, as pnpm-lock.yaml has them, then exits;
-  # quick when nothing has changed.
-  deps:
-    <<: *dev
-    command:
-      - pnpm
-      - install
-      - --frozen-lockfile
-      - --store-dir=/pnpm-store
-      - --config.package-import-method=copy
-      - --config.confirmModulesPurge=false
-    restart: "no"
-
-  server:
-    <<: *dev
-    depends_on:
-      postgres:
-        condition: service_healthy
-      deps:
-        condition: service_completed_successfully
-    command:
-      - sh
-      - -c
-      - node packages/db/src/apply-schema-cli.ts && exec node --watch apps/server/src/main.ts
-    # .env's values, if there is one (`pnpm dev` copies .env.example when
-    # there is not), but those below are this stack's, whatever it says.
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      DATABASE_URL: postgres://ai_office:${POSTGRES_PASSWORD:-devpassword}@postgres:5432/ai_office
-      HOST: 0.0.0.0
-      PORT: "3046"
-      # Vite's port is published to the host's loopback only: what tells
-      # the server it is not served beyond this machine.
-      PUBLISHED_ADDRESS: 127.0.0.1
-      PUBLIC_URL: http://ai-office.localhost:${AI_OFFICE_DEV_PORT:-3045}
-      # The AI Gateway's own port, for the sandboxes only, through the
-      # sandbox relay (server:3047); never published.
-      GATEWAY_HOST: 0.0.0.0
-      GATEWAY_PORT: "3047"
-      # ChatGPT's sign-in ends on localhost:1455, published below.
-      OAUTH_CALLBACK_HOST: 0.0.0.0
-      SANDBOX_GATEWAY_URL: http://sandbox-relay:3047
-      SANDBOX_NETWORK: ai-office-dev-sandboxes
-      SANDBOX_WORK_DIR: ${AI_OFFICE_DEV_SANDBOX_DIR:-${HOME}/.ai-office/dev-sandboxes}
-    ports:
-      - 127.0.0.1:${AI_OFFICE_DEV_OAUTH_PORT:-1455}:1455
-    expose:
-      - "3046"
-      - "3047"
-    # Your own Ollama, say, as under Docker Desktop: add
-    # host.docker.internal to ALLOWED_INTERNAL_HOSTS to use it.
-    extra_hosts:
-      - host.docker.internal:host-gateway
-    # The development image's volumes, as x-dev has them (compose cannot
-    # extend a list), and the host's Docker and the sandbox directory.
-    volumes:
-      - .:/app
-      - pnpm-store:/pnpm-store
-      - node-modules:/app/node_modules
-      - node-modules-server:/app/apps/server/node_modules
-      - node-modules-web:/app/apps/web/node_modules
-      - node-modules-communications:/app/packages/communications/node_modules
-      - node-modules-db:/app/packages/db/node_modules
-      - node-modules-events:/app/packages/events/node_modules
-      - node-modules-gateway:/app/packages/gateway/node_modules
-      - node-modules-github:/app/packages/github/node_modules
-      - node-modules-orchestrator:/app/packages/orchestrator/node_modules
-      - node-modules-shared:/app/packages/shared/node_modules
-      - node-modules-e2e:/app/e2e/node_modules
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ${AI_OFFICE_DEV_SANDBOX_DIR:-${HOME}/.ai-office/dev-sandboxes}:${AI_OFFICE_DEV_SANDBOX_DIR:-${HOME}/.ai-office/dev-sandboxes}
-    group_add:
-      - ${AI_OFFICE_DEV_DOCKER_GID:-0}
-    networks:
-      - default
-    restart: unless-stopped
-
-  web:
-    <<: *dev
-    depends_on:
-      deps:
-        condition: service_completed_successfully
-    # On the port it is published on, so the page's address and Vite's
-    # hot reload agree.
-    command:
-      - pnpm
-      - --filter
-      - "@ai-office/web"
-      - exec
-      - vite
-      - --host
-      - 0.0.0.0
-      - --port
-      - ${AI_OFFICE_DEV_PORT:-3045}
-    environment:
-      AI_OFFICE_SERVER_URL: http://server:3046
-      PUBLIC_URL: http://ai-office.localhost:${AI_OFFICE_DEV_PORT:-3045}
-    ports:
-      # The one entry point: the web app, /api and the AI Gateway's /v1.
-      - 127.0.0.1:${AI_OFFICE_DEV_PORT:-3045}:${AI_OFFICE_DEV_PORT:-3045}
-    networks:
-      - default
-    restart: unless-stopped
-
   sandbox-relay:
     image: node:26.10.0-slim@sha256:930557a230abacbc3f4fd9b8648abf8f4bee1e17cb72195dcdfb2f709bc85b33
     user: node
     command: ["node", "/relay/relay.ts"]
     environment:
-      RELAY_GATEWAY: server:3047
+      RELAY_GATEWAY: host.docker.internal:${GATEWAY_PORT:-3047}
       SANDBOX_EGRESS_HOSTS: ${SANDBOX_EGRESS_HOSTS:-}
+    extra_hosts:
+      - host.docker.internal:host-gateway
     volumes:
       - ./docker/sandbox-relay/relay.ts:/relay/relay.ts:ro
     read_only: true
@@ -205,27 +60,13 @@ services:
 
 volumes:
   postgres-data:
-  pnpm-store:
-  node-modules:
-  node-modules-server:
-  node-modules-web:
-  node-modules-communications:
-  node-modules-db:
-  node-modules-events:
-  node-modules-gateway:
-  node-modules-github:
-  node-modules-orchestrator:
-  node-modules-shared:
-  node-modules-e2e:
 
 networks:
-  # The sandbox relay's network (the server's SANDBOX_NETWORK); each sandbox
-  # has an internal network of its own, which the relay joins (ADR 0006).
-  # Internal, and with inter-container traffic off: nothing else is on it.
-  # Not docker-compose.yml's ai-office-sandboxes, so the two stacks never
-  # share a relay or sweep each other's sandboxes' networks.
+  # Where AI Office finds the sandbox relay outside compose; each sandbox
+  # has an internal network of its own, which the relay joins. Internal, and
+  # with inter-container traffic off: nothing else is on it.
   sandboxes:
-    name: ai-office-dev-sandboxes
+    name: ai-office-sandboxes
     internal: true
     driver_opts:
       com.docker.network.bridge.enable_icc: "false"

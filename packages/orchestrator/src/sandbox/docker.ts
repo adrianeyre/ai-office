@@ -157,7 +157,7 @@ async function findRelay(relayNetwork: string): Promise<string> {
   );
   if (relay === undefined) {
     throw new Error(
-      `The sandbox relay is not running on the Docker network ${relayNetwork}: start it with the stack under compose, or with 'pnpm dev'.`,
+      `The sandbox relay is not running on the Docker network ${relayNetwork}: start it with 'pnpm db:up', or with the stack under compose.`,
     );
   }
   return relay;

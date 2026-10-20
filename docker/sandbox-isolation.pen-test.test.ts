@@ -45,9 +45,7 @@ interface ComposeService {
 }
 
 interface ComposeFile {
-  name?: string;
   services: Record<string, ComposeService>;
-  volumes?: Record<string, { name?: string } | null>;
   networks?: Record<
     string,
     {
@@ -142,36 +140,22 @@ describe("S2-1: egress from a sandbox (H2)", () => {
 
   // Since S2-5 each sandbox joins a network of its own, made internal as
   // ai-office-sandboxes is, which the relay on ai-office-sandboxes joins.
-  it("regression (S2-1): sandboxes no longer join Docker's default bridge: they join internal networks beside ai-office-sandboxes, or, under pnpm dev, ai-office-dev-sandboxes, which docker-compose.dev.yml makes internal, with the sandbox relay", () => {
+  it("regression (S2-1): outside compose, sandboxes no longer join Docker's default bridge: they join internal networks beside ai-office-sandboxes, which docker-compose.dev.yml makes internal, with the sandbox relay", () => {
     const config = loadConfig(fakeSecrets);
     expect(config.sandboxes.network).not.toBeUndefined();
     expect(config.sandboxes.network).toBe("ai-office-sandboxes");
     expect(devCompose.networks?.["sandboxes"]).toEqual({
-      name: "ai-office-dev-sandboxes",
+      name: "ai-office-sandboxes",
       internal: true,
       driver_opts: { "com.docker.network.bridge.enable_icc": "false" },
     });
-    expect(
-      devCompose.services["server"]?.environment?.["SANDBOX_NETWORK"],
-    ).toBe("ai-office-dev-sandboxes");
     const relay = devCompose.services["sandbox-relay"];
     expect(relay?.networks).toEqual(["default", "sandboxes"]);
-    // It reaches the Gateway's own port on the dev server, and only that.
-    expect(relay?.environment?.["RELAY_GATEWAY"]).toBe("server:3047");
-    expect(relay?.extra_hosts).toBeUndefined();
-  });
-
-  // pnpm dev may run beside a docker-compose.yml stack on one machine: each
-  // server finds the relay on its own SANDBOX_NETWORK and sweeps only the
-  // sandboxes' networks labelled with it, so the two must never share one.
-  it("holds: the development stack's sandbox network, project and volumes are never docker-compose.yml's", () => {
-    expect(devCompose.networks?.["sandboxes"]?.name).not.toBe(sandboxes?.name);
-    expect(devCompose.name).not.toBe(compose.name);
-    expect(
-      Object.values(devCompose.volumes ?? {}).filter(
-        (volume) => volume?.name !== undefined,
-      ),
-    ).toEqual([]);
+    // It reaches the Gateway on the host, and only that.
+    expect(relay?.environment?.["RELAY_GATEWAY"]).toBe(
+      "host.docker.internal:${GATEWAY_PORT:-3047}",
+    );
+    expect(relay?.extra_hosts).toEqual(["host.docker.internal:host-gateway"]);
   });
 
   it("sibling (S2-1): every compose file that starts sandboxes makes their network internal, and puts the sandbox relay on it, from the Node image, read-only and with no capabilities", () => {
@@ -298,7 +282,7 @@ describe("S2-3: reach into the stack (H3, H14)", () => {
       expect(
         file.services["sandbox-relay"]?.environment?.["RELAY_GATEWAY"],
         path,
-      ).toMatch(/^(app|server):3047$/);
+      ).toMatch(/^(app:3047|host\.docker\.internal:\$\{GATEWAY_PORT:-3047\})$/);
     }
     expect(appOnSandboxes()).toBe(false);
   });
@@ -321,17 +305,12 @@ describe("S2-3: reach into the stack (H3, H14)", () => {
     );
   });
 
-  it("sibling (S2-3): neither the pen-test stack's app nor the development stack's server or Vite is on its sandboxes' network, and the dev relay reaches only the Gateway's port", () => {
+  it("sibling (S2-3): the pen-test stack's app is not on its sandboxes' network either, and outside compose the relay reaches the host only at the Gateway's port", () => {
     expect(penTestCompose.services["app"]?.networks).toEqual(["default"]);
-    expect(devCompose.services["server"]?.networks).toEqual(["default"]);
-    expect(devCompose.services["web"]?.networks).toEqual(["default"]);
     expect(
       devCompose.services["sandbox-relay"]?.environment?.["RELAY_GATEWAY"],
-    ).toBe("server:3047");
-    // The Gateway's own port is never published.
-    expect(JSON.stringify(devCompose.services["server"]?.ports)).not.toContain(
-      "3047",
-    );
+    ).toBe("host.docker.internal:${GATEWAY_PORT:-3047}");
+    expect(devCompose.services["app"]).toBeUndefined();
   });
 
   // Fixed with A1-2 (#213), whose sibling path this was: HOST defaults to
@@ -584,7 +563,9 @@ describe("S2-1, S2-3, S2-5 · the sandboxes the app starts under compose, and .e
     expect(values["SANDBOX_NETWORK"]).not.toBe("bridge");
     const config = loadConfig({ ...values, ...fakeSecrets });
     expect(config.sandboxes.network).toBe("ai-office-sandboxes");
-    expect(config.sandboxes.network).toBe(sandboxes?.name);
+    expect(config.sandboxes.network).toBe(
+      devCompose.networks?.["sandboxes"]?.name,
+    );
     expect(config.sandboxes.gatewayUrl).toBe("http://sandbox-relay:3047");
     // Outside compose the server is on loopback (A1-2), so a container's
     // route to the host's address does not reach it.

@@ -57,7 +57,6 @@ const dockerfiles = [
   "docker/sandbox-claude/Dockerfile",
   "docker/sandbox-codex/Dockerfile",
   "docker/sandbox-opencode/Dockerfile",
-  "docker/dev/Dockerfile",
 ];
 const baseImages = (
   await Promise.all(
