@@ -29,7 +29,9 @@ export const workspaceNodeModules = [
 /**
  * The variables docker-compose.dev.yml takes from `pnpm dev`: the user
  * and group the server and Vite run as, the group that owns Docker's
- * socket, and the sandboxes' work directory. A value already set wins.
+ * socket, the sandboxes' work directory, the HTTPS proxy's directory and
+ * the public address, https://ai-office.localhost with the HTTPS port unless
+ * it is 443. A value already set wins.
  */
 export function devEnvironment(
   env: Readonly<Record<string, string | undefined>>,
@@ -56,6 +58,16 @@ export function devEnvironment(
     AI_OFFICE_DEV_SANDBOX_DIR: value(
       "AI_OFFICE_DEV_SANDBOX_DIR",
       join(home, ".ai-office", "dev-sandboxes"),
+    ),
+    AI_OFFICE_DEV_CADDY_DIR: value(
+      "AI_OFFICE_DEV_CADDY_DIR",
+      join(home, ".ai-office", "dev-caddy"),
+    ),
+    AI_OFFICE_DEV_PUBLIC_URL: value(
+      "AI_OFFICE_DEV_PUBLIC_URL",
+      new URL(
+        `https://ai-office.localhost:${value("AI_OFFICE_DEV_HTTPS_PORT", "443")}`,
+      ).origin,
     ),
   };
 }
@@ -106,6 +118,11 @@ if (import.meta.main) {
   for (const path of workspaceNodeModules) {
     mkdirSync(join(root, path), { recursive: true });
   }
+  const caddyDir = dev["AI_OFFICE_DEV_CADDY_DIR"] ?? "";
+  mkdirSync(caddyDir, { recursive: true, mode: 0o700 });
+  console.log(
+    `AI Office will be at ${dev["AI_OFFICE_DEV_PUBLIC_URL"] ?? ""}. Its certificate is from Caddy's local CA: trust ${join(caddyDir, "caddy", "pki", "authorities", "local", "root.crt")} (made on the first run) in your browser once.`,
+  );
 
   const steps: [string, string[], NodeJS.ProcessEnv][] = [
     // For the user the server runs as, which the sandboxes run as too.
