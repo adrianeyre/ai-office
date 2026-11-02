@@ -674,6 +674,7 @@ export async function scenario(
     notices,
     events: bus,
     runner,
+    models: model,
     gitIdentity: (floorId: string) => office.floorGitIdentity(floorId),
     scratchDir: root,
     pushUrl: () => remote,

@@ -65,6 +65,15 @@ export interface QaPromptInput {
   readonly agentMemory?: AgentMemory;
 }
 
+/** The form of QA's report: in its prompt, and when asked again. */
+export const qaReportForm: readonly string[] = [
+  "<qa-report>",
+  "Result: pass or fail",
+  "Summary: what you ran and what you found, in a sentence or two.",
+  "Steps: for a fail, numbered steps that reproduce it; for a pass, none.",
+  "</qa-report>",
+];
+
 export function qaPrompt(input: QaPromptInput): string {
   const { floor, agent, issue, branch, round, role } = input;
   const number = String(issue.number);
@@ -126,11 +135,7 @@ export function qaPrompt(input: QaPromptInput): string {
     "",
     "Pass only when every test passes and the change does what the issue asks. End your last message with your report, in this form:",
     "",
-    "    <qa-report>",
-    "    Result: pass or fail",
-    "    Summary: what you ran and what you found, in a sentence or two.",
-    "    Steps: for a fail, numbered steps that reproduce it; for a pass, none.",
-    "    </qa-report>",
+    ...qaReportForm.map((line) => `    ${line}`),
     "",
     ...proposingMemory("report"),
     ...withRoleProposals(input.agentMemory, "report"),

@@ -71,6 +71,8 @@ describe("QA", () => {
       `What changed: Approved by ${grace.name} and Quinta in round 1 of the Review Loop. The basket, take 1.`,
     );
     expect(prompt).toContain("<qa-report>");
+    // Its report was in its last message: it was not asked again.
+    expect(model.requestsOf(qa?.id ?? "")).toEqual([]);
 
     // The test it added is on the branch, as the Owner's commit with QA's
     // trailer, after the coder's.
@@ -341,20 +343,63 @@ describe("QA", () => {
       "ready-to-merge finished",
     ]);
   });
-  it("blocks, leaving the issue at needs-qa, when QA gives no result", async () => {
+  it("asks QA once more for a report its run ended without", async () => {
     setup = await scenario({ qa: [{ result: "pass", silent: true }] });
     const { model, grace, quinta } = setup;
     const qa = setup.qa;
     model.answer(grace.id, approve());
     model.answer(quinta.id, approve());
+    model.answer(
+      qa?.id ?? "",
+      "<qa-report>\nResult: pass\nSummary: pnpm test passes.\nSteps: none\n</qa-report>",
+    );
     await setup.run();
+
+    // One call, as QA, on the issue and its pull request, quoting its
+    // last message and giving the report's form.
+    const [request, ...more] = model.requestsOf(qa?.id ?? "");
+    expect(more).toEqual([]);
+    expect(request).toMatchObject({
+      model: "claude-opus-5-5",
+      issue: 1,
+      pullRequest: 2,
+    });
+    expect(request?.messages[0]?.content).toContain(
+      "<last-message>\nChecked.\n</last-message>",
+    );
+    expect(request?.messages[0]?.content).toContain("    Result: pass or fail");
+    // Its answer is the round's report: on to ready-to-merge, unblocked.
+    const [comment] = await qaComments(setup);
+    expect(comment?.body).toContain("pnpm test passes.");
+    expect(await labelsOf(setup, 1)).toEqual(["ai-office", "ready-to-merge"]);
+    expect(
+      (await actionNotices(setup)).map(({ title }) => title),
+    ).not.toContainEqual(expect.stringContaining("Agent blocked"));
+    expect(workDone(setup)).toEqual([
+      "needs-work finished",
+      "needs-review finished",
+      "needs-qa finished",
+      "ready-to-merge finished",
+    ]);
+  });
+
+  it("blocks, leaving the issue at needs-qa, when QA gives no result, even when asked again", async () => {
+    setup = await scenario({ qa: [{ result: "pass", silent: true }] });
+    const { model, grace, quinta } = setup;
+    const qa = setup.qa;
+    model.answer(grace.id, approve());
+    model.answer(quinta.id, approve());
+    model.answer(qa?.id ?? "", "All checks passed.");
+    await setup.run();
+
+    expect(model.requestsOf(qa?.id ?? "")).toHaveLength(1);
 
     expect(await labelsOf(setup, 1)).toEqual(["ai-office", "needs-qa"]);
     expect(await qaComments(setup)).toEqual([]);
     expect(ofType(await setup.events(), "qa.reported")).toEqual([]);
     const notices = await actionNotices(setup);
     expect(notices.map(({ title }) => title)).toEqual([
-      `Agent blocked: ${qa?.name ?? ""} on QA of #1: ${qa?.name ?? ""} gave no QA result on PR #2.`,
+      `Agent blocked: ${qa?.name ?? ""} on QA of #1: ${qa?.name ?? ""} gave no QA result on PR #2, even when asked again.`,
     ]);
     expect(notices[0]).toMatchObject({
       agentId: qa?.id,
