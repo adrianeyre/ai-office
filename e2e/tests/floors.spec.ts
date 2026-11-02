@@ -56,7 +56,7 @@ test("adds a Floor from the Floor Template picked", async ({ page }) => {
   const development = picker.getByRole("radio", { name: "Development" });
   const blank = picker.getByRole("radio", { name: "Blank" });
   // Development first, and chosen; each with its starting team.
-  await expect(picker.getByRole("radio")).toHaveCount(10);
+  await expect(picker.getByRole("radio")).toHaveCount(11);
   await expect(development).toBeChecked();
   await expect(development).toHaveAccessibleDescription(
     "A software team that changes the code, reviews each pull request and tests it. Starting team: Manager, coder, reviewer, QA",
@@ -73,6 +73,12 @@ test("adds a Floor from the Floor Template picked", async ({ page }) => {
     picker.getByRole("radio", { name: "Infrastructure" }),
   ).toHaveAccessibleDescription(
     "A platform team that changes the Terraform in the repository, reviews each change for security and checks its plan and policies, without ever applying it. Starting team: Manager, platform engineer, security reviewer, plan QA",
+  );
+
+  await expect(
+    picker.getByRole("radio", { name: "Local" }),
+  ).toHaveAccessibleDescription(
+    "A software team on your own Models through Ollama, sharing one Model, that makes one small change per pull request in its repository, reviews it and tests it. Starting team: Manager, local coder, local reviewer, local QA",
   );
 
   await picker.getByText("Blank", { exact: true }).click();
