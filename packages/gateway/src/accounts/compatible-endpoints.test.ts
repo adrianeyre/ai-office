@@ -90,6 +90,20 @@ describe("Ollama and compatible endpoints, routed", () => {
     });
   });
 
+  it("take a context window, which overrides the model catalogue's, and give it back (null for the catalogue's)", async () => {
+    const { accounts, ollama } = await office();
+    expect(
+      (await accounts.update(ollama.id, { contextWindow: 32_768 }))
+        .contextWindow,
+    ).toBe(32_768);
+    expect(
+      (await accounts.list()).find(({ id }) => id === ollama.id)?.contextWindow,
+    ).toBe(32_768);
+    expect(
+      (await accounts.update(ollama.id, { contextWindow: null })).contextWindow,
+    ).toBeNull();
+  });
+
   it("give a compatible endpoint any Model in a Combo's slot, and Ollama only its own", async () => {
     const { combos, ollama, endpoint } = await office();
     const combo = await combos.add({

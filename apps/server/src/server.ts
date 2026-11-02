@@ -410,6 +410,11 @@ export async function startOffice(
     sources: () => aiAccounts.catalogueSources(),
     fetch: upstream.fetch,
   });
+  // Each Model's effective context window: an AI Account's Context window,
+  // or the catalogue's (FR-84; the reviewer's diff limit).
+  const contextWindow = contextWindowOf(modelCatalogue, {
+    accounts: aiAccounts,
+  });
   const aiProviders = createAiProviders({
     store: stores.aiProviders,
     events,
@@ -631,7 +636,7 @@ export async function startOffice(
     events,
     agents: workingAgents,
     defaultModels: () => aiProviders.defaultModels(),
-    contextWindow: contextWindowOf(modelCatalogue),
+    contextWindow,
     onError: (error) => {
       logger.warn({ err: error }, "A Context Usage listener failed.");
     },
@@ -1351,6 +1356,9 @@ export async function startOffice(
     // Commits pushed after the reviewers approved go back to them.
     queue: { enqueue: (work) => workQueue.enqueue(work) },
     ownerLogin: async () => (await officeSettings.intakeSettings()).ownerLogin,
+    // A diff too large for a reviewer's context window goes to the Owner.
+    defaultModels: () => aiProviders.defaultModels(),
+    contextWindow,
   });
   // The turns of the work Roles a Plan gives an issue (PRD FR-25 (1)): the
   // coder flow hands it from one to the next, the Review Loop sends a fix
@@ -1406,6 +1414,8 @@ export async function startOffice(
               events,
               models,
               defaultModels: () => aiProviders.defaultModels(),
+              // How much of a diff each reviewer's Model is shown.
+              contextWindow,
               capPaused: (agentId) => capEnforcement.isPaused(agentId),
               // Stalls judged by the Decision Model, while it is on.
               decisionModel,

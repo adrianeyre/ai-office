@@ -89,6 +89,10 @@ export const aiAccounts = pgTable(
     // limits on extra usage, which only a Claude subscription offers.
     forcedModel: text("forced_model"),
     extraUsage: boolean("extra_usage").notNull().default(false),
+    // The context window, in tokens, of the Models it serves, as the Owner
+    // set it; null for the model catalogue's. It overrides the catalogue,
+    // for endpoints (such as Ollama) that report none.
+    contextWindow: integer("context_window"),
     // An API key's per-minute rate limits as its latest answer reported
     // them in its headers (requests, tokens, input and output tokens:
     // each `{ limit, remaining, resetsAt }`, and `observedAt`); null for
@@ -135,6 +139,10 @@ export const aiAccounts = pgTable(
     check(
       "ai_accounts_refresh_token_sealed",
       sql`${table.refreshToken} IS NULL OR ${table.refreshToken} LIKE 'aio1:%'`,
+    ),
+    check(
+      "ai_accounts_context_window",
+      sql`${table.contextWindow} IS NULL OR ${table.contextWindow} > 0`,
     ),
     check(
       "ai_accounts_extra_usage",

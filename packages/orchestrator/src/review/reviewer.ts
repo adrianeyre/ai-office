@@ -17,6 +17,7 @@ import {
 import { modelOf } from "../agents/agents.ts";
 import type { AgentRecord, AgentStore } from "../agents/store.ts";
 import type { DefaultModels } from "../ai-providers/ai-providers.ts";
+import type { ContextWindowOf } from "../context/window.ts";
 import type { DecisionModel } from "../decision-model/decision-model.ts";
 import type { FloorRecord, FloorStore } from "../floors/store.ts";
 import type { IntakeQueue } from "../intake/intake.ts";
@@ -46,9 +47,12 @@ import {
   type Conflict,
 } from "./conflict.ts";
 import { commentableLines } from "./diff.ts";
+import { reviewersDiffLimit } from "./diff-limit.ts";
 import { createEscalation, reviewRoundLinks } from "./escalation.ts";
 import { approvalHandoff, reviewersHandoff } from "./handoff.ts";
 import {
+  diffLimitOf,
+  maxAnswerTokens,
   maxFileCharacters,
   notShownInFull,
   retryMessage,
@@ -80,7 +84,10 @@ import { parseVerdict } from "./verdict.ts";
 // verdict is posted on the pull request as a review by the GitHub App,
 // with its comments inline where the diff allows. Each reviewer's prompt
 // has the repository's memory (FR-53), and the office-wide and reviewers'
-// Role memory (FR-54, FR-55), read once a round.
+// Role memory (FR-54, FR-55), read once a round. How much of the diff a
+// reviewer is shown is sized from its Model's context window: a pull
+// request whose diff is more than one of its reviewers can be shown goes
+// to the Owner, "Too large to review", naming the window.
 //
 // The Review Loop (FR-26 to FR-28; §5 scenarios 3 and 4): every verdict is
 // kept with its round. When every required reviewer approves with no
@@ -124,6 +131,11 @@ export interface ReviewFlowOptions {
   readonly models: ModelClient;
   /** Each AI Provider's default Model, for reviewers without their own. */
   readonly defaultModels?: () => Promise<DefaultModels>;
+  /**
+   * Each reviewer's Model's effective context window, which sizes the
+   * most of a diff it is shown; 100,000 characters without it.
+   */
+  readonly contextWindow?: ContextWindowOf;
   /** Whether an Agent is paused at a Token Cap (FR-33). */
   readonly capPaused?: (agentId: string) => boolean;
   /**
@@ -194,8 +206,6 @@ export class InvalidVerdictError extends Error {
   }
 }
 
-/** The most tokens one reviewer's answer may use. */
-const maxAnswerTokens = 8192;
 /** The most files whose text a reviewer is given. */
 const maxContentFiles = 20;
 /** The longest reason a Notice's title carries. */
@@ -383,6 +393,14 @@ export function createReviewFlow(options: ReviewFlowOptions): ExecuteWork {
       ...(round.handoff === undefined ? {} : { handoff: round.handoff }),
       ...(round.memory === undefined ? {} : { memory: round.memory }),
       ...(agentMemory === undefined ? {} : { agentMemory }),
+      // As much of the diff as its own Model's context window holds.
+      ...(options.contextWindow === undefined
+        ? {}
+        : {
+            diffLimit: diffLimitOf(
+              await options.contextWindow(agent.aiProvider, model),
+            ),
+          }),
       ...round.changed,
     });
     const messages: ModelMessage[] = [{ role: "user", content: prompt.user }];
@@ -862,8 +880,16 @@ export function createReviewFlow(options: ReviewFlowOptions): ExecuteWork {
       };
       // An approval counts only for a pull request the reviewer is shown
       // in full (P1-11): one too large to show goes to the Owner, before
-      // any reviewer is asked, so no approval is recorded for it.
-      const unshown = notShownInFull(round.changed.files);
+      // any reviewer is asked, so no approval is recorded for it. Too
+      // large is for the smallest of the reviewers' context windows.
+      const unshown = notShownInFull(
+        round.changed.files,
+        await reviewersDiffLimit(
+          reviewers,
+          round.defaults,
+          options.contextWindow,
+        ),
+      );
       if (unshown !== undefined) {
         await escalate({
           floor,

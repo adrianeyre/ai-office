@@ -372,6 +372,8 @@ export {
   completeOAuthLoginRequestSchema,
   maxPauseThreshold,
   minPauseThreshold,
+  minContextWindow,
+  maxContextWindow,
   usageHistorySchema,
   usageReadingSchema,
   usageWindowLabels,

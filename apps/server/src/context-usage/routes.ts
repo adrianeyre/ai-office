@@ -30,35 +30,68 @@ import { sendFloorError } from "../floors/routes.ts";
 //   `no_session` when it has none going.
 // Every route needs a session.
 
+/** An AI Account's AI Provider, and the Context window set on it. */
+interface AccountWindow {
+  readonly aiProvider: string;
+  readonly contextWindow?: number | null;
+}
+
 /** How long the model catalogue is read from memory before again. */
 const catalogueCacheMs = 60_000;
 
 /**
- * A Model's context window from the catalogue (null when it gives none),
- * the catalogue read at most once a minute: every model call asks.
+ * A Model's effective context window, in tokens: the smallest Context
+ * window the Owner set on one of its AI Provider's AI Accounts, which
+ * overrides the catalogue, since the Gateway may send the call to any of
+ * them; else the catalogue's; null when neither gives one. The catalogue
+ * and the accounts are read at most once a minute: every model call asks.
  */
 export function contextWindowOf(
   catalogue: Pick<ModelCatalogue, "list">,
-  now: () => number = Date.now,
+  options: {
+    /** The AI Accounts, each with the Context window the Owner set. */
+    readonly accounts?: {
+      list(): Promise<readonly AccountWindow[]>;
+    };
+    readonly now?: () => number;
+  } = {},
 ): (aiProvider: string, model: string) => Promise<number | null> {
+  const now = options.now ?? Date.now;
   let cached:
     | {
         readonly at: number;
-        readonly entries: ReturnType<ModelCatalogue["list"]>;
+        readonly read: Promise<
+          readonly [
+            Awaited<ReturnType<ModelCatalogue["list"]>>,
+            readonly AccountWindow[],
+          ]
+        >;
       }
     | undefined;
   return async (aiProvider, model) => {
     if (cached === undefined || now() - cached.at >= catalogueCacheMs) {
-      const entries = catalogue.list();
-      cached = { at: now(), entries };
+      const read = Promise.all([
+        catalogue.list(),
+        options.accounts?.list() ?? Promise.resolve([]),
+      ] as const);
+      cached = { at: now(), read };
       // A failed read is not kept.
-      entries.catch(() => {
-        if (cached?.entries === entries) {
+      read.catch(() => {
+        if (cached?.read === read) {
           cached = undefined;
         }
       });
     }
-    const { models } = catalogueModelsOf(await cached.entries, aiProvider);
+    const [entries, accounts] = await cached.read;
+    const set = accounts.flatMap((account) =>
+      account.aiProvider === aiProvider && account.contextWindow != null
+        ? [account.contextWindow]
+        : [],
+    );
+    if (set.length > 0) {
+      return Math.min(...set);
+    }
+    const { models } = catalogueModelsOf(entries, aiProvider);
     return models.find((entry) => entry.model === model)?.contextWindow ?? null;
   };
 }

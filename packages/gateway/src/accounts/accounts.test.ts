@@ -203,6 +203,8 @@ const cases: Case[] = [
         // No forced Model, and extra usage off (FR-41).
         forcedModel: null,
         extraUsage: false,
+        // The model catalogue's context window.
+        contextWindow: null,
         // No rate limits reported yet, and no credit read.
         rateLimits: null,
         balance: null,

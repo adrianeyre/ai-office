@@ -81,6 +81,7 @@ CREATE TABLE "ai_accounts" (
 	"weekly_pause_threshold" integer,
 	"forced_model" text,
 	"extra_usage" boolean DEFAULT false NOT NULL,
+	"context_window" integer,
 	"rate_limits" jsonb,
 	"balance" jsonb,
 	"created_at" timestamp with time zone NOT NULL,
@@ -95,6 +96,7 @@ CREATE TABLE "ai_accounts" (
 	CONSTRAINT "ai_accounts_credential_sealed" CHECK ("ai_accounts"."credential" LIKE 'aio1:%'),
 	CONSTRAINT "ai_accounts_priority" CHECK ("ai_accounts"."priority" BETWEEN 1 AND 100),
 	CONSTRAINT "ai_accounts_refresh_token_sealed" CHECK ("ai_accounts"."refresh_token" IS NULL OR "ai_accounts"."refresh_token" LIKE 'aio1:%'),
+	CONSTRAINT "ai_accounts_context_window" CHECK ("ai_accounts"."context_window" IS NULL OR "ai_accounts"."context_window" > 0),
 	CONSTRAINT "ai_accounts_extra_usage" CHECK (NOT "ai_accounts"."extra_usage" OR ("ai_accounts"."ai_provider" = 'Claude' AND "ai_accounts"."account_type" = 'oauth')),
 	CONSTRAINT "ai_accounts_oauth_login" CHECK (("ai_accounts"."account_type" = 'oauth') = ("ai_accounts"."refresh_token" IS NOT NULL AND "ai_accounts"."token_expires_at" IS NOT NULL))
 );

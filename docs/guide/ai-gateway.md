@@ -912,6 +912,33 @@ Model:
   `modelMappings.deleted`, `aiAccounts.forcedModel`) and applies from the
   next request. Mappings are kept in `gateway_model_mappings`.
 
+#### Context windows
+
+A Model's **effective context window** is what AI Office sizes prompts by:
+how much of a pull request's diff a reviewer is shown (see
+[the issue pipeline](issue-pipeline.md)), and each Agent's Context Usage.
+
+- **From the catalogue.** The model catalogue keeps each Model's context
+  window where its AI Provider reports one (an endpoint's
+  `context_window`, `context_length` or vLLM's `max_model_len`).
+- **Set on an AI Account.** Each AI Account's **Edit** form has an
+  optional **Context window (tokens)** field, from 1,024 to 100,000,000,
+  for a local Model served with a smaller window than it reports, or an
+  endpoint that reports none. Set, it overrides the catalogue for every
+  Model of that account's AI Provider; when several of its accounts have
+  one, the smallest counts, since the AI Gateway may send a call to any
+  of them. Empty uses the catalogue's. The window is shown on the
+  account's row ("Context window 32,768 tokens").
+- **Unknown.** With neither, the window is unknown, and AI Office sizes
+  prompts as it would for a large one.
+- **When it applies.** The catalogue and the accounts are read at most
+  once a minute.
+- **API.** `PATCH /api/ai-accounts/:id` with `{"contextWindow"}` (a whole
+  number of tokens, or `null` for the catalogue's). Accounts carry
+  `contextWindow`, `null` when unset. Each change is a `config.changed`
+  event (`aiAccounts.contextWindow`). It is kept in
+  `ai_accounts.context_window`.
+
 #### Extra usage
 
 Anthropic lets a Claude subscription go on past its plan's limits, billed as
@@ -1232,6 +1259,10 @@ its URL required and its key optional:
   after an OpenAI-compatible endpoint's URL) is fetched, and the
   catalogue lists the Models of every endpoint of that kind together.
   vLLM's `max_model_len` is read as a context window. None has a price.
+- **Its context window.** Ollama, and many compatible endpoints, report
+  no context window, or report the Model's own rather than the one it is
+  served with. Each AI Account's **Edit** form has a **Context window
+  (tokens)** field: see [Context windows](#context-windows).
 - **A key, or none.** Without one, it is sent no credential at all.
 - Recorder mode and the request history keep the path as sent, the
   endpoint's own path included (`/openai/v1/chat/completions`).

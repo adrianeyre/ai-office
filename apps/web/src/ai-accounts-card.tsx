@@ -10,8 +10,10 @@ import {
   analyticsSeriesSchema,
   completeOAuthLoginRequestSchema,
   maxAiAccountPriority,
+  maxContextWindow,
   maxPauseThreshold,
   minAiAccountPriority,
+  minContextWindow,
   minPauseThreshold,
   oauthLoginSchema,
   importOAuthLoginRequestSchema,
@@ -769,17 +771,18 @@ interface EditValues {
   fiveHourPauseThreshold: string;
   weeklyPauseThreshold: string;
   forcedModel: string;
+  contextWindow: string;
   extraUsage: boolean;
 }
 
-/** A threshold field's value: a number, or null when left empty. */
+/** A number field's value: a number, or null when left empty. */
 const thresholdOf = (value: string): number | null =>
   value.trim() === "" ? null : Number(value);
 
 /**
  * Renames and reprioritises one account, sets its pause thresholds, forces
- * a Model and, where its AI Provider offers it, turns extra usage on or
- * off (FR-41).
+ * a Model, sets the context window of the Models it serves and, where its
+ * AI Provider offers it, turns extra usage on or off (FR-41).
  */
 function EditForm({
   account,
@@ -808,6 +811,8 @@ function EditForm({
           ? ""
           : String(account.weeklyPauseThreshold),
       forcedModel: account.forcedModel ?? "",
+      contextWindow:
+        account.contextWindow == null ? "" : String(account.contextWindow),
       extraUsage: account.extraUsage === true,
     },
   });
@@ -831,6 +836,9 @@ function EditForm({
             forcedModel:
               values.forcedModel.trim() === "" ? null : values.forcedModel,
           }
+        : {}),
+      ...(dirtyFields.contextWindow === true
+        ? { contextWindow: thresholdOf(values.contextWindow) }
         : {}),
       ...(dirtyFields.extraUsage === true
         ? { extraUsage: values.extraUsage }
@@ -916,6 +924,21 @@ function EditForm({
             placeholder="None"
             aria-describedby={`${id}-forcedModel-hint`}
             {...register("forcedModel")}
+          />
+        </Field>
+        <Field
+          id={`${id}-contextWindow`}
+          label="Context window (tokens)"
+          hint={`How many tokens the Models it serves hold, overriding the model catalogue's: set it where the endpoint reports none, such as Ollama. A small window shows reviewers less of a diff. Empty uses the catalogue's.`}
+        >
+          <Input
+            id={`${id}-contextWindow`}
+            type="number"
+            min={minContextWindow}
+            max={maxContextWindow}
+            placeholder="From the catalogue"
+            aria-describedby={`${id}-contextWindow-hint`}
+            {...register("contextWindow")}
           />
         </Field>
       </div>
@@ -1169,6 +1192,15 @@ function AccountRow({
           )}
           {account.extraUsage !== null && (
             <> · Extra usage {account.extraUsage ? "on" : "off"}</>
+          )}
+          {account.contextWindow != null && (
+            <>
+              {" "}
+              · Context window {account.contextWindow.toLocaleString(
+                "en-GB",
+              )}{" "}
+              tokens
+            </>
           )}
         </p>
       </div>

@@ -884,6 +884,13 @@ export type CreditBalance = z.infer<typeof creditBalanceSchema>;
 export const minPauseThreshold = 1;
 export const maxPauseThreshold = 100;
 
+/**
+ * The smallest and largest context window an AI Account may be set to, in
+ * tokens: below 1,024 no prompt fits.
+ */
+export const minContextWindow = 1024;
+export const maxContextWindow = 100_000_000;
+
 /** The kind of an account, by its AI Provider and account type. */
 export const aiAccountKindOf = (account: {
   readonly aiProvider: string;
@@ -1205,7 +1212,9 @@ const pauseThreshold = (window: string) =>
 /**
  * The body of `PATCH /api/ai-accounts/:id`: rename, reprioritise, pause,
  * set the usage pause thresholds (null for none), force a Model (null for
- * none) and turn extra usage on or off where its AI Provider offers it.
+ * none), turn extra usage on or off where its AI Provider offers it, and
+ * set the context window of the Models it serves (null for the model
+ * catalogue's).
  */
 export const aiAccountUpdateSchema = z
   .strictObject({
@@ -1232,10 +1241,25 @@ export const aiAccountUpdateSchema = z
     extraUsage: z
       .boolean({ error: "Extra usage is true or false." })
       .optional(),
+    /**
+     * The context window of the Models it serves, in tokens, overriding
+     * the model catalogue's; null for the catalogue's.
+     */
+    contextWindow: z
+      .number({ error: "The context window is a whole number of tokens." })
+      .int({ error: "The context window is a whole number of tokens." })
+      .min(minContextWindow, {
+        error: `The context window is at least ${minContextWindow.toLocaleString("en-GB")} tokens.`,
+      })
+      .max(maxContextWindow, {
+        error: `The context window is at most ${maxContextWindow.toLocaleString("en-GB")} tokens.`,
+      })
+      .nullable()
+      .optional(),
   })
   .refine((update) => Object.keys(update).length > 0, {
     error:
-      "Change at least one of name, priority, paused, the thresholds, the forced Model and extra usage.",
+      "Change at least one of name, priority, paused, the thresholds, the forced Model, extra usage and the context window.",
   });
 export type AiAccountUpdate = z.infer<typeof aiAccountUpdateSchema>;
 
@@ -1285,6 +1309,11 @@ export const aiAccountSchema = z.object({
    * null where its AI Provider offers none.
    */
   extraUsage: z.boolean().nullable(),
+  /**
+   * The context window of the Models it serves, in tokens, as the Owner
+   * set it; null (or absent) for the model catalogue's.
+   */
+  contextWindow: z.number().int().nullable().optional(),
   /**
    * Its per-minute rate limits as its latest answer reported them; null
    * when its AI Provider sends none (or they have all reset since).

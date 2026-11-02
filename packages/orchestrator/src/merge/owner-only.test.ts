@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { memoryPath, repositorySkillFolders } from "@ai-office/shared";
 
+import { diffLimitOf } from "../review/prompt.ts";
 import {
   maxListedFiles,
   ownerOnly,
@@ -199,5 +200,22 @@ describe("ownerOnly", () => {
         /^no reviewer can be shown it in full \(its diff is [\d,]+ characters, more than the 100,000 a reviewer is shown\)$/,
       ),
     ]);
+  });
+
+  it("judges in full by the reviewers' context window, as the review Stage does: a small one holds less, a large or unknown one 100,000 characters", () => {
+    const files = [
+      {
+        ...changed("catalogue.json"),
+        patch: `@@ -0,0 +1 @@\n+${"x".repeat(50_000)}`,
+      },
+    ];
+    expect(ownerOnly(files, diffLimitOf(32_768))).toEqual([
+      expect.stringMatching(
+        /^no reviewer can be shown it in full \(its diff is [\d,]+ characters, more than the 29,008 a 32,768-token context window holds\)$/,
+      ),
+    ]);
+    expect(ownerOnly(files, diffLimitOf(200_000))).toEqual([]);
+    expect(ownerOnly(files, diffLimitOf(null))).toEqual([]);
+    expect(ownerOnly(files)).toEqual([]);
   });
 });
