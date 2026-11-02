@@ -48,6 +48,9 @@ import {
   type RetentionSettings,
   type SandboxSettings,
   type UsageThrottlingSettings,
+  defaultWatchdogSettings,
+  watchdogSettingsSchema,
+  type WatchdogSettings,
 } from "@ai-office/shared";
 import type { Encryptor } from "@ai-office/shared/crypto";
 import { eq } from "drizzle-orm";
@@ -68,8 +71,9 @@ import { gitIdentityFor } from "../git/identity.ts";
 // caches warm (FR-39); whether requests waterfall through the Owner's
 // Combos (FR-40); the outbound HTTP proxy every upstream request goes
 // through (FR-35), its password sealed and never handed back; the Decision
-// Model (FR-17, FR-89); and how long what AI Office records is kept
-// (retention, §7).
+// Model (FR-17, FR-89); how long what AI Office records is kept
+// (retention, §7); and the watchdog's stall timeout and the sandbox time
+// limit (FR-23, FR-22), each AI Provider's own where set.
 
 /** The outbound proxy as it is stored: its password sealed. */
 export interface StoredOutboundProxy {
@@ -156,6 +160,9 @@ export interface OfficeSettingsStore {
   /** The seasonal events as set; undefined until set. */
   seasonalEvents(): Promise<SeasonalEvents | undefined>;
   setSeasonalEvents(events: SeasonalEvents, at: Date): Promise<void>;
+  /** The watchdog's time limits as set; undefined until set. */
+  watchdog(): Promise<WatchdogSettings | undefined>;
+  setWatchdog(settings: WatchdogSettings, at: Date): Promise<void>;
 }
 
 /** The webhook settings as kept: off, and no secret, until set. */
@@ -186,6 +193,7 @@ export function memoryOfficeSettingsStore(): OfficeSettingsStore {
   let profile: OwnerProfile | undefined;
   let cast: Partial<LobbyCast> = {};
   let activities: Record<string, string[]> = {};
+  let watchdog: WatchdogSettings | undefined;
   return {
     gitIdentity: () =>
       Promise.resolve(
@@ -287,6 +295,11 @@ export function memoryOfficeSettingsStore(): OfficeSettingsStore {
     seasonalEvents: () => Promise.resolve(structuredClone(seasonal)),
     setSeasonalEvents(set) {
       seasonal = structuredClone(set);
+      return Promise.resolve();
+    },
+    watchdog: () => Promise.resolve(structuredClone(watchdog)),
+    setWatchdog(set) {
+      watchdog = structuredClone(set);
       return Promise.resolve();
     },
   };
@@ -753,6 +766,21 @@ export function databaseOfficeSettingsStore(db: Database): OfficeSettingsStore {
         .values({ id: 1, ...values })
         .onConflictDoUpdate({ target: officeSettings.id, set: values });
     },
+    async watchdog() {
+      const [row] = await db
+        .select({ watchdog: officeSettings.watchdog })
+        .from(officeSettings)
+        .where(eq(officeSettings.id, 1));
+      const parsed = watchdogSettingsSchema.safeParse(row?.watchdog);
+      return parsed.success ? parsed.data : undefined;
+    },
+    async setWatchdog(watchdog, at) {
+      const values = { watchdog, updatedAt: at };
+      await db
+        .insert(officeSettings)
+        .values({ id: 1, ...values })
+        .onConflictDoUpdate({ target: officeSettings.id, set: values });
+    },
   };
 }
 
@@ -876,6 +904,14 @@ export interface OfficeSettings {
   retentionSettings(): Promise<RetentionSettings>;
   /** Sets them, recording which changed. */
   setRetentionSettings(settings: RetentionSettings): Promise<RetentionSettings>;
+  /**
+   * The watchdog's time limits (FR-23, FR-22): work stalls after 20
+   * minutes with no progress, and a sandbox is killed after an hour, until
+   * set; an AI Provider's own, where set, for its Agents.
+   */
+  watchdogSettings(): Promise<WatchdogSettings>;
+  /** Sets them, recording which changed. */
+  setWatchdogSettings(settings: WatchdogSettings): Promise<WatchdogSettings>;
 }
 
 /** Why the outbound proxy's settings could not be stored. */
@@ -1400,6 +1436,44 @@ export function createOfficeSettings(options: {
         keys: ["seasonalEvents"],
       });
       return structuredClone(seasonal);
+    },
+
+    async watchdogSettings() {
+      return (
+        (await store.watchdog()) ?? structuredClone(defaultWatchdogSettings)
+      );
+    },
+
+    async setWatchdogSettings(settings) {
+      const current =
+        (await store.watchdog()) ?? structuredClone(defaultWatchdogSettings);
+      const own = (set: WatchdogSettings, provider: string) =>
+        JSON.stringify((set.providers as Record<string, unknown>)[provider]);
+      const providers = new Set([
+        ...Object.keys(current.providers),
+        ...Object.keys(settings.providers),
+      ]);
+      // Which limits changed, and whose, never their values.
+      const keys = [
+        ...(["stallTimeoutMinutes", "sandboxTimeLimitMinutes"] as const)
+          .filter((key) => current[key] !== settings[key])
+          .map((key) => `watchdog.${key}`),
+        ...[...providers]
+          .filter(
+            (provider) => own(current, provider) !== own(settings, provider),
+          )
+          .map((provider) => `watchdog.providers.${provider}`),
+      ];
+      await store.setWatchdog(settings, now());
+      if (keys.length > 0) {
+        await events.publish({
+          type: "config.changed",
+          version: 1,
+          scope: "office",
+          keys,
+        });
+      }
+      return structuredClone(settings);
     },
 
     async setLobbyCharacter(role, character) {

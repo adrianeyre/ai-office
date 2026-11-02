@@ -35,6 +35,7 @@ import { SkillsCard } from "./skills-card.tsx";
 import { StorageCard } from "./storage-card.tsx";
 import { TotpSettings } from "./totp-settings.tsx";
 import { VersionCard } from "./version-check.tsx";
+import { WatchdogCard } from "./watchdog-card.tsx";
 import { WebhooksCard } from "./webhooks-card.tsx";
 
 // Placeholders until each page is built; every one names what it will hold.
@@ -132,6 +133,7 @@ export function AdminPage() {
       <IntakeCard />
       <WebhooksCard />
       <SandboxesCard />
+      <WatchdogCard />
       <GitIdentityCard />
       <PromptCacheCard />
       <RetentionCard />

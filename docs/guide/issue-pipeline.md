@@ -297,8 +297,13 @@ AI Office does that later.
    screened by AI Office's rules the same way, before each call runs where
    Claude Code asks, and keep no answer from a sandbox one stopped.
 5. It returns the commits and the tokens used. On cancellation (an
-   `AbortSignal`) or after an hour, the sandbox is killed and the clone
-   deleted.
+   `AbortSignal`) or at its time limit, the sandbox is killed and the
+   clone deleted ("The sandbox for issue #N ran out of time"). The time
+   limit is an hour by default, set in General Settings' **Watchdog** card
+   (`GET` and `PUT /api/office/watchdog`, `sandboxTimeLimitMinutes`, 10 to
+   480 minutes), and may be longer or shorter for one AI Provider's Agents
+   (`providers`, below). It is read as each sandbox starts, so a change
+   applies from the next run; a run already going keeps its limit.
 
 **The sandbox's environment holds only:**
 
@@ -1003,8 +1008,8 @@ has the protection for each Merge Policy, setting by setting.
 Each Floor's Manager watches its work, every minute, by rules in plain
 code (PRD FR-23; `createWatchdog` in `@ai-office/orchestrator`):
 
-- **Stalled work.** Work running with no sign of progress for 20
-  minutes (the Merge Policy's work, which waits on CI and bounds its own
+- **Stalled work.** Work running with no sign of progress for the stall
+  timeout, 20 minutes by default (the Merge Policy's work, which waits on CI and bounds its own
   wait, aside) (since it started, or since the last output, tool call, model
   call, review or push on its issue) is stopped and given to a free Agent
   of its Role (enabled, not paused, with nothing queued or running), or
@@ -1021,6 +1026,23 @@ code (PRD FR-23; `createWatchdog` in `@ai-office/orchestrator`):
 - **Loops near their cap.** When a Review Loop sends an issue back to
   its coder with one round left before the Round Cap, an action Notice
   tells the Owner, who can step in before it ends at `needs-human`.
+
+**Its time limits.** General Settings' **Watchdog** card sets the stall
+timeout (5 to 240 minutes; 20 by default) and the sandbox time limit (10
+to 480 minutes; 60 by default), kept in `office_settings` (`GET` and `PUT
+/api/office/watchdog`; anything outside those bounds is a `400`). Local
+Models (Ollama on one GPU, say) are slower than hosted ones, so each AI
+Provider may have its own limits (`providers`, such as `{"Ollama":
+{"stallTimeoutMinutes": 60, "sandboxTimeLimitMinutes": 240}}`; one left
+out is the office's), which win for its Agents. Work is judged by the AI
+Provider of the Agent working it (for an Agent on "Any AI Provider", the
+one it was given); work held by no Agent has the office's limits. The
+watchdog reads the limits at each check, and the sandbox
+runner as each sandbox starts, so a change needs no restart. Each change
+is a `config.changed` event naming what changed (such as
+`watchdog.stallTimeoutMinutes` or `watchdog.providers.Ollama`), never the
+values. The third stall still hands an issue to the Owner, whatever the
+timeout.
 
 **Its authority.** The Manager may retry, reassign, relabel, pause and
 escalate with a Notice; for the Owner's requests in its chat, it may also

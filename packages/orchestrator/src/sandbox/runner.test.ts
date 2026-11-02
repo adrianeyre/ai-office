@@ -892,6 +892,25 @@ describe("the sandbox runner", () => {
     });
   });
 
+  it("asks the time limit for each run as it starts", async () => {
+    const asked: string[] = [];
+    setup = await setUp(
+      async ({ killed }) => {
+        await killed;
+      },
+      {
+        // The Owner's limit for the task's AI Provider, read afresh.
+        timeoutMs: (task) => {
+          asked.push(task.agent.aiProvider);
+          return Promise.resolve(1500);
+        },
+      },
+    );
+    const error = await refusal(setup.runner.run(setup.task));
+    expect(error.outcome).toBe("timed_out");
+    expect(asked).toEqual([setup.task.agent.aiProvider]);
+  });
+
   it("fails, starting no sandbox, for an AI Provider without an agent tool", async () => {
     setup = await setUp(works);
     const error = await refusal(

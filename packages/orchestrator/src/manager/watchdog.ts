@@ -11,7 +11,9 @@ import {
   type PipelineStage,
   type Redactor,
   type Role,
+  type WatchdogSettings,
   type WatchdogTrigger,
+  watchdogLimitsFor,
 } from "@ai-office/shared";
 
 import type { AgentRecord, AgentStore } from "../agents/store.ts";
@@ -36,7 +38,8 @@ import { freeAgent, roleOfWork, sandboxStageAt } from "./dispatch.ts";
 //
 // - **Stalled work**: work running with no sign of progress (its start, or
 //   the last event about its issue: output, a tool call, a model call, a
-//   review) for longer than the stall timeout (20 minutes by default). It
+//   review) for longer than the stall timeout (20 minutes by default; the
+//   Owner may set it in General Settings, and per AI Provider). It
 //   is stopped and given to another free Agent of its Role (reassign), or
 //   queued again (retry). Once an issue's work at a stage has stalled more
 //   than twice, it is escalated instead: stopped, labelled `needs-human`
@@ -130,6 +133,12 @@ export interface WatchdogOptions {
   /** The Agents paused at a Token Cap: never free to take work. */
   readonly pausedAgents?: () => readonly string[];
   readonly limits?: Partial<WatchdogLimits>;
+  /**
+   * The Owner's time limits (General Settings), read at each check: work
+   * stalls after its Agent's AI Provider's stall timeout, or the office's.
+   * Without them, after `limits.stallTimeoutMs`.
+   */
+  readonly timeLimits?: () => Promise<WatchdogSettings>;
   /** Removes credentials from what is written to the issue. */
   readonly redactor?: Redactor;
   readonly now?: () => Date;
@@ -465,12 +474,21 @@ export function createWatchdog(options: WatchdogOptions): Watchdog {
     floor: FloorRecord,
     team: readonly AgentRecord[],
     active: readonly WorkItem[],
+    timeLimits: WatchdogSettings | undefined,
   ): Promise<DecisionRequest[]> => {
     const requests: DecisionRequest[] = [];
     /** Agents given work in this check: no longer free. */
     const chosen: string[] = [];
-    const minutes = Math.round(limits.stallTimeoutMs / 60_000);
     for (const item of active) {
+      // Its Agent's AI Provider's own stall timeout, or the office's.
+      const stallTimeoutMs =
+        timeLimits === undefined
+          ? limits.stallTimeoutMs
+          : watchdogLimitsFor(
+              timeLimits,
+              team.find(({ id }) => id === item.agentId)?.aiProvider,
+            ).stallTimeoutMinutes * 60_000;
+      const minutes = Math.round(stallTimeoutMs / 60_000);
       // The Merge Policy's work waits on CI, not on an Agent, and bounds
       // its own wait.
       if (
@@ -482,7 +500,7 @@ export function createWatchdog(options: WatchdogOptions): Watchdog {
       }
       const seen = progress.get(issueKey(floor.id, item.issue));
       const last = Math.max(item.startedAt.getTime(), seen?.getTime() ?? 0);
-      if (now().getTime() - last < limits.stallTimeoutMs) {
+      if (now().getTime() - last < stallTimeoutMs) {
         continue;
       }
       // Its stalls at this stage since it was last handed to the Owner.
@@ -710,6 +728,15 @@ export function createWatchdog(options: WatchdogOptions): Watchdog {
   const check = async (): Promise<DecisionRecord[]> => {
     const taken: DecisionRecord[] = [];
     const allActive = await work.active();
+    // Read afresh each check, so a change applies without a restart;
+    // `limits` while they cannot be read.
+    const timeLimits =
+      options.timeLimits === undefined
+        ? undefined
+        : await options.timeLimits().catch((error: unknown) => {
+            report(error);
+            return undefined;
+          });
     for (const floor of await floors.list()) {
       try {
         const team = await agents.list(floor.id);
@@ -718,7 +745,9 @@ export function createWatchdog(options: WatchdogOptions): Watchdog {
         }
         const active = allActive.filter(({ floorId }) => floorId === floor.id);
         const recent = await work.recent(floor.id, historyLimit);
-        taken.push(...(await takeAll(await stalls(floor, team, active))));
+        taken.push(
+          ...(await takeAll(await stalls(floor, team, active, timeLimits))),
+        );
         // Agents that keep failing are paused before their work is retried.
         taken.push(...(await takeAll(failingAgents(floor, team, recent))));
         const rest = await agents.list(floor.id);

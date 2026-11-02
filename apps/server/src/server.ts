@@ -109,8 +109,10 @@ import {
   defaultPromptCacheKeepAliveSettings,
   defaultPromptCacheSettings,
   defaultUsageThrottlingSettings,
+  defaultWatchdogSettings,
   designerRole,
   leastUsedWindowMs,
+  watchdogLimitsFor,
   type OutboundProxy,
   type PromptCacheTtl,
 } from "@ai-office/shared";
@@ -1331,6 +1333,23 @@ export async function startOffice(
             return skills;
           },
           workDir: join(workDir, "runs"),
+          // The Owner's sandbox time limit for the task's AI Provider, or
+          // the office's, read as each run starts; an hour until set.
+          timeoutMs: async (task) => {
+            const settings = await officeSettings
+              .watchdogSettings()
+              .catch((error: unknown) => {
+                logger.warn(
+                  { err: error },
+                  "The sandbox time limit could not be read.",
+                );
+                return defaultWatchdogSettings;
+              });
+            return (
+              watchdogLimitsFor(settings, task.agent.aiProvider)
+                .sandboxTimeLimitMinutes * 60_000
+            );
+          },
           freshStarts,
         }));
   // The Batches handed over "in one PR" (ADR 0010): every Stage works
@@ -1596,6 +1615,8 @@ export async function startOffice(
           events,
           decisions: stores.decisions,
           pausedAgents: () => capEnforcement.pausedAgents(),
+          // The Owner's stall timeouts, read at each check.
+          timeLimits: () => officeSettings.watchdogSettings(),
           redactor,
           onError: (error) => {
             logger.warn(
