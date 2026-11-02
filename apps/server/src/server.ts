@@ -65,6 +65,7 @@ import {
   createGrillingDocuments,
   createGrillingIssues,
   createSandboxRunner,
+  promptBudgetOf,
   createToolCallScreens,
   createStatusReports,
   createStatusUpdates,
@@ -412,6 +413,11 @@ export async function startOffice(
     sources: () => aiAccounts.catalogueSources(),
     fetch: upstream.fetch,
   });
+  // Each Model's effective context window: an AI Account's Context window,
+  // or the catalogue's (FR-84; the reviewer's diff limit).
+  const contextWindow = contextWindowOf(modelCatalogue, {
+    accounts: aiAccounts,
+  });
   const aiProviders = createAiProviders({
     store: stores.aiProviders,
     events,
@@ -633,7 +639,7 @@ export async function startOffice(
     events,
     agents: workingAgents,
     defaultModels: () => aiProviders.defaultModels(),
-    contextWindow: contextWindowOf(modelCatalogue),
+    contextWindow,
     onError: (error) => {
       logger.warn({ err: error }, "A Context Usage listener failed.");
     },
@@ -764,6 +770,12 @@ export async function startOffice(
     },
   });
   const memory = { memory: repositoryMemory };
+  // How much of the memory and the Skills each Agent's prompt carries:
+  // the Owner's prompt budgets, lowered for a small context window.
+  const promptBudget = promptBudgetOf(
+    () => officeSettings.promptBudgetSettings(),
+    contextWindow,
+  );
   // The office-wide and Role memory (PRD FR-54, FR-55), kept in AI Office:
   // mounted read-only into every sandbox and quoted in every reviewer's
   // prompt; Agents propose to their Role's, and the Manager or the Owner
@@ -1070,6 +1082,7 @@ export async function startOffice(
     defaultModels: () => aiProviders.defaultModels(),
     redactor,
     ...memory,
+    promptBudget,
     // "/skill-name" runs one of the Floor's Skills, and the Manager may
     // choose one (FR-74).
     skills: floorChatSkills(floorSkills),
@@ -1370,6 +1383,9 @@ export async function startOffice(
     // Commits pushed after the reviewers approved go back to them.
     queue: { enqueue: (work) => workQueue.enqueue(work) },
     ownerLogin: async () => (await officeSettings.intakeSettings()).ownerLogin,
+    // A diff too large for a reviewer's context window goes to the Owner.
+    defaultModels: () => aiProviders.defaultModels(),
+    contextWindow,
   });
   // The turns of the work Roles a Plan gives an issue (PRD FR-25 (1)): the
   // coder flow hands it from one to the next, the Review Loop sends a fix
@@ -1406,6 +1422,7 @@ export async function startOffice(
               capPaused: (agentId) => capEnforcement.isPaused(agentId),
               ...memory,
               sharedMemory,
+              promptBudget,
               roles: stores.roles,
               turns,
               batchBranches,
@@ -1425,6 +1442,8 @@ export async function startOffice(
               events,
               models,
               defaultModels: () => aiProviders.defaultModels(),
+              // How much of a diff each reviewer's Model is shown.
+              contextWindow,
               capPaused: (agentId) => capEnforcement.isPaused(agentId),
               // Stalls judged by the Decision Model, while it is on.
               decisionModel,
@@ -1434,6 +1453,7 @@ export async function startOffice(
               redactor,
               ...memory,
               sharedMemory,
+              promptBudget,
               roles: stores.roles,
               turns,
               batchBranches,
@@ -1465,6 +1485,7 @@ export async function startOffice(
               redactor,
               ...memory,
               sharedMemory,
+              promptBudget,
               roles: stores.roles,
               batchBranches,
               onError: (error) => {
@@ -1491,6 +1512,7 @@ export async function startOffice(
               capPaused: (agentId) => capEnforcement.isPaused(agentId),
               ...memory,
               sharedMemory,
+              promptBudget,
               roles: stores.roles,
               batchBranches,
               onError: (error) => {
@@ -1523,6 +1545,7 @@ export async function startOffice(
               redactor,
               ...memory,
               sharedMemory,
+              promptBudget,
               batchBranches,
               onError: (error) => {
                 logger.warn(

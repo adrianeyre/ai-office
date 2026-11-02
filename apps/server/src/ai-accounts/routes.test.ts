@@ -167,6 +167,8 @@ const cases: Case[] = [
         // No forced Model; an API key offers no extra usage (FR-41).
         forcedModel: null,
         extraUsage: null,
+        // The model catalogue's context window.
+        contextWindow: null,
         rateLimits: null,
         balance: null,
         createdAt: new Date(clockStart).toISOString(),

@@ -6,6 +6,7 @@ import {
   withRoleProposals,
   type AgentMemory,
 } from "../memory/shared.ts";
+import type { PromptBudget } from "../memory/budget.ts";
 import type { HandoffSummary } from "../review/store.ts";
 import { repositoryAgentFilesNote } from "../sandbox/agent-tools.ts";
 import { sharedBranchLines, type SharedBranch } from "../sandbox/branch.ts";
@@ -55,6 +56,11 @@ export interface DesignPromptInput {
   readonly memory?: string;
   /** The office-wide and Role memory mounted in its sandbox (FR-54, FR-55). */
   readonly agentMemory?: AgentMemory;
+  /**
+   * The most of each memory the prompt carries, for its Model (the prompt
+   * budget); as much as AI Office keeps when absent.
+   */
+  readonly budget?: PromptBudget;
 }
 
 /** The form of the designer's report: in its prompt, and when asked again. */
@@ -102,8 +108,10 @@ export function designPrompt(input: DesignPromptInput): string {
           `Known risks: ${quotedIn("handoff", input.handoff.risks)}`,
           "</handoff>",
         ]),
-    ...(input.memory === undefined ? [] : ["", ...memorySection(input.memory)]),
-    ...withMountedMemory(input.agentMemory),
+    ...(input.memory === undefined
+      ? []
+      : ["", ...memorySection(input.memory, input.budget?.repositoryMemory)]),
+    ...withMountedMemory(input.agentMemory, input.budget),
     "",
     "## What to do",
     "",

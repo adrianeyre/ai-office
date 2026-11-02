@@ -526,6 +526,68 @@ const cases: Case[] = [
     },
   ],
   [
+    "carries 12,000 characters of each memory and 40,000 of the Skills listing by default, and sets other prompt budgets at runtime",
+    async (setup) => {
+      const before = await request(setup, "GET", "/api/office/prompt-budget");
+      expect(before.statusCode).toBe(200);
+      expect(before.json()).toEqual({
+        repositoryMemory: 12_000,
+        officeMemory: 12_000,
+        roleMemory: 12_000,
+        skills: 40_000,
+      });
+      const chosen = {
+        repositoryMemory: 6000,
+        officeMemory: 3000,
+        roleMemory: 12_000,
+        skills: 10_000,
+      };
+      const set = await request(
+        setup,
+        "PUT",
+        "/api/office/prompt-budget",
+        chosen,
+      );
+      expect(set.statusCode).toBe(200);
+      expect(set.json()).toEqual(chosen);
+      expect(
+        (await request(setup, "GET", "/api/office/prompt-budget")).json(),
+      ).toEqual(chosen);
+      expect(
+        (await setup.bus.eventsAfter(0)).map(({ event }) => event),
+      ).toContainEqual({
+        type: "config.changed",
+        version: 1,
+        scope: "office",
+        keys: [
+          "promptBudget.repositoryMemory",
+          "promptBudget.officeMemory",
+          "promptBudget.skills",
+        ],
+      });
+
+      for (const payload of [
+        {},
+        { ...chosen, repositoryMemory: -1 },
+        { ...chosen, officeMemory: 1_000_001 },
+        { ...chosen, skills: 2.5 },
+        { ...chosen, roleMemory: "12000" },
+        { ...chosen, extra: true },
+      ]) {
+        const response = await request(
+          setup,
+          "PUT",
+          "/api/office/prompt-budget",
+          payload,
+        );
+        expect({ payload, status: response.statusCode }).toEqual({
+          payload,
+          status: 400,
+        });
+      }
+    },
+  ],
+  [
     "paces no usage window by default, and turns the pacing gates on at runtime",
     async (setup) => {
       const before = await request(

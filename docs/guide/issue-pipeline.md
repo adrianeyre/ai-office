@@ -608,13 +608,27 @@ holds the issue while they review, all at once:
    **Only a pull request shown in full is reviewed** (pen-test finding
    P1-11). Before any reviewer is asked, `notShownInFull` checks that the
    prompt can carry the whole diff: every file's diff, as GitHub gives
-   it, and no more than 100,000 characters of it. A pull request whose
-   diff is longer, or with a file GitHub shows no diff of (binary, or too
-   large), goes to the Owner: it is labelled `needs-human`, and an action
-   Notice says why ("Too large to review: PR #N (#I) cannot be shown to a
-   reviewer in full (…), so it is yours to review."). No reviewer is
-   asked and no approval is recorded, so the Merge Policy never merges it
-   on an approval of part of it.
+   it, and no more of it than every required reviewer can be shown. That
+   limit is sized from each reviewer's Model's effective context window
+   (`diffLimitOf`): the **Context window** set on one of its AI
+   Provider's AI Accounts, else the model catalogue's (see
+   [the AI Gateway](ai-gateway.md)). From the window are taken the
+   answer (8,192 tokens) and 8,000 tokens for the rest of the prompt
+   (its instructions, the memory, the issue and the Handoff); half of
+   what is left, at 3.5 characters a token, is for the diff, and the
+   other half for the files it changes. It is never more than 100,000
+   characters, which is also the limit when no window is known, so a
+   hosted Model's large window changes nothing: a 32,768-token window
+   holds 29,008 characters of diff, a 65,536-token one 86,352, and from
+   about 73,000 tokens up it is 100,000. The smallest limit among the
+   reviewers counts. A pull request whose diff is longer, or with a file
+   GitHub shows no diff of (binary, or too large), goes to the Owner: it
+   is labelled `needs-human`, and an action Notice says why ("Too large
+   to review: PR #N (#I) cannot be shown to a reviewer in full (…), so it
+   is yours to review.", naming the window when one set the limit: "its
+   diff is 50,124 characters, more than the 29,008 a 32,768-token context
+   window holds"). No reviewer is asked and no approval is recorded, so
+   the Merge Policy never merges it on an approval of part of it.
 3. **A verdict, checked.** The answer must be one JSON object that
    `reviewVerdictSchema` (`@ai-office/shared`) accepts: `approve` or
    `changes_requested`, a summary, and comments, each `blocking` or
@@ -957,10 +971,12 @@ Floor's **Merge Policy** is in its settings (`mergePolicy` in `PATCH
   it leaves out could be anything.
 - **What no reviewer could be shown is the Owner's to merge.** A pull
   request whose whole diff a reviewer's prompt cannot carry (longer than
-  100,000 characters, or with a file GitHub shows no diff of) goes to the
+  100,000 characters, or than the Floor's required reviewers' context
+  windows hold, or with a file GitHub shows no diff of) goes to the
   Owner, "… not merged automatically, as no reviewer can be shown it in
   full (…)", whatever approvals it has (pen-test finding P1-11;
-  `notShownInFull`). The review round sends it to the Owner before any
+  `notShownInFull`, with the review Stage's own limit,
+  `reviewersDiffLimit`, so the two never disagree). The review round sends it to the Owner before any
   reviewer is asked, so this catches an approval recorded otherwise, such
   as before the check existed.
 - **What later Agents read is the Owner's to merge.** In the same way, a

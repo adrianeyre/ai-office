@@ -1,7 +1,7 @@
 import type { PullRequestFile } from "@ai-office/github";
 import { memoryPath, repositorySkillFolders } from "@ai-office/shared";
 
-import { notShownInFull } from "../review/prompt.ts";
+import { notShownInFull, type DiffLimit } from "../review/prompt.ts";
 
 // What the Merge Policy never merges without the Owner, on any Floor:
 //
@@ -192,9 +192,14 @@ const pathsOf = (files: readonly PullRequestFile[]): string[] =>
 /**
  * Why the pull request must go to the Owner whatever its reviewers and CI
  * say, from the files it changes: each, as a phrase for the Notice. Empty
- * when nothing it changes asks for the Owner.
+ * when nothing it changes asks for the Owner. `diffLimit` is the most of
+ * a diff its reviewers can be shown, from their context windows, as the
+ * review Stage has it (`reviewersDiffLimit`).
  */
-export function ownerOnly(files: readonly PullRequestFile[]): string[] {
+export function ownerOnly(
+  files: readonly PullRequestFile[],
+  diffLimit?: DiffLimit,
+): string[] {
   const reasons: string[] = [];
   if (files.length >= maxListedFiles) {
     // GitHub lists no more: what it leaves out could be anything.
@@ -213,7 +218,7 @@ export function ownerOnly(files: readonly PullRequestFile[]): string[] {
   }
   // An approval counts only for a pull request its reviewer was shown in
   // full (P1-11), whenever the approval was given.
-  const unshown = notShownInFull(files);
+  const unshown = notShownInFull(files, diffLimit);
   if (unshown !== undefined) {
     reasons.push(`no reviewer can be shown it in full (${unshown})`);
   }

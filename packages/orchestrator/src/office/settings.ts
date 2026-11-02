@@ -19,6 +19,7 @@ import {
   defaultLoadBalancingSettings,
   defaultPromptCacheKeepAliveSettings,
   defaultOutboundProxySettings,
+  defaultPromptBudgetSettings,
   defaultPromptCacheSettings,
   defaultRetentionSettings,
   defaultSandboxConcurrencyLimit,
@@ -41,6 +42,7 @@ import {
   type OutboundProxy,
   type OutboundProxySettings,
   type OutboundProxyUpdate,
+  type PromptBudgetSettings,
   type PromptCacheKeepAliveSettings,
   type PromptCacheSettings,
   type PromptCacheTtl,
@@ -72,8 +74,10 @@ import { gitIdentityFor } from "../git/identity.ts";
 // Combos (FR-40); the outbound HTTP proxy every upstream request goes
 // through (FR-35), its password sealed and never handed back; the Decision
 // Model (FR-17, FR-89); how long what AI Office records is kept
-// (retention, §7); and the watchdog's stall timeout and the sandbox time
-// limit (FR-23, FR-22), each AI Provider's own where set.
+// (retention, §7); the watchdog's stall timeout and the sandbox time
+// limit (FR-23, FR-22), each AI Provider's own where set; and the prompt
+// budgets, the most of each memory and of the Skills listing an Agent's
+// prompt carries.
 
 /** The outbound proxy as it is stored: its password sealed. */
 export interface StoredOutboundProxy {
@@ -142,6 +146,9 @@ export interface OfficeSettingsStore {
   /** The retention periods set in the admin; each unset one absent. */
   retention(): Promise<Partial<RetentionSettings>>;
   setRetention(settings: RetentionSettings, at: Date): Promise<void>;
+  /** The prompt budgets set in General Settings; each unset one absent. */
+  promptBudget(): Promise<Partial<PromptBudgetSettings>>;
+  setPromptBudget(settings: PromptBudgetSettings, at: Date): Promise<void>;
   /** Whether GitHub's webhooks are taken, and their secret, sealed. */
   githubWebhooks(): Promise<StoredWebhooks>;
   setGithubWebhooks(webhooks: StoredWebhooks, at: Date): Promise<void>;
@@ -189,6 +196,7 @@ export function memoryOfficeSettingsStore(): OfficeSettingsStore {
   let outboundProxy: StoredOutboundProxy | undefined;
   let decisionModel: Partial<DecisionModelSettings> = {};
   let retention: Partial<RetentionSettings> = {};
+  let budget: Partial<PromptBudgetSettings> = {};
   let webhooks: StoredWebhooks = { enabled: false, sealedSecret: null };
   let profile: OwnerProfile | undefined;
   let cast: Partial<LobbyCast> = {};
@@ -271,6 +279,11 @@ export function memoryOfficeSettingsStore(): OfficeSettingsStore {
       retention = { ...settings };
       return Promise.resolve();
     },
+    promptBudget: () => Promise.resolve({ ...budget }),
+    setPromptBudget(settings) {
+      budget = { ...settings };
+      return Promise.resolve();
+    },
     githubWebhooks: () => Promise.resolve({ ...webhooks }),
     setGithubWebhooks(set) {
       webhooks = { ...set };
@@ -346,6 +359,14 @@ const decisionModelKeys = ["enabled", "model", "summaries"] as const;
 
 /** The retention periods, each named as `config.changed` names it. */
 const retentionKeys = retentionRules;
+
+/** The prompt budgets, each named as `config.changed` names it. */
+const promptBudgetKeys = [
+  "repositoryMemory",
+  "officeMemory",
+  "roleMemory",
+  "skills",
+] as const;
 
 /** Keeps office settings in the one-row `office_settings` table. */
 export function databaseOfficeSettingsStore(db: Database): OfficeSettingsStore {
@@ -681,6 +702,38 @@ export function databaseOfficeSettingsStore(db: Database): OfficeSettingsStore {
         .values({ id: 1, ...values })
         .onConflictDoUpdate({ target: officeSettings.id, set: values });
     },
+    async promptBudget() {
+      const [row] = await db
+        .select({
+          repositoryMemory: officeSettings.promptBudgetRepositoryMemory,
+          officeMemory: officeSettings.promptBudgetOfficeMemory,
+          roleMemory: officeSettings.promptBudgetRoleMemory,
+          skills: officeSettings.promptBudgetSkills,
+        })
+        .from(officeSettings)
+        .where(eq(officeSettings.id, 1));
+      const set: Partial<PromptBudgetSettings> = {};
+      for (const key of promptBudgetKeys) {
+        const value = row?.[key];
+        if (value != null) {
+          set[key] = value;
+        }
+      }
+      return set;
+    },
+    async setPromptBudget(settings, at) {
+      const values = {
+        promptBudgetRepositoryMemory: settings.repositoryMemory,
+        promptBudgetOfficeMemory: settings.officeMemory,
+        promptBudgetRoleMemory: settings.roleMemory,
+        promptBudgetSkills: settings.skills,
+        updatedAt: at,
+      };
+      await db
+        .insert(officeSettings)
+        .values({ id: 1, ...values })
+        .onConflictDoUpdate({ target: officeSettings.id, set: values });
+    },
     async githubWebhooks() {
       const [row] = await db
         .select({
@@ -912,6 +965,15 @@ export interface OfficeSettings {
   watchdogSettings(): Promise<WatchdogSettings>;
   /** Sets them, recording which changed. */
   setWatchdogSettings(settings: WatchdogSettings): Promise<WatchdogSettings>;
+  /**
+   * The prompt budgets, in characters: 12,000 of each memory and 40,000
+   * of the Skills listing, until set.
+   */
+  promptBudgetSettings(): Promise<PromptBudgetSettings>;
+  /** Sets them, recording which changed. */
+  setPromptBudgetSettings(
+    settings: PromptBudgetSettings,
+  ): Promise<PromptBudgetSettings>;
 }
 
 /** Why the outbound proxy's settings could not be stored. */
@@ -1352,6 +1414,34 @@ export function createOfficeSettings(options: {
         .filter((key) => current[key] !== settings[key])
         .map((key) => `retention.${key}`);
       await store.setRetention(settings, now());
+      if (keys.length > 0) {
+        await events.publish({
+          type: "config.changed",
+          version: 1,
+          scope: "office",
+          keys,
+        });
+      }
+      return { ...settings };
+    },
+
+    async promptBudgetSettings() {
+      return {
+        ...defaultPromptBudgetSettings,
+        ...(await store.promptBudget()),
+      };
+    },
+
+    async setPromptBudgetSettings(settings) {
+      const current = {
+        ...defaultPromptBudgetSettings,
+        ...(await store.promptBudget()),
+      };
+      // Which budgets changed, never their values.
+      const keys = promptBudgetKeys
+        .filter((key) => current[key] !== settings[key])
+        .map((key) => `promptBudget.${key}`);
+      await store.setPromptBudget(settings, now());
       if (keys.length > 0) {
         await events.publish({
           type: "config.changed",

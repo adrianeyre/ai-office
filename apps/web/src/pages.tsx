@@ -23,6 +23,7 @@ import { Office2D } from "./office-2d.tsx";
 import { useOfficePlace } from "./office-place.ts";
 import { usePhoneView } from "./phone-view.ts";
 import { OfficeMemoryCard } from "./office-memory-card.tsx";
+import { PromptBudgetCard } from "./prompt-budget-card.tsx";
 import { PromptCacheCard } from "./prompt-cache-card.tsx";
 import { RetentionCard } from "./retention-card.tsx";
 import type { InspectTarget } from "./scene/inspectable.ts";
@@ -130,6 +131,7 @@ export function AdminPage() {
       <FloorTemplatesCard />
       <SkillsCard />
       <OfficeMemoryCard />
+      <PromptBudgetCard />
       <IntakeCard />
       <WebhooksCard />
       <SandboxesCard />

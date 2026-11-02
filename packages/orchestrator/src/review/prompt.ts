@@ -2,6 +2,8 @@ import type { PullRequestFile } from "@ai-office/github";
 import { maxReviewComments } from "@ai-office/shared";
 
 import { roleLines, type RoleInstructions } from "../coder/prompt.ts";
+import { charactersIn } from "../context/window.ts";
+import { agentMemoryWithin, type PromptBudget } from "../memory/budget.ts";
 import { memorySection } from "../memory/memory.ts";
 import {
   holdsMemory,
@@ -71,6 +73,16 @@ export interface ReviewerPromptInput {
   readonly memory?: string;
   /** The office-wide and reviewers' Role memory (FR-54, FR-55). */
   readonly agentMemory?: AgentMemory;
+  /**
+   * The most of the diff this reviewer's Model can be shown, from its
+   * context window; `maxDiffCharacters` when absent.
+   */
+  readonly diffLimit?: DiffLimit;
+  /**
+   * The most of each memory the prompt carries, for its Model (the prompt
+   * budget); as much as AI Office keeps when absent.
+   */
+  readonly budget?: PromptBudget;
 }
 
 export interface ReviewerPrompt {
@@ -84,25 +96,69 @@ export const maxDiffCharacters = 100_000;
 export const maxFileCharacters = 30_000;
 /** The most of all the files together a prompt carries. */
 export const maxFilesCharacters = 150_000;
+/** The most tokens one reviewer's answer may use. */
+export const maxAnswerTokens = 8192;
+/**
+ * The tokens of a context window kept for the rest of a reviewer's
+ * prompt: its instructions, the memory, the issue and the Handoff.
+ */
+export const promptHeadroomTokens = 8000;
+
+/**
+ * The most of a diff a reviewer is shown (its characters), and, when its
+ * Model's context window made it less than `maxDiffCharacters`, that
+ * window (in tokens).
+ */
+export interface DiffLimit {
+  readonly characters: number;
+  readonly contextWindow?: number;
+}
+
+/**
+ * The most of a diff a reviewer whose Model has `contextWindow` tokens is
+ * shown: what the window holds beside the answer and the rest of the
+ * prompt, half of it, the other half being the files it changes, and never
+ * more than `maxDiffCharacters`, which a window unknown (null) or large
+ * enough gets.
+ */
+export function diffLimitOf(contextWindow: number | null): DiffLimit {
+  if (contextWindow === null) {
+    return { characters: maxDiffCharacters };
+  }
+  const characters = Math.floor(
+    charactersIn(contextWindow - maxAnswerTokens - promptHeadroomTokens) / 2,
+  );
+  return characters >= maxDiffCharacters
+    ? { characters: maxDiffCharacters }
+    : { characters, contextWindow };
+}
 
 /**
  * Why a reviewer's prompt cannot show the pull request's changes in full,
  * so that its approval would not count for them (P1-11): GitHub shows no
  * diff of a file (binary, or too large), or the diff is longer than a
- * prompt carries. Undefined when every change is shown. The files' text
- * is context: the diff holds every change.
+ * prompt carries (`limit`, from the reviewer's context window). Undefined
+ * when every change is shown. The files' text is context: the diff holds
+ * every change.
  */
 export function notShownInFull(
   files: readonly PullRequestFile[],
+  limit: DiffLimit = diffLimitOf(null),
 ): string | undefined {
   const hidden = files.filter(({ patch }) => patch === null).length;
   if (hidden > 0) {
     return `GitHub shows no diff of ${hidden === 1 ? "one of its files" : `${String(hidden)} of its files`} (binary, or too large)`;
   }
   const length = unifiedDiff(files).length;
-  return length <= maxDiffCharacters
-    ? undefined
-    : `its diff is ${length.toLocaleString("en-GB")} characters, more than the ${maxDiffCharacters.toLocaleString("en-GB")} a reviewer is shown`;
+  if (length <= limit.characters) {
+    return undefined;
+  }
+  const most = limit.characters.toLocaleString("en-GB");
+  return `its diff is ${length.toLocaleString("en-GB")} characters, more than the ${
+    limit.contextWindow === undefined
+      ? `${most} a reviewer is shown`
+      : `${most} a ${limit.contextWindow.toLocaleString("en-GB")}-token context window holds`
+  }`;
 }
 
 /** Text that cannot close (or open) a `<tag>` quote it is put in. */
@@ -184,7 +240,13 @@ export function reviewerPrompt(input: ReviewerPromptInput): ReviewerPrompt {
     "",
   ].join("\n");
 
-  let budget = maxFilesCharacters;
+  // A small context window holds less of the files too: as much as of
+  // the diff.
+  const limit = input.diffLimit ?? diffLimitOf(null);
+  let budget =
+    limit.contextWindow === undefined
+      ? maxFilesCharacters
+      : Math.min(maxFilesCharacters, limit.characters);
   const files = input.contents.map(({ path, text }) => {
     const shown = cut(text, Math.min(maxFileCharacters, budget), "the file");
     budget = Math.max(0, budget - shown.length);
@@ -196,10 +258,17 @@ export function reviewerPrompt(input: ReviewerPromptInput): ReviewerPrompt {
   });
 
   const user = [
-    ...(input.memory === undefined ? [] : [...memorySection(input.memory), ""]),
+    ...(input.memory === undefined
+      ? []
+      : [...memorySection(input.memory, input.budget?.repositoryMemory), ""]),
     ...(input.agentMemory === undefined || !holdsMemory(input.agentMemory)
       ? []
-      : [...quotedMemorySection(input.agentMemory), ""]),
+      : [
+          ...quotedMemorySection(
+            agentMemoryWithin(input.agentMemory, input.budget),
+          ),
+          "",
+        ]),
     "## The issue",
     "",
     `<issue number="${number}">`,
@@ -237,7 +306,7 @@ export function reviewerPrompt(input: ReviewerPromptInput): ReviewerPrompt {
     ),
     "",
     fromPullRequest(
-      cut(unifiedDiff(input.files), maxDiffCharacters, "the diff"),
+      cut(unifiedDiff(input.files), limit.characters, "the diff"),
     ),
     "</diff>",
     "",

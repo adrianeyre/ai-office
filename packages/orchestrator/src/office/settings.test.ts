@@ -291,6 +291,39 @@ const cases: Case[] = [
     },
   ],
   [
+    "carries 12,000 characters of each memory and 40,000 of the Skills listing until the Owner chooses otherwise",
+    async ({ settings, bus }) => {
+      expect(await settings.promptBudgetSettings()).toEqual({
+        repositoryMemory: 12_000,
+        officeMemory: 12_000,
+        roleMemory: 12_000,
+        skills: 40_000,
+      });
+      const chosen = {
+        repositoryMemory: 4000,
+        officeMemory: 12_000,
+        roleMemory: 2000,
+        skills: 8000,
+      };
+      expect(await settings.setPromptBudgetSettings(chosen)).toEqual(chosen);
+      // The same again changes nothing.
+      await settings.setPromptBudgetSettings(chosen);
+      expect(await settings.promptBudgetSettings()).toEqual(chosen);
+      expect(
+        (await configChanges(bus)).map(({ scope, keys }) => [scope, keys]),
+      ).toEqual([
+        [
+          "office",
+          [
+            "promptBudget.repositoryMemory",
+            "promptBudget.roleMemory",
+            "promptBudget.skills",
+          ],
+        ],
+      ]);
+    },
+  ],
+  [
     "keeps bodies 7 days, records 90, activity a year and delivery logs 90 days until the Owner chooses otherwise",
     async ({ settings, bus }) => {
       expect(await settings.retentionSettings()).toEqual({

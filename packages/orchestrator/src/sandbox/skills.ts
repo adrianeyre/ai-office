@@ -23,9 +23,13 @@ export interface SkillMount {
   readonly readonly: true;
 }
 
-/** A Skill to mount: its name (its folder's) and files. */
+/**
+ * A Skill to mount: its name (its folder's), its description (which its
+ * listing gives) and files.
+ */
 export interface SkillToMount {
   readonly name: string;
+  readonly description: string;
   readonly files: readonly SkillFile[];
 }
 

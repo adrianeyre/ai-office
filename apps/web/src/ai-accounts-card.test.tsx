@@ -1460,6 +1460,39 @@ describe("the AI Accounts in AI Settings", () => {
     ).not.toContain("Extra usage");
   });
 
+  it("sets the context window of the Models an account serves, and empties it for the catalogue's", async () => {
+    const { sent } = stubServer([work]);
+    const user = userEvent.setup();
+    const view = await card();
+    await user.click(await view.findByRole("button", { name: "Edit Work" }));
+    const form = view.getByRole("form", { name: "Edit Work" });
+    await user.type(
+      within(form).getByLabelText("Context window (tokens)"),
+      "32768",
+    );
+    await user.click(within(form).getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(sent.at(-1)).toEqual({
+        method: "PATCH",
+        url: "/api/ai-accounts/account-work",
+        body: { contextWindow: 32_768 },
+        csrf: "csrf-token-1",
+      });
+    });
+    const changed = await view.findByRole("listitem", { name: "Work" });
+    await waitFor(() => {
+      expect(changed.textContent).toContain("Context window 32,768 tokens");
+    });
+
+    await user.click(view.getByRole("button", { name: "Edit Work" }));
+    const again = view.getByRole("form", { name: "Edit Work" });
+    await user.clear(within(again).getByLabelText("Context window (tokens)"));
+    await user.click(within(again).getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(sent.at(-1)).toMatchObject({ body: { contextWindow: null } });
+    });
+  });
+
   it("shows why a forced Model was refused", async () => {
     stubServer([work]);
     const fetchStub = vi.mocked(fetch);

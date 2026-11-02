@@ -276,6 +276,7 @@ describe("the sandbox runner", () => {
         return Promise.resolve([
           {
             name: "pdf",
+            description: "PDFs.",
             files: [
               {
                 path: "SKILL.md",
@@ -340,6 +341,43 @@ describe("the sandbox runner", () => {
     ).toBe(false);
   });
 
+  it("mounts only the first Skills whose listing fits the prompt budget, and says in the prompt how many were left out", async () => {
+    const mounted: (readonly SkillMount[])[] = [];
+    let prompt = "";
+    const skill = (name: string) => ({
+      name,
+      description: "x".repeat(96),
+      files: [
+        {
+          path: "SKILL.md",
+          content: `---\nname: ${name}\ndescription: A Skill.\n---\n`,
+        },
+      ],
+    });
+    setup = await setUp(
+      (context) => {
+        prompt = context.prompt;
+        return Promise.resolve();
+      },
+      {
+        sandbox: (environment, _tool, mounts) => {
+          mounted.push(mounts);
+          return setup.sandbox.provider(environment);
+        },
+        skills: () =>
+          Promise.resolve([skill("pdf"), skill("tdd"), skill("pr")]),
+      },
+    );
+    // Each listed in 99 or 98 characters: two fit in 200.
+    const run = await setup.runner.run({ ...setup.task, skillsBudget: 200 });
+    const hostPath = mounted[0]?.[0]?.hostPath ?? "";
+    expect((await readdir(hostPath)).sort()).toEqual(["pdf", "tdd"]);
+    expect(prompt).toBe(
+      "Work issue #4.\n## Skills left out\n\nYour Role has more Skills on this Floor than your prompt has room for: only the first are mounted. (1 more Skill was left out: the list is longer than the 200 characters a prompt carries.)\n",
+    );
+    await run.discard();
+  });
+
   it("mounts the office-wide and Role memory read-only at the same place for every agent tool, beside the clone rather than in it", async () => {
     const mounted: (readonly SkillMount[])[] = [];
     // What the Agent finds while it works, read from the mount's host side.
@@ -364,6 +402,7 @@ describe("the sandbox runner", () => {
           Promise.resolve([
             {
               name: "pdf",
+              description: "PDFs.",
               files: [
                 {
                   path: "SKILL.md",

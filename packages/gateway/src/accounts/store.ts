@@ -66,6 +66,12 @@ export interface AiAccountRecord {
    */
   readonly extraUsage: boolean;
   /**
+   * The context window of the Models it serves, in tokens, as the Owner
+   * set it: it overrides the model catalogue's. Null (or absent) for the
+   * catalogue's.
+   */
+  readonly contextWindow?: number | null;
+  /**
    * An API key's per-minute rate limits as its latest answer reported them
    * (FR-36); null (or absent) for none.
    */
@@ -110,6 +116,7 @@ export interface AiAccountChanges {
   readonly weeklyPauseThreshold?: number | null;
   readonly forcedModel?: string | null;
   readonly extraUsage?: boolean;
+  readonly contextWindow?: number | null;
   readonly rateLimits?: RateLimits | null;
   readonly balance?: CreditBalance | null;
   readonly updatedAt: Date;

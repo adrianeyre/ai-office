@@ -97,6 +97,7 @@ export const aiAccountBody = (
   weeklyPauseThreshold: account.weeklyPauseThreshold,
   forcedModel: account.forcedModel,
   extraUsage: offersExtraUsage(account) ? account.extraUsage : null,
+  contextWindow: account.contextWindow ?? null,
   rateLimits: rateLimitsBody(account.rateLimits ?? null, now),
   balance: account.balance ?? null,
   createdAt: account.createdAt.toISOString(),

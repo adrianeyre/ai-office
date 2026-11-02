@@ -67,6 +67,10 @@ const setUp = async (
      * handed over by "complete issues".
      */
     readonly batch?: "chat" | "command";
+    /** The reviewers' Models' context window, in tokens; null for unknown. */
+    readonly contextWindow?: number | null;
+    /** The basket's text, in place of a short one. */
+    readonly basket?: string;
   } = {},
 ): Promise<Setup> => {
   const fake = createFakeGitHub();
@@ -99,7 +103,10 @@ const setUp = async (
     fake.setLabel(repository, 1, name, actor === undefined ? {} : { actor });
   }
   const head = fake.pushCommit(repository, branch, {
-    files: { "src/basket.ts": "export const basket: string[] = [];\n" },
+    files: {
+      "src/basket.ts":
+        options.basket ?? "export const basket: string[] = [];\n",
+    },
   });
   await fake.repository(repository).createPullRequest({
     title,
@@ -160,6 +167,11 @@ const setUp = async (
     reviews: stores.reviews,
     batches: stores.batches,
     ownerLogin: () => Promise.resolve("adrianeyre"),
+    ...(options.contextWindow === undefined
+      ? {}
+      : {
+          contextWindow: () => Promise.resolve(options.contextWindow ?? null),
+        }),
     now: () => new Date(clock),
     sleep: (ms, signal) => {
       if (options.sleep !== undefined) {
@@ -276,6 +288,38 @@ describe("auto-merge", () => {
       }),
     ]);
     expect(current.waited()).toBe(0);
+  });
+
+  describe("a diff sized for the reviewers' context window, as the review Stage sizes it", () => {
+    /** About 50,000 characters of basket. */
+    const basket = `export const basket = [\n${'  "a basket item",\n'.repeat(2500)}];\n`;
+
+    it("holds back a pull request whose diff a reviewer's small context window cannot hold, naming the window", async () => {
+      current = await setUp({
+        policy: "auto_merge",
+        contextWindow: 32_768,
+        basket,
+      });
+      await current.approved(1);
+      current.fake.finishCI(repository, branch, { name: "test" });
+      expect(await current.run()).toBe("finished");
+      expect((await pullRequest(current)).merged).toBe(false);
+      const [notice] = await current.openNotices();
+      expect(notice?.title).toMatch(
+        /^PR #2 awaiting your approval: not merged automatically, as no reviewer can be shown it in full \(its diff is [\d,]+ characters, more than the 29,008 a 32,768-token context window holds\)\.$/,
+      );
+    });
+
+    it("merges it when the window is large, or unknown: 100,000 characters, as before", async () => {
+      for (const contextWindow of [1_000_000, null]) {
+        current?.flow.stop();
+        current = await setUp({ policy: "auto_merge", contextWindow, basket });
+        await current.approved(1);
+        current.fake.finishCI(repository, branch, { name: "test" });
+        expect(await current.run()).toBe("finished");
+        expect((await pullRequest(current)).merged).toBe(true);
+      }
+    });
   });
 
   it("waits for CI to finish on the head, then merges", async () => {

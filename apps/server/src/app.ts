@@ -933,7 +933,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       events,
       agents: workingAgents,
       defaultModels,
-      contextWindow: contextWindowOf(modelCatalogue),
+      contextWindow: contextWindowOf(modelCatalogue, { accounts: aiAccounts }),
       now,
     });
     const report = (error: unknown) => {
@@ -1038,7 +1038,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     chats: directChats,
     usage: directChatUsageOf({
       history: requestHistory,
-      contextWindow: contextWindowOf(modelCatalogue),
+      contextWindow: contextWindowOf(modelCatalogue, { accounts: aiAccounts }),
     }),
     heartbeatMs: options.heartbeatMs ?? 15_000,
     signedIn: async (request) =>

@@ -443,6 +443,7 @@ const info = (account: AiAccountRecord): AiAccountInfo => ({
   weeklyPauseThreshold: account.weeklyPauseThreshold,
   forcedModel: account.forcedModel,
   extraUsage: account.extraUsage,
+  contextWindow: account.contextWindow ?? null,
   rateLimits: account.rateLimits ?? null,
   balance: account.balance ?? null,
   createdAt: account.createdAt,
@@ -1960,6 +1961,7 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
         weeklyPauseThreshold,
         forcedModel,
         extraUsage,
+        contextWindow,
       } = update;
       // A forced Model is one of its own AI Provider's (FR-41), or any
       // for a compatible endpoint.
@@ -1999,6 +2001,10 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
           : {}),
         ...(extraUsage !== undefined && extraUsage !== current.extraUsage
           ? { extraUsage }
+          : {}),
+        ...(contextWindow !== undefined &&
+        contextWindow !== (current.contextWindow ?? null)
+          ? { contextWindow }
           : {}),
       };
       const keys = Object.keys(changes);

@@ -1,7 +1,11 @@
+import { defaultPromptBudgetSettings } from "@ai-office/shared";
 import { describe, expect, it } from "vitest";
 
+import { promptBudgetFor } from "../memory/budget.ts";
+import { longAgentMemory, longMemory } from "../memory/testing.ts";
 import { builtIn } from "../roles/testing.ts";
 import {
+  diffLimitOf,
   notShownInFull,
   maxDiffCharacters,
   maxFileCharacters,
@@ -182,6 +186,116 @@ describe("whether a reviewer can be shown a pull request in full (P1-11)", () =>
       notShownInFull([file("one.json", half), file("two.json", half)]),
     ).toMatch(
       /^its diff is [\d,]+ characters, more than the 100,000 a reviewer is shown$/,
+    );
+  });
+});
+
+describe("the most of a diff a reviewer is shown, from its Model's context window", () => {
+  const file = (patch: string) => ({
+    path: "catalogue.json",
+    status: "added" as const,
+    patch,
+  });
+  /** A diff of about `characters` characters. */
+  const diff = (characters: number) => [
+    file(`@@ -0,0 +1 @@
++${"x".repeat(characters)}`),
+  ];
+
+  it("is 100,000 characters when the window is unknown, as before", () => {
+    expect(diffLimitOf(null)).toEqual({ characters: maxDiffCharacters });
+    expect(notShownInFull(diff(60_000), diffLimitOf(null))).toBeUndefined();
+  });
+
+  it("is 100,000 characters for a large window: a hosted Model's", () => {
+    expect(diffLimitOf(200_000)).toEqual({
+      characters: maxDiffCharacters,
+    });
+    expect(diffLimitOf(1_048_576)).toEqual({ characters: maxDiffCharacters });
+    expect(notShownInFull(diff(60_000), diffLimitOf(200_000))).toBeUndefined();
+  });
+
+  it("is less for a small window: half of what is left beside the answer and the rest of the prompt, at 3.5 characters a token", () => {
+    // (32,768 - 8,192 - 8,000) tokens × 3.5 ÷ 2.
+    expect(diffLimitOf(32_768)).toEqual({
+      characters: 29_008,
+      contextWindow: 32_768,
+    });
+    expect(diffLimitOf(65_536).characters).toBe(86_352);
+    expect(diffLimitOf(8192).characters).toBe(0);
+  });
+
+  it("refuses a diff a small window cannot hold, naming the window", () => {
+    const limit = diffLimitOf(32_768);
+    expect(notShownInFull(diff(20_000), limit)).toBeUndefined();
+    expect(notShownInFull(diff(60_000), limit)).toMatch(
+      /^its diff is [\d,]+ characters, more than the 29,008 a 32,768-token context window holds$/,
+    );
+  });
+
+  it("cuts the diff and the files to what a small window holds", () => {
+    const limit = diffLimitOf(32_768);
+    const { user } = reviewerPrompt({
+      ...input,
+      files: diff(40_000),
+      contents: [{ path: "catalogue.json", text: "y".repeat(40_000) }],
+      diffLimit: limit,
+    });
+    expect(user).toContain(
+      "(the diff cut here: it is longer than 29,008 characters)",
+    );
+    expect(user).toContain(
+      "(the file cut here: it is longer than 29,008 characters)",
+    );
+    // Without a window, as before.
+    const before = reviewerPrompt({
+      ...input,
+      files: diff(40_000),
+      contents: [{ path: "catalogue.json", text: "y".repeat(40_000) }],
+    }).user;
+    expect(before).not.toContain("the diff cut here");
+    expect(before).toContain(
+      `(the file cut here: it is longer than ${maxFileCharacters.toLocaleString("en-GB")} characters)`,
+    );
+  });
+});
+
+describe("the prompt budget (#20)", () => {
+  const memory = longMemory;
+  const agentMemory = longAgentMemory("reviewer");
+
+  it("leaves the prompt byte-identical with the default budget on a large context window", () => {
+    const before = reviewerPrompt({ ...input, memory, agentMemory });
+    for (const contextWindow of [null, 200_000, 1_048_576]) {
+      expect(
+        reviewerPrompt({
+          ...input,
+          memory,
+          agentMemory,
+          budget: promptBudgetFor(defaultPromptBudgetSettings, contextWindow),
+        }),
+      ).toEqual(before);
+    }
+  });
+
+  it("truncates each quoted memory over a small window's budget, saying so, the same every time", () => {
+    const budget = promptBudgetFor(defaultPromptBudgetSettings, 32_768);
+    const { user } = reviewerPrompt({ ...input, memory, agentMemory, budget });
+    expect(user).toContain(
+      "\n… (the memory cut here: it is longer than 5,734 characters)\n</memory>",
+    );
+    expect(user).toContain(
+      "\n… (the office-wide memory cut here: it is longer than the 5,734 characters a prompt carries)\n</office-memory>",
+    );
+    expect(user).toContain(
+      "\n(21 older entries were left out: the Role's memory is longer than the 5,734 characters a prompt carries.)\n</role-memory>",
+    );
+    // The newest entries are kept.
+    expect(user).toContain("- Entry 40: ");
+    expect(user).toContain("- Entry 22: ");
+    expect(user).not.toContain("- Entry 21: ");
+    expect(reviewerPrompt({ ...input, memory, agentMemory, budget }).user).toBe(
+      user,
     );
   });
 });
