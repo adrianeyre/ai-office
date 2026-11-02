@@ -162,42 +162,47 @@ export default function ChatDemo() {
     >
       {(s) => (
         <>
-          <Window title="web-shop · Manager" className="mc-win">
-            <div className="mc-body">
-              <div className="mc-thread">
-                <div className="mc-turn--past" data-gone={s.plan || undefined}>
-                  <Bar w={150} h={30} r={15} tone={1} className="mc-past-q" />
-                  <Bar w="78%" h={8} r={4} tone={2} />
+          <div className="aio-fade mc-fade">
+            <Window title="web-shop · Manager" className="mc-win">
+              <div className="mc-body">
+                <div className="mc-thread">
+                  <div
+                    className="mc-turn--past"
+                    data-gone={s.plan || undefined}
+                  >
+                    <Bar w={150} h={30} r={15} tone={1} className="mc-past-q" />
+                    <Bar w="78%" h={8} r={4} tone={2} />
+                  </div>
+                  <Collapse open={s.sent} reveal="drop" from="below">
+                    <div className="mc-q">
+                      <Text>{ASK}</Text>
+                    </div>
+                  </Collapse>
+                  <Collapse open={s.phase === "thinking"}>
+                    <Text className="mc-thinking">Thinking</Text>
+                  </Collapse>
+                  <Collapse open={s.phase === "answer"}>
+                    <div className="mc-a">
+                      <Stream
+                        className="mc-stream"
+                        text={REPLY}
+                        count={s.words}
+                      />
+                    </div>
+                  </Collapse>
+                  <Collapse open={s.plan} reveal="drop">
+                    <Plan s={s} />
+                  </Collapse>
                 </div>
-                <Collapse open={s.sent} reveal="drop" from="below">
-                  <div className="mc-q">
-                    <Text>{ASK}</Text>
-                  </div>
-                </Collapse>
-                <Collapse open={s.phase === "thinking"}>
-                  <Text className="mc-thinking">Thinking</Text>
-                </Collapse>
-                <Collapse open={s.phase === "answer"}>
-                  <div className="mc-a">
-                    <Stream
-                      className="mc-stream"
-                      text={REPLY}
-                      count={s.words}
-                    />
-                  </div>
-                </Collapse>
-                <Collapse open={s.plan} reveal="drop">
-                  <Plan s={s} />
-                </Collapse>
+                <Field
+                  className="mc-composer"
+                  value={s.draft}
+                  placeholder="Message the Manager"
+                  focused={!s.sent}
+                />
               </div>
-              <Field
-                className="mc-composer"
-                value={s.draft}
-                placeholder="Message the Manager"
-                focused={!s.sent}
-              />
-            </div>
-          </Window>
+            </Window>
+          </div>
           <span className="mc-rest" data-target="rest" />
         </>
       )}

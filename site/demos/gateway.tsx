@@ -201,15 +201,6 @@ function Accounts({ s }: { s: S }) {
           </div>
         </div>
       ))}
-      <div className="gw-account" aria-hidden>
-        <div className="gw-account-line">
-          <Bar w={92} h={7} tone={3} />
-          <Bar w={44} h={18} r={9} tone={1} />
-        </div>
-        <div className="gw-account-line">
-          <Bar w={180} h={6} r={3} tone={1} />
-        </div>
-      </div>
     </section>
   );
 }
@@ -220,7 +211,7 @@ export default function GatewayDemo() {
     <Stage<S>
       width={720}
       height={440}
-      compact={{ below: 640, width: 358, height: 560 }}
+      compact={{ below: 640, width: 358, height: 540 }}
       initial={START}
       poster={POSTER}
       script={script}
@@ -230,31 +221,33 @@ export default function GatewayDemo() {
     >
       {(s, _rect, layout) => (
         <>
-          <Window url="localhost:3045/gateway" className="gw-window">
-            <div className="gw-app">
-              {layout === "wide" && (
-                <div className="gw-side">
-                  {[52, 64, 44, 58, 48].map((w, i) => (
-                    <span
-                      key={i}
-                      className="gw-nav"
-                      data-on={i === 2 || undefined}
-                    >
-                      <Bar w={12} h={12} r={3} tone={i === 2 ? 4 : 2} />
-                      <Bar w={w} h={6} tone={i === 2 ? 4 : 2} />
-                    </span>
-                  ))}
+          <div className="aio-fade gw-fade">
+            <Window url="localhost:3045/gateway" className="gw-window">
+              <div className="gw-app">
+                {layout === "wide" && (
+                  <div className="gw-side">
+                    {[52, 64, 44, 58, 48].map((w, i) => (
+                      <span
+                        key={i}
+                        className="gw-nav"
+                        data-on={i === 2 || undefined}
+                      >
+                        <Bar w={12} h={12} r={3} tone={i === 2 ? 4 : 2} />
+                        <Bar w={w} h={6} tone={i === 2 ? 4 : 2} />
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="gw-main">
+                  <div className="gw-head">
+                    <Text className="gw-title">Gateway requests</Text>
+                    <Bar w={72} h={24} r={8} tone={2} />
+                  </div>
+                  <Requests s={s} />
                 </div>
-              )}
-              <div className="gw-main">
-                <div className="gw-head">
-                  <Text className="gw-title">Gateway requests</Text>
-                  <Bar w={72} h={24} r={8} tone={2} />
-                </div>
-                <Requests s={s} />
               </div>
-            </div>
-          </Window>
+            </Window>
+          </div>
           <Accounts s={s} />
         </>
       )}

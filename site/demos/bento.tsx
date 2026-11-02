@@ -103,12 +103,26 @@ export function NoticesTile() {
                   <GitPullRequest size={16} strokeWidth={2} />
                 </span>
                 <span className="bt-notice-text">
-                  <Text className="bt-notice-title">
-                    PR #43 is waiting for your approval
-                  </Text>
-                  <Text className="bt-notice-line">
-                    web-shop · CI passed · 2 approvals
-                  </Text>
+                  {/* The Notice changes with its action: the words move with
+                      the button, never one state beside the other */}
+                  <States
+                    className="bt-notice-title"
+                    align="start"
+                    value={s.on ? "done" : "ask"}
+                    states={{
+                      ask: "PR #43 is waiting for your approval",
+                      done: "PR #43 is merged into main",
+                    }}
+                  />
+                  <States
+                    className="bt-notice-line"
+                    align="start"
+                    value={s.on ? "done" : "ask"}
+                    states={{
+                      ask: "web-shop · CI passed · 2 approvals",
+                      done: "web-shop · merged by you, just now",
+                    }}
+                  />
                 </span>
                 <span className="bt-button" data-on={s.on || undefined}>
                   <States

@@ -51,6 +51,25 @@ window's gutter (top and left now one gutter), the narrow notice's action
 (under its words), cards and marks a gutter from the foot, type tiles
 without a void on phones.
 
+## Second pass (review of the built page)
+
+- No plates: the hero, Gateway and chat windows sit on the page's own
+  ground, a full gutter in from the stage's top and sides, running off its
+  foot inside a fading mask (the `fade-crop` gold's wrapper), so they fill
+  their column with no hard cut. The Gateway's card straddles the page's
+  left edge, whole.
+- The Notice tile's poster is one state: the Notice reads merged when its
+  button does (both cross-fade together).
+- The stat's number is sized to its tile, so the tile has no empty band;
+  the local-models statement carries one line of detail and the row's
+  tiles are as tall as their content.
+- Gate on posters at 1440 and 390: hero and Gateway (wide) pass but for
+  the bundled-CSS `kit override` lines above. Stand: the compact Gateway
+  and chat windows show narrower than tall (a phone column holds a list
+  and a thread, not a desktop window's proportions); the hero's filler
+  rows run past its padding (they run off into the fade on purpose); the
+  chat's centred title bar (`uneven inset`, as the gold).
+
 Not checked: a separate fresh-eye reviewer (`review.md`) was not run; touch
 on a real phone; Safari and Firefox; a pause, offscreen return or reduced
 motion toggled mid-play; every look but light and dark.

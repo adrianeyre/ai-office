@@ -192,59 +192,61 @@ export default function HeroDemo() {
     >
       {(s, _rect, layout) => (
         <>
-          <Window url="localhost:3045" className="hero-window">
-            <div className="hero-app">
-              {layout === "wide" && (
-                <div className="hero-side">
-                  <span className="hero-brand">
-                    <img src={icon} alt="" width={20} height={20} />
-                    <Text className="hero-brand-name">AI Office</Text>
-                  </span>
-                  {[58, 46, 64, 40].map((w, i) => (
-                    <span key={i} className="hero-nav">
-                      <Bar w={12} h={12} r={3} tone={2} />
-                      <Bar w={w} h={6} tone={2} />
+          <div className="aio-fade">
+            <Window url="localhost:3045" className="hero-window">
+              <div className="hero-app">
+                {layout === "wide" && (
+                  <div className="hero-side">
+                    <span className="hero-brand">
+                      <img src={icon} alt="" width={20} height={20} />
+                      <Text className="hero-brand-name">AI Office</Text>
                     </span>
-                  ))}
-                  <span className="hero-nav" data-on>
-                    <Bar w={12} h={12} r={3} tone={4} />
-                    <Text className="hero-nav-floor">web-shop</Text>
-                  </span>
-                </div>
-              )}
-              <div className="hero-main">
-                <div className="hero-head">
-                  <Text className="hero-title">
-                    {layout === "wide" ? "Issues" : "web-shop"}
-                  </Text>
-                  <span className="hero-tools">
-                    <Bar w={64} h={24} r={8} tone={2} />
-                    <Bar w={24} h={24} r={8} tone={2} />
-                  </span>
-                </div>
-                <div className="hero-list">
-                  <Issue s={s} layout={layout} />
-                  {QUEUE.map((q, i) => (
-                    <div key={i} className="hero-issue hero-issue--filler">
-                      <Bar w={28} h={28} r={14} tone={1} />
-                      <span className="hero-issue-text">
-                        <Bar w={q.title} h={7} tone={3} />
-                        <Bar w={q.line} h={6} tone={2} />
+                    {[58, 46, 64, 40].map((w, i) => (
+                      <span key={i} className="hero-nav">
+                        <Bar w={12} h={12} r={3} tone={2} />
+                        <Bar w={w} h={6} tone={2} />
                       </span>
-                      <Bar w={q.label} h={22} r={11} tone={1} />
-                    </div>
-                  ))}
+                    ))}
+                    <span className="hero-nav" data-on>
+                      <Bar w={12} h={12} r={3} tone={4} />
+                      <Text className="hero-nav-floor">web-shop</Text>
+                    </span>
+                  </div>
+                )}
+                <div className="hero-main">
+                  <div className="hero-head">
+                    <Text className="hero-title">
+                      {layout === "wide" ? "Issues" : "web-shop"}
+                    </Text>
+                    <span className="hero-tools">
+                      <Bar w={64} h={24} r={8} tone={2} />
+                      <Bar w={24} h={24} r={8} tone={2} />
+                    </span>
+                  </div>
+                  <div className="hero-list">
+                    <Issue s={s} layout={layout} />
+                    {QUEUE.map((q, i) => (
+                      <div key={i} className="hero-issue hero-issue--filler">
+                        <Bar w={28} h={28} r={14} tone={1} />
+                        <span className="hero-issue-text">
+                          <Bar w={q.title} h={7} tone={3} />
+                          <Bar w={q.line} h={6} tone={2} />
+                        </span>
+                        <Bar w={q.label} h={22} r={11} tone={1} />
+                      </div>
+                    ))}
+                  </div>
+                  <Toast
+                    className="hero-notice"
+                    show={s.notice}
+                    icon={<GitMerge size={14} strokeWidth={2} />}
+                  >
+                    Notice: PR #43 merged into main
+                  </Toast>
                 </div>
-                <Toast
-                  className="hero-notice"
-                  show={s.notice}
-                  icon={<GitMerge size={14} strokeWidth={2} />}
-                >
-                  Notice: PR #43 merged into main
-                </Toast>
               </div>
-            </div>
-          </Window>
+            </Window>
+          </div>
 
           <Window
             chrome="terminal"

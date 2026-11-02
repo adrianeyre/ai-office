@@ -1,28 +1,29 @@
-/* The Manager chat demo, as the `ai-chat` gold: the window pinned one
-   gutter from the top and wide sides of a quiet well, running off the
-   bottom just under the composer; the thread anchored over the composer,
-   older content going up out of the window. */
+/* The Manager chat demo, after the `ai-chat` gold, on the page's own
+   ground (no plate): the window across the column, a hair in for its
+   shadow, ending just under the composer, where it fades out; the thread
+   anchored over the composer, older content going up out of the window. */
 .mc {
   & .ss-stage {
     overflow: hidden;
-    border-radius: 20px;
-    background: var(--ss-well);
+    background: transparent;
   }
 
+  /* A short fade, under the composer only */
+  .mc-fade {
+    --aio-fade: 36px;
+  }
+
+  /* Runs 40px past the stage's foot, with the composer above the fade */
   .mc-win {
-    position: absolute;
-    top: 28px;
-    left: 56px;
-    width: 528px;
-    height: 540px;
-    box-shadow: var(--ss-shadow-hero);
+    height: calc(100% + 40px);
+    box-shadow: var(--ss-shadow-ground);
   }
 
   .mc-body {
     display: grid;
     grid-template-rows: 1fr auto;
     height: 100%;
-    padding: 16px 20px 56px;
+    padding: 16px 24px 80px;
     background: var(--ss-surface);
   }
 
@@ -151,7 +152,7 @@
   .mc-who {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     color: var(--ss-text);
     font-size: 11.5px;
   }
@@ -210,15 +211,8 @@
   }
 
   /* Compact: a gutter each side, the window full width of the stage */
-  & .ss-stage[data-layout="compact"] .mc-win {
-    top: 16px;
-    left: 16px;
-    width: 326px;
-    height: 600px;
-  }
-
   & .ss-stage[data-layout="compact"] .mc-body {
-    padding: 14px 14px 40px;
+    padding: 14px 14px 80px;
   }
 
   & .ss-stage[data-layout="compact"] .mc-plan-row {

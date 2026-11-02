@@ -1,22 +1,19 @@
-/* The hero demo. Corner bleed in a quiet well, as the `hero-demo` gold:
-   the app's window one gutter in from the top and left, running off the
-   right and the bottom; the Agent's live view comes forward over the
-   queue's filler rows, one gutter from the stage's right and bottom. */
+/* The hero demo, on the page's own ground (no plate): the app's window
+   fills the column, a hair in from its top and sides for its shadow, and
+   fades out at its foot over the queue's filler rows (the `fade-crop`
+   layout). The Agent's live view comes forward over those rows, one
+   gutter from the stage's right and bottom. */
 .hero-demo {
   & .ss-stage {
-    --gutter: 28px;
+    --gutter: 16px;
     overflow: hidden;
-    border-radius: 20px;
-    background: var(--ss-well);
+    background: transparent;
   }
 
+  /* Runs 40px past the stage's foot, inside the fade */
   .hero-window {
-    position: absolute;
-    top: var(--gutter);
-    left: var(--gutter);
-    width: 780px;
-    height: 470px;
-    box-shadow: var(--ss-shadow-hero);
+    height: calc(100% + 40px);
+    box-shadow: var(--ss-shadow-ground);
   }
 
   .hero-app {
@@ -91,11 +88,9 @@
     border-bottom: 1px solid var(--ss-line);
   }
 
-  /* The visible width ends at the stage's edge: the tools sit inside it */
   .hero-tools {
     display: flex;
     gap: 8px;
-    margin-right: 56px;
   }
 
   .hero-title {
@@ -115,7 +110,6 @@
     grid-template-columns: 28px minmax(0, 1fr) auto;
     align-items: center;
     gap: 12px;
-    width: 470px;
     padding: 10px 4px;
     border-bottom: 1px solid var(--ss-line-faint);
   }
@@ -157,16 +151,16 @@
   /* The Notice the app shows in its corner when one arrives */
   .hero-notice {
     position: absolute;
-    top: 286px;
-    right: 108px;
+    top: 196px;
+    right: 20px;
   }
 
   /* The live view: the app's dark terminal, in front of the queue */
   .hero-live {
     --ss-term-bg: #0f1024;
     position: absolute;
-    right: var(--gutter);
-    bottom: var(--gutter);
+    right: 32px;
+    bottom: 28px;
     z-index: 2;
     width: 352px;
     height: 148px;
@@ -205,27 +199,17 @@
     color: var(--ss-term-ok);
   }
 
-  /* Compact: the Floor alone, no sidebar, one gutter from the top and left
-     and off the right; the live view under the issue, full width */
-  & .ss-stage[data-layout="compact"] {
-    --gutter: 16px;
-  }
-
-  & .ss-stage[data-layout="compact"] .hero-window {
-    width: 380px;
-    height: 460px;
+  /* Compact: the Floor alone, no sidebar, across the column and fading at
+     its foot; the live view under the issue, full width */
+  & .ss-stage[data-layout="compact"] .aio-fade {
+    --aio-fade: 110px;
   }
 
   & .ss-stage[data-layout="compact"] .hero-main {
     padding: 14px 14px;
   }
 
-  & .ss-stage[data-layout="compact"] .hero-tools {
-    margin-right: 22px;
-  }
-
   & .ss-stage[data-layout="compact"] .hero-issue {
-    width: 326px;
     grid-template-columns: 28px minmax(0, 1fr);
     row-gap: 8px;
   }
@@ -240,13 +224,13 @@
   }
 
   & .ss-stage[data-layout="compact"] .hero-notice {
-    top: 196px;
-    right: auto;
-    left: 14px;
+    top: 156px;
+    right: 14px;
   }
 
   & .ss-stage[data-layout="compact"] .hero-live {
-    left: var(--gutter);
+    right: 24px;
+    left: 24px;
     width: auto;
     height: 136px;
   }

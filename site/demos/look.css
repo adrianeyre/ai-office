@@ -124,6 +124,23 @@
   --ss-term-bg: #08091a;
 }
 
+/* The fade crop (the `fade-crop` gold): a window a full gutter in from
+   the stage's top and sides runs off its foot, and this wrapper's mask
+   fades it out over the last stretch, so the window keeps its shadow on
+   three sides and is never sliced by a hard edge on the page. */
+.aio .aio-fade {
+  --aio-fade: 150px;
+  position: absolute;
+  inset: 0;
+  padding: 16px 16px 0;
+  mask-image: linear-gradient(
+    to bottom,
+    #000 calc(100% - var(--aio-fade)),
+    transparent
+  );
+  mask-repeat: no-repeat;
+}
+
 /* A GitHub label, as the app shows a Stage's: a tinted pill in its tone */
 .aio .aio-label {
   display: inline-flex;

@@ -1,22 +1,23 @@
-/* The AI Gateway demo, as the `subscriptions` gold: the requests page
-   pinned one gutter from the top and right, off the bottom; the AI
+/* The AI Gateway demo, after the `subscriptions` gold, on the page's own
+   ground (no plate): the requests page a hair in from the top and right
+   for its shadow, fading out at its foot over earlier requests; the AI
    Accounts card straddling its left edge, over the sidebar (chrome, never
-   content). */
+   content), whole. */
 .gw {
   & .ss-stage {
-    --gutter: 28px;
+    --gutter: 16px;
     overflow: hidden;
-    border-radius: 20px;
-    background: var(--ss-well);
+    background: transparent;
+  }
+
+  /* The page starts past the card's middle, so the card straddles it */
+  .gw-fade {
+    padding-left: 148px;
   }
 
   .gw-window {
-    position: absolute;
-    top: var(--gutter);
-    right: var(--gutter);
-    width: 516px;
-    height: 460px;
-    box-shadow: var(--ss-shadow-hero);
+    height: calc(100% + 40px);
+    box-shadow: var(--ss-shadow-ground);
   }
 
   .gw-app {
@@ -121,11 +122,9 @@
 
   /* ---- The AI Accounts card ---- */
 
-  /* A satellite that runs off the foot of the stage, past a filler
-     account, so only filler is cut */
   .gw-accounts {
     position: absolute;
-    bottom: -36px;
+    top: 112px;
     left: var(--gutter);
     z-index: 1;
     display: grid;
@@ -181,28 +180,16 @@
 
   /* Compact: the requests page across the top, off the right, without its
      sidebar or Model column; the AI Accounts card over its earlier rows */
-  & .ss-stage[data-layout="compact"] {
-    --gutter: 16px;
-  }
-
-  & .ss-stage[data-layout="compact"] .gw-window {
-    right: auto;
-    left: var(--gutter);
-    width: 380px;
-    height: 560px;
+  & .ss-stage[data-layout="compact"] .gw-fade {
+    padding-left: 16px;
   }
 
   & .ss-stage[data-layout="compact"] .gw-main {
     padding: 14px 14px;
   }
 
-  & .ss-stage[data-layout="compact"] .gw-head > :last-child {
-    margin-right: 24px;
-  }
-
   & .ss-stage[data-layout="compact"] .gw-row {
     grid-template-columns: 60px minmax(0, 1fr) 44px;
-    width: 326px;
   }
 
   & .ss-stage[data-layout="compact"] .gw-row > :nth-child(2) {
@@ -210,8 +197,10 @@
   }
 
   & .ss-stage[data-layout="compact"] .gw-accounts {
-    right: var(--gutter);
-    bottom: var(--gutter);
+    top: auto;
+    right: 28px;
+    bottom: 28px;
+    left: 28px;
     width: auto;
   }
 }
