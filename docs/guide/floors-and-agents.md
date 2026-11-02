@@ -150,6 +150,7 @@ The built-in templates are:
 | **Data & analytics** | an analytics engineer (work), a data reviewer (review, its required reviewer) and data-quality QA | checks: `dbt test` and `sqlfluff lint` on the sample data's `ci` target; Skill `dbt-checks`; theme `observatory` |
 | **Infrastructure** | a platform engineer (work), a security reviewer (review, its required reviewer) and plan QA | checks: `terraform fmt`, `validate`, `plan` from no state, and checkov's policy checks, never an apply; Skill `terraform-checks`; theme `data-centre` |
 | **Mobile app** | a mobile developer (work), the built-in reviewer (its required reviewer) and device-test QA | checks: unit and simulator tests; Skill `mobile-checks`; theme `device-lab` |
+| **Local** | a local coder (work), a local reviewer (review, its required reviewer) and local QA, each suggesting the Ollama AI Provider and the one shared Model `qwen3.6:27b` | Merge Policy "send to me", Round Cap 3; checks: one `npm run check` its first issue sets up; the Manager plans small issues that name their files, with explicit acceptance criteria, one change per pull request; never acts on a production service or a package registry; theme `office` |
 
 #### Online store, Website & marketing and Content & blog
 

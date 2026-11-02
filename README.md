@@ -238,7 +238,12 @@ examples; component tests, visual snapshots and contrast; `dbt test` and
 SQL lint on sample data; `terraform plan` from no state and policy
 checks, and never an apply; unit and simulator tests. Each says plainly
 what its Floor never acts on (the live docs site, a package registry,
-the production warehouse, live infrastructure, the app stores). The
+the production warehouse, live infrastructure, the app stores).
+**Local** (a local coder, a local reviewer and local QA) is a software
+team on the Owner's own Models: every Role suggests the Ollama AI
+Provider and one shared Model, `qwen3.6:27b`, and its Manager plans
+small issues that name their files, with explicit acceptance criteria,
+one change per pull request. The
 template's Roles and Skills join
 the Role and Skill libraries where they are missing; the Floor remembers
 which template it started from, and nothing depends on the template
@@ -247,7 +252,7 @@ shelves and parcels for Online store, a photo studio for Website &
 marketing, bookshelves and a printing press for Content & blog, a wall of
 bookcases for Documentation, colour swatches for Design system, wall
 dashboards for Data & analytics, server racks for Infrastructure and a
-wall of phones for Mobile app; Development and Blank keep the office as
+wall of phones for Mobile app; Development, Blank and Local keep the office as
 it was. Each desk is dressed as its Role is in the Role library (a
 copywriter's notebooks, a merchandiser's product samples). Themes and
 dressing are decoration only. Built-in

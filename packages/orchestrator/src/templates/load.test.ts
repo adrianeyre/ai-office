@@ -50,6 +50,7 @@ describe("the built-in Floor Templates", () => {
       "design-system",
       "documentation",
       "infrastructure",
+      "local",
       "mobile-app",
       "online-store",
       "website-and-marketing",
@@ -315,6 +316,23 @@ describe("the built-in Floor Templates", () => {
       skills: ["terraform-checks"],
       firstIssue: "Set up the infrastructure's checks",
       setupCommand: "",
+    },
+    {
+      id: "local",
+      name: "Local",
+      icon: "server",
+      theme: "office",
+      // Every Role on Ollama, on one shared Model (local.test.ts).
+      team: [
+        ["local-coder", "local coder", "work", "Ollama", []],
+        ["local-reviewer", "local reviewer", "review", "Ollama", []],
+        ["local-qa", "local QA", "qa", "Ollama", []],
+      ],
+      checks: ["check"],
+      requiredReviewers: ["local-reviewer"],
+      skills: [],
+      firstIssue: "Set up the repository's checks",
+      setupCommand: npmInstall,
     },
     {
       id: "mobile-app",

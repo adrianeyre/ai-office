@@ -289,6 +289,32 @@ const cases: Case[] = [
             enabled: true,
           },
           {
+            id: "local",
+            name: "Local",
+            description:
+              "A software team on your own Models through Ollama, sharing one Model, that makes one small change per pull request in its repository, reviews it and tests it.",
+            icon: "server",
+            theme: "office",
+            team: [
+              { role: "manager", name: "Manager", stage: null, count: 1 },
+              {
+                role: "local-coder",
+                name: "local coder",
+                stage: "work",
+                count: 1,
+              },
+              {
+                role: "local-reviewer",
+                name: "local reviewer",
+                stage: "review",
+                count: 1,
+              },
+              { role: "local-qa", name: "local QA", stage: "qa", count: 1 },
+            ],
+            builtIn: true,
+            enabled: true,
+          },
+          {
             id: "mobile-app",
             name: "Mobile app",
             description:

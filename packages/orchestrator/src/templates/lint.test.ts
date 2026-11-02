@@ -33,6 +33,7 @@ const linted = [
   "data-and-analytics",
   "infrastructure",
   "mobile-app",
+  "local",
 ];
 
 const builtIn = async (id: string): Promise<FloorTemplate> => {
