@@ -456,6 +456,20 @@ export function createMergeFlow(options: MergeFlowOptions): MergeFlow {
   };
 
   /**
+   * The most of a diff the Floor's reviewers can be shown, as the review
+   * Stage has them: the gate and the Batch's pull request body both ask it.
+   */
+  const diffLimitFor = async (floor: FloorRecord) =>
+    reviewersDiffLimit(
+      (await options.agents.list(floor.id)).filter(
+        (agent) =>
+          agent.enabled && floor.requiredReviewerAgentIds.includes(agent.id),
+      ),
+      await options.defaultModels?.(),
+      options.contextWindow,
+    );
+
+  /**
    * What the gate makes of the pull request at its head, CI aside: why it
    * may not merge automatically, and whether its reviewers should review
    * it again instead, when all that stands in the way is commits pushed
@@ -474,19 +488,10 @@ export function createMergeFlow(options: MergeFlowOptions): MergeFlow {
   }> => {
     const team = await options.agents.list(floor.id);
     const head = pullRequest.head.sha;
-    // Shown in full to the Floor's reviewers as the review Stage has them.
-    const reviewers = team.filter(
-      (agent) =>
-        agent.enabled && floor.requiredReviewerAgentIds.includes(agent.id),
-    );
     const common = await changesOwnerOnly(
       client,
       pullRequest,
-      await reviewersDiffLimit(
-        reviewers,
-        await options.defaultModels?.(),
-        options.contextWindow,
-      ),
+      await diffLimitFor(floor),
     );
     const reasons = [...common];
     const again: Issue[] = [];
@@ -766,6 +771,7 @@ export function createMergeFlow(options: MergeFlowOptions): MergeFlow {
         floorId: floor.id,
         base: floor.defaultBranch,
         batch,
+        diffLimit: await diffLimitFor(floor),
       });
     }
     const policy =
