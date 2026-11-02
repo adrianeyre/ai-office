@@ -1,0 +1,209 @@
+/* The bento grid's pictures (demos/bento.tsx). The tiles, their copy and
+   the grid are the page's (styles.css, .bento); each picture is a Stage
+   as wide as its tile's slot, on a transparent ground, so the tile's own
+   surface is the ground and the tile crops the picture. */
+.bt-stage .ss-stage {
+  overflow: hidden;
+  background: transparent;
+}
+
+/* ---- Notices (hero): a window one tile gutter in, off the right and
+   the bottom ---- */
+
+.bt-stage .bt-window {
+  position: absolute;
+  top: 28px;
+  left: 28px;
+  width: calc(100% + 28px);
+  height: 320px;
+  box-shadow: var(--ss-shadow-hero);
+}
+
+.bt-stage .bt-notices {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  /* The window runs 56px past the tile: its rows stop a gutter short of
+     the tile's edge */
+  padding: 10px 74px 0 18px;
+  background: var(--ss-surface);
+}
+
+.bt-stage .bt-notice {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--ss-line-faint);
+}
+
+/* Narrow: the action goes under the notice's words, so they stay whole */
+.bt-stage .bt-window[data-compact] .bt-notices {
+  padding-right: 74px;
+}
+
+.bt-stage .bt-window[data-compact] .bt-notice {
+  grid-template-columns: 32px minmax(0, 1fr);
+  row-gap: 10px;
+}
+
+.bt-stage .bt-window[data-compact] .bt-button {
+  grid-column: 2;
+  justify-self: start;
+}
+
+.bt-stage .bt-notice-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--ss-accent-soft);
+  color: var(--ss-accent-text);
+}
+
+.bt-stage .bt-notice-text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.bt-stage .bt-notice-text--filler {
+  gap: 10px;
+}
+
+.bt-stage .bt-notice-title {
+  color: var(--ss-text-strong);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.bt-stage .bt-notice-line {
+  color: var(--ss-text);
+  font-size: 11.5px;
+}
+
+.bt-stage .bt-button {
+  display: inline-grid;
+  place-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--ss-radius-md);
+  background: var(--ss-accent);
+  color: var(--aio-on-accent);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.25s ease;
+}
+
+.bt-stage .bt-button[data-on] {
+  background: var(--ss-success);
+  color: #fff;
+}
+
+.bt-stage .ss-stage[data-theme="dark"] .bt-button[data-on] {
+  color: #052e16;
+}
+
+.bt-stage .bt-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---- The two components: a card at the tile's gutter, off the foot ---- */
+
+.bt-stage .bt-card {
+  position: absolute;
+  top: 28px;
+  right: 28px;
+  left: 28px;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--ss-raised);
+  box-shadow: var(--ss-shadow-satellite);
+}
+
+.bt-stage .bt-cap-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.bt-stage .bt-strong {
+  color: var(--ss-text-strong);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.bt-stage .bt-muted {
+  color: var(--ss-text);
+  font-size: 11.5px;
+}
+
+.bt-stage .bt-cap-figure {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.bt-stage .bt-cap-value {
+  color: var(--ss-text-strong);
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.bt-stage .bt-cap-meter {
+  height: 8px;
+  border-radius: 4px;
+}
+
+.bt-stage .bt-seg {
+  --ss-row: 32px;
+}
+
+.bt-stage .bt-seg .ss-seg__option {
+  white-space: nowrap;
+}
+
+/* ---- Connections: a row of marks, running off the right ---- */
+
+.bt-stage .bt-marks {
+  position: absolute;
+  top: 28px;
+  left: 28px;
+  display: grid;
+  gap: 10px;
+}
+
+/* Two rows, the second offset, both running off the tile's right edge */
+.bt-stage .bt-marks-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 10px;
+}
+
+.bt-stage .bt-marks-row + .bt-marks-row {
+  margin-left: 48px;
+}
+
+.bt-stage .bt-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 14px 0 8px;
+  border-radius: 12px;
+  background: var(--ss-raised);
+  box-shadow: var(--ss-shadow-card);
+  color: var(--ss-text-strong);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}

@@ -1,0 +1,21 @@
+{
+  // Type-checks the product demos and the vendored Stageshow kit they are
+  // built on (../stageshow/), which Vite bundles: modules resolve as a
+  // bundler resolves them, and JSX is React's. The kit is written to plain
+  // `strict`, not to the repository's stricter checks, and is kept as
+  // published, so those checks are off here; ESLint still holds the demos'
+  // own code to the rest.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    "noUncheckedIndexedAccess": false,
+    "noPropertyAccessFromIndexSignature": false,
+    "exactOptionalPropertyTypes": false,
+    "noUnusedLocals": false
+  },
+  "include": [".", "../stageshow/kit"]
+}

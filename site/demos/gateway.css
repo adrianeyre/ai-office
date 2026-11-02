@@ -1,0 +1,217 @@
+/* The AI Gateway demo, as the `subscriptions` gold: the requests page
+   pinned one gutter from the top and right, off the bottom; the AI
+   Accounts card straddling its left edge, over the sidebar (chrome, never
+   content). */
+.gw {
+  & .ss-stage {
+    --gutter: 28px;
+    overflow: hidden;
+    border-radius: 20px;
+    background: var(--ss-well);
+  }
+
+  .gw-window {
+    position: absolute;
+    top: var(--gutter);
+    right: var(--gutter);
+    width: 516px;
+    height: 460px;
+    box-shadow: var(--ss-shadow-hero);
+  }
+
+  .gw-app {
+    display: flex;
+    height: 100%;
+    background: var(--ss-surface);
+  }
+
+  .gw-side {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 4px;
+    width: 132px;
+    padding: 14px 10px;
+    background: var(--ss-canvas);
+    border-right: 1px solid var(--ss-line);
+  }
+
+  .gw-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 28px;
+    padding: 0 8px;
+    border-radius: var(--ss-radius-md);
+  }
+
+  .gw-nav[data-on] {
+    background: var(--ss-surface);
+    box-shadow: var(--ss-shadow-card);
+  }
+
+  .gw-main {
+    flex: 1;
+    min-width: 0;
+    padding: 16px;
+  }
+
+  .gw-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 12px;
+  }
+
+  .gw-title {
+    color: var(--ss-text-strong);
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .gw-table {
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid var(--ss-line);
+  }
+
+  .gw-row {
+    display: grid;
+    grid-template-columns: 64px 108px minmax(0, 1fr) 48px;
+    align-items: center;
+    gap: 12px;
+    height: 38px;
+    padding: 0 4px;
+    border-bottom: 1px solid var(--ss-line-faint);
+    color: var(--ss-text);
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+
+  .gw-row--head {
+    height: 32px;
+    color: var(--ss-text-faint);
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .gw-agent {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ss-text-strong);
+    font-weight: 500;
+  }
+
+  .gw-model {
+    font-family: var(--ss-mono);
+    font-size: 10.5px;
+  }
+
+  .gw-num {
+    justify-self: end;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The request the story ends on: served by the other Claude account */
+  .gw-row[data-fallback] .gw-account {
+    color: var(--ss-accent-text);
+    font-weight: 600;
+  }
+
+  /* ---- The AI Accounts card ---- */
+
+  /* A satellite that runs off the foot of the stage, past a filler
+     account, so only filler is cut */
+  .gw-accounts {
+    position: absolute;
+    bottom: -36px;
+    left: var(--gutter);
+    z-index: 1;
+    display: grid;
+    gap: 14px;
+    width: 268px;
+    padding: 16px;
+    border-radius: 14px;
+    background: var(--ss-raised);
+    box-shadow: var(--ss-shadow-satellite);
+  }
+
+  .gw-accounts-head,
+  .gw-account-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .gw-account {
+    display: grid;
+    gap: 8px;
+  }
+
+  .gw-strong {
+    color: var(--ss-text-strong);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .gw-muted {
+    color: var(--ss-text-faint);
+    font-size: 11px;
+  }
+
+  .gw-account-name {
+    color: var(--ss-text-strong);
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .gw-meter {
+    flex: 1;
+  }
+
+  .gw-percent {
+    width: 32px;
+    color: var(--ss-text);
+    font-size: 11px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Compact: the requests page across the top, off the right, without its
+     sidebar or Model column; the AI Accounts card over its earlier rows */
+  & .ss-stage[data-layout="compact"] {
+    --gutter: 16px;
+  }
+
+  & .ss-stage[data-layout="compact"] .gw-window {
+    right: auto;
+    left: var(--gutter);
+    width: 380px;
+    height: 560px;
+  }
+
+  & .ss-stage[data-layout="compact"] .gw-main {
+    padding: 14px 14px;
+  }
+
+  & .ss-stage[data-layout="compact"] .gw-head > :last-child {
+    margin-right: 24px;
+  }
+
+  & .ss-stage[data-layout="compact"] .gw-row {
+    grid-template-columns: 60px minmax(0, 1fr) 44px;
+    width: 326px;
+  }
+
+  & .ss-stage[data-layout="compact"] .gw-row > :nth-child(2) {
+    display: none;
+  }
+
+  & .ss-stage[data-layout="compact"] .gw-accounts {
+    right: var(--gutter);
+    bottom: var(--gutter);
+    width: auto;
+  }
+}

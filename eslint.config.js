@@ -7,7 +7,8 @@ import tseslint from "typescript-eslint";
 
 export default defineConfig(
   // `.sandcastle/` is the harness that runs agents on this repository, not
-  // part of AI Office, and `docs/` is prose.
+  // part of AI Office, `docs/` is prose, and `site/stageshow/` is the
+  // Stageshow kit, vendored as published.
   globalIgnores([
     "**/dist/",
     "**/coverage/",
@@ -15,6 +16,7 @@ export default defineConfig(
     "**/playwright-report/",
     ".sandcastle/",
     "docs/",
+    "site/stageshow/",
   ]),
   eslint.configs.recommended,
   tseslint.configs.strictTypeChecked,
@@ -28,7 +30,7 @@ export default defineConfig(
     },
   },
   {
-    files: ["apps/web/**/*.{ts,tsx}"],
+    files: ["apps/web/**/*.{ts,tsx}", "site/**/*.{ts,tsx}"],
     extends: [reactHooks.configs.flat["recommended-latest"]],
   },
   // Formatting is Prettier's job; this turns off every rule that disagrees.

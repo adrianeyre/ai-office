@@ -1,0 +1,253 @@
+/* The hero demo. Corner bleed in a quiet well, as the `hero-demo` gold:
+   the app's window one gutter in from the top and left, running off the
+   right and the bottom; the Agent's live view comes forward over the
+   queue's filler rows, one gutter from the stage's right and bottom. */
+.hero-demo {
+  & .ss-stage {
+    --gutter: 28px;
+    overflow: hidden;
+    border-radius: 20px;
+    background: var(--ss-well);
+  }
+
+  .hero-window {
+    position: absolute;
+    top: var(--gutter);
+    left: var(--gutter);
+    width: 780px;
+    height: 470px;
+    box-shadow: var(--ss-shadow-hero);
+  }
+
+  .hero-app {
+    display: flex;
+    height: 100%;
+    background: var(--ss-surface);
+  }
+
+  .hero-side {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 4px;
+    width: 168px;
+    padding: 14px 10px;
+    background: var(--ss-canvas);
+    border-right: 1px solid var(--ss-line);
+  }
+
+  .hero-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 6px 12px;
+  }
+
+  .hero-brand img {
+    display: block;
+    border-radius: 5px;
+  }
+
+  .hero-brand-name {
+    color: var(--ss-text-strong);
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+
+  .hero-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 28px;
+    padding: 0 8px;
+    border-radius: var(--ss-radius-md);
+  }
+
+  .hero-nav[data-on] {
+    background: var(--ss-surface);
+    box-shadow: var(--ss-shadow-card);
+  }
+
+  .hero-nav-floor {
+    color: var(--ss-text-strong);
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .hero-main {
+    position: relative;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    padding: 16px 20px;
+  }
+
+  .hero-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4px 12px;
+    border-bottom: 1px solid var(--ss-line);
+  }
+
+  /* The visible width ends at the stage's edge: the tools sit inside it */
+  .hero-tools {
+    display: flex;
+    gap: 8px;
+    margin-right: 56px;
+  }
+
+  .hero-title {
+    color: var(--ss-text-strong);
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .hero-list {
+    display: flex;
+    flex-direction: column;
+    padding-top: 6px;
+  }
+
+  .hero-issue {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    width: 470px;
+    padding: 10px 4px;
+    border-bottom: 1px solid var(--ss-line-faint);
+  }
+
+  .hero-issue-text {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .hero-issue--filler .hero-issue-text {
+    gap: 8px;
+  }
+
+  .hero-issue-title {
+    color: var(--ss-text-strong);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+
+  .hero-number {
+    color: var(--ss-text-faint);
+    font-weight: 500;
+  }
+
+  .hero-issue-line {
+    color: var(--ss-text);
+    font-size: 11.5px;
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+
+  .hero-lead {
+    display: grid;
+  }
+
+  /* The Notice the app shows in its corner when one arrives */
+  .hero-notice {
+    position: absolute;
+    top: 286px;
+    right: 108px;
+  }
+
+  /* The live view: the app's dark terminal, in front of the queue */
+  .hero-live {
+    --ss-term-bg: #0f1024;
+    position: absolute;
+    right: var(--gutter);
+    bottom: var(--gutter);
+    z-index: 2;
+    width: 352px;
+    height: 148px;
+    opacity: 0;
+    will-change: transform;
+    transform: translateY(12px) scale(0.98);
+    transition:
+      opacity 0.3s ease,
+      transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .hero-live[data-show] {
+    opacity: 1;
+    transform: none;
+  }
+
+  .hero-live-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .hero-live-line {
+    display: flex;
+    gap: 1ch;
+    color: #c9cdf2;
+    white-space: pre;
+  }
+
+  .hero-live-mark {
+    width: 1ch;
+    color: var(--ss-term-dim);
+  }
+
+  .hero-live-line[data-ok] .hero-live-mark {
+    color: var(--ss-term-ok);
+  }
+
+  /* Compact: the Floor alone, no sidebar, one gutter from the top and left
+     and off the right; the live view under the issue, full width */
+  & .ss-stage[data-layout="compact"] {
+    --gutter: 16px;
+  }
+
+  & .ss-stage[data-layout="compact"] .hero-window {
+    width: 380px;
+    height: 460px;
+  }
+
+  & .ss-stage[data-layout="compact"] .hero-main {
+    padding: 14px 14px;
+  }
+
+  & .ss-stage[data-layout="compact"] .hero-tools {
+    margin-right: 22px;
+  }
+
+  & .ss-stage[data-layout="compact"] .hero-issue {
+    width: 326px;
+    grid-template-columns: 28px minmax(0, 1fr);
+    row-gap: 8px;
+  }
+
+  & .ss-stage[data-layout="compact"] .hero-label-slot {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  & .ss-stage[data-layout="compact"] .hero-issue--filler > :last-child {
+    display: none;
+  }
+
+  & .ss-stage[data-layout="compact"] .hero-notice {
+    top: 196px;
+    right: auto;
+    left: 14px;
+  }
+
+  & .ss-stage[data-layout="compact"] .hero-live {
+    left: var(--gutter);
+    width: auto;
+    height: 136px;
+  }
+}
