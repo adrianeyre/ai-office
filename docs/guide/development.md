@@ -29,6 +29,8 @@ pnpm install
 | `pnpm e2e`       | Builds the web app, then runs the Playwright end-to-end tests |
 | `pnpm scenes`    | Screenshot tests of the 3D scenes in headless Chromium with software WebGL, without a GPU: the 3D Office's key scenes (see [Scene screenshot tests](#scene-screenshot-tests)) and a Floor in each 3D theme (see [the guide](web-app.md#screenshot-tests-of-the-3d-scenes)) |
 | `pnpm screenshots` | Builds the web app, then retakes the README's screenshots in `docs/images/` |
+| `pnpm site:build` | Builds the project website (`site/`, its stageshow demos bundled by Vite) in `site/dist/` |
+| `pnpm site:dev` / `pnpm site:preview` | Serves the website as you change it / serves the built `site/dist/` |
 | `pnpm sandbox:build` | Builds the sandbox images for Claude Code, Codex and opencode (needs Docker); for compose, `AGENT_UID=1000 AGENT_GID=1000 pnpm sandbox:build` |
 | `pnpm sandbox:ensure` | Builds only the sandbox images not built yet; `pnpm dev` runs it first |
 | `docker compose up --build` | Runs the whole AI Office in Docker: the app, Postgres, and Agents' and the Manager chat's sandboxes, started from inside the app (build the sandbox images first, as above); see [Running with docker compose](running.md#running-ai-office-with-docker-compose) |
