@@ -1162,6 +1162,12 @@ export const officeSettings = pgTable(
      * `seasonalEventsSchema` (packages/shared) checks them; null until set.
      */
     seasonalEvents: jsonb("seasonal_events"),
+    /**
+     * The watchdog's stall timeout and the sandbox time limit, in minutes,
+     * and each AI Provider's own, as `watchdogSettingsSchema`
+     * (packages/shared) checks them; null until set.
+     */
+    watchdog: jsonb("watchdog"),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
   },
   (table) => [

@@ -746,6 +746,7 @@ CREATE TABLE "office_settings" (
 	"lobby_cast" jsonb,
 	"floor_activities" jsonb,
 	"seasonal_events" jsonb,
+	"watchdog" jsonb,
 	"updated_at" timestamp with time zone NOT NULL,
 	CONSTRAINT "office_settings_single_row" CHECK ("office_settings"."id" = 1),
 	CONSTRAINT "office_settings_outbound_proxy" CHECK (("office_settings"."gateway_outbound_proxy_url" IS NOT NULL OR "office_settings"."gateway_outbound_proxy_username" IS NULL) AND ("office_settings"."gateway_outbound_proxy_username" IS NOT NULL OR "office_settings"."gateway_outbound_proxy_password" IS NULL) AND ("office_settings"."gateway_outbound_proxy_password" IS NULL OR "office_settings"."gateway_outbound_proxy_password" LIKE 'aio1:%')),

@@ -352,6 +352,56 @@ const cases: Case[] = [
     },
   ],
   [
+    "stalls work after 20 minutes and kills a sandbox after an hour by default, and sets other limits, per AI Provider too",
+    async (setup) => {
+      const path = "/api/office/watchdog";
+      const before = await request(setup, "GET", path);
+      expect(before.statusCode).toBe(200);
+      expect(before.json()).toEqual({
+        stallTimeoutMinutes: 20,
+        sandboxTimeLimitMinutes: 60,
+        providers: {},
+      });
+
+      const chosen = {
+        stallTimeoutMinutes: 30,
+        sandboxTimeLimitMinutes: 60,
+        providers: { Ollama: { sandboxTimeLimitMinutes: 240 } },
+      };
+      const set = await request(setup, "PUT", path, chosen);
+      expect(set.statusCode).toBe(200);
+      expect(set.json()).toEqual(chosen);
+      expect((await request(setup, "GET", path)).json()).toEqual(chosen);
+      // What changed, never the values.
+      expect(
+        (await setup.bus.eventsAfter(0)).map(({ event }) => event),
+      ).toContainEqual({
+        type: "config.changed",
+        version: 1,
+        scope: "office",
+        keys: ["watchdog.stallTimeoutMinutes", "watchdog.providers.Ollama"],
+      });
+
+      for (const payload of [
+        {},
+        { ...chosen, stallTimeoutMinutes: 4 },
+        { ...chosen, stallTimeoutMinutes: 241 },
+        { ...chosen, sandboxTimeLimitMinutes: 9 },
+        { ...chosen, sandboxTimeLimitMinutes: 481 },
+        { ...chosen, stallTimeoutMinutes: "30" },
+        { ...chosen, providers: { Ollama: { stallTimeoutMinutes: 1 } } },
+        { ...chosen, providers: { Llama: { stallTimeoutMinutes: 30 } } },
+      ]) {
+        const response = await request(setup, "PUT", path, payload);
+        expect({ payload, status: response.statusCode }).toEqual({
+          payload,
+          status: 400,
+        });
+      }
+      expect((await request(setup, "GET", path)).json()).toEqual(chosen);
+    },
+  ],
+  [
     "keeps bodies 7 days, records 90, the Activity Feed a year and delivery logs 90 days by default, and sets other periods",
     async (setup) => {
       const before = await request(setup, "GET", "/api/office/retention");

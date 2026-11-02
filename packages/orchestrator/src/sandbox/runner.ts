@@ -246,8 +246,12 @@ export interface SandboxRunnerOptions {
   readonly screens?: ToolCallScreens;
   /** Where clones are made, one directory per run. */
   readonly workDir: string;
-  /** How long a run may take in all; an hour by default. */
-  readonly timeoutMs?: number;
+  /**
+   * How long a run may take in all; an hour by default. As a function,
+   * asked as each run starts (the Owner's sandbox time limit for the
+   * task's AI Provider), so a change applies from the next run.
+   */
+  readonly timeoutMs?: number | ((task: SandboxTask) => Promise<number>);
   /** How long the Agent may be silent; 10 minutes by default. */
   readonly idleTimeoutSeconds?: number;
   /** How long the setup command may take; 15 minutes by default. */
@@ -469,7 +473,10 @@ export function createSandboxRunner(
   // Sandcastle's own Git on the host runs nothing the Agent's repository
   // names (S1-2).
   guardSandcastleGit();
-  const timeoutMs = options.timeoutMs ?? 60 * 60 * 1000;
+  const timeoutMs = async (task: SandboxTask): Promise<number> =>
+    typeof options.timeoutMs === "function"
+      ? options.timeoutMs(task)
+      : (options.timeoutMs ?? 60 * 60 * 1000);
 
   return {
     async run(task) {
@@ -601,7 +608,7 @@ export function createSandboxRunner(
         }
       };
 
-      const timeout = AbortSignal.timeout(timeoutMs);
+      const timeout = AbortSignal.timeout(await timeoutMs(task));
       const signal = AbortSignal.any([
         ...(task.signal === undefined ? [] : [task.signal]),
         timeout,

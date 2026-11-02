@@ -19,6 +19,7 @@ import {
   requestBodiesSettingsSchema,
   retentionSettingsSchema,
   sandboxSettingsSchema,
+  watchdogSettingsSchema,
 } from "@ai-office/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -29,7 +30,8 @@ import { sendFloorError } from "../floors/routes.ts";
 // The office admin's settings (PRD FR-65). So far: the Git identity agent
 // commits are by (FR-68), which each Floor can override in its own
 // settings; intake's (FR-8): the Owner's GitHub login and how often intake
-// checks for issues; how many sandboxes may run at once (FR-22); and
+// checks for issues; how many sandboxes may run at once (FR-22), how long
+// each may run and how long work may stall (FR-23); and
 // whether the AI Gateway keeps request and response bodies (FR-44); how it
 // balances requests (FR-37); how it retries them (FR-39); the TTL it
 // gives prompt-cache breakpoints (§6.8), and whether it keeps Agents'
@@ -175,6 +177,26 @@ export function registerOfficeRoutes(
       const sandboxes = await settings.setSandboxSettings(parsed.data);
       request.log.info("The office's sandbox limit was set.");
       return sandboxes;
+    },
+  );
+
+  // The watchdog's stall timeout and the sandbox time limit, and each AI
+  // Provider's own.
+  app.get("/api/office/watchdog", { config: { access: "owner" } }, () =>
+    settings.watchdogSettings(),
+  );
+
+  app.put(
+    "/api/office/watchdog",
+    { config: { access: "owner" } },
+    async (request, reply) => {
+      const parsed = watchdogSettingsSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return sendInvalidRequest(reply, parsed.error);
+      }
+      const watchdog = await settings.setWatchdogSettings(parsed.data);
+      request.log.info("The watchdog's time limits were set.");
+      return watchdog;
     },
   );
 
