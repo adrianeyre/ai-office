@@ -721,8 +721,15 @@ Floor without a QA Agent skips the stage: approval moves the issue on to
    has one. The issue and the Handoff are quoted, as for the coder.
 2. **Its report.** It ends with a `<qa-report>` block: `Result: pass` or
    `fail`, a summary, and for a failure the steps that reproduce it
-   (`parseQaReport`). A run without one blocks the Agent ("Agent blocked:
-   … gave no QA result"), and the issue stays at `needs-qa`.
+   (`parseQaReport`). A run without a valid one is asked for it once
+   more, as a reviewer's answer that is not a verdict is: one model call
+   through the AI Gateway with the Agent's own Gateway Key, quoting its
+   last message and asking for the block alone, in its form (`askAgain`).
+   The call is attributed to the Agent and the issue and counts against
+   its Token Caps like any other; a run that ended with its report makes
+   none. If the answer has no valid block either, the Agent is blocked
+   ("Agent blocked: … gave no QA result …, even when asked again"), and
+   the issue stays at `needs-qa`.
 3. **Tests it added are pushed** as the coder's commits are (as the Owner,
    with its `Agent:` trailer), and the App comments the result on the
    pull request ("**QA passed**" or "**QA failed**", with the steps). Each
@@ -809,8 +816,11 @@ without a designer skips it.
 3. **Its report.** It ends with a `<design-review>` block: `Result: pass`
    or `changes`, a summary, and for changes the numbered findings (screen,
    what is wrong, what the guide says, the component or CSS change)
-   (`parseDesignReport`). A run without one blocks the Agent ("Agent
-   blocked: … gave no design review"), and the issue stays at `needs-qa`.
+   (`parseDesignReport`). A run without a valid one is asked for it once
+   more, as QA's is, through the AI Gateway with the designer's own
+   Gateway Key. If the answer has no valid block either, the Agent is
+   blocked ("Agent blocked: … gave no design review …, even when asked
+   again"), and the issue stays at `needs-qa`.
 4. **The App comments the result** on the pull request ("**Design
    approved**" or "**Design changes requested**", with any fixes it made
    and the changes for the coder). Each round is kept in `design_reviews`

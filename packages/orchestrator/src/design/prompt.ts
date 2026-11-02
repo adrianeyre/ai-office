@@ -57,6 +57,15 @@ export interface DesignPromptInput {
   readonly agentMemory?: AgentMemory;
 }
 
+/** The form of the designer's report: in its prompt, and when asked again. */
+export const designReviewForm: readonly string[] = [
+  "<design-review>",
+  "Result: pass or changes",
+  "Summary: the style guide you used, the screens you took, and what you found, in a sentence or two.",
+  "Findings: for changes, numbered: the screen, what is wrong, what the style guide says, and the component or CSS change to make; for a pass, none.",
+  "</design-review>",
+];
+
 export function designPrompt(input: DesignPromptInput): string {
   const { floor, agent, issue, branch, round } = input;
   const number = String(issue.number);
@@ -122,11 +131,7 @@ export function designPrompt(input: DesignPromptInput): string {
     "",
     "Pass when the UI follows the style guide, counting the fixes you committed. Ask for changes only for what you could not fix yourself. End your last message with your report, in this form:",
     "",
-    "    <design-review>",
-    "    Result: pass or changes",
-    "    Summary: the style guide you used, the screens you took, and what you found, in a sentence or two.",
-    "    Findings: for changes, numbered: the screen, what is wrong, what the style guide says, and the component or CSS change to make; for a pass, none.",
-    "    </design-review>",
+    ...designReviewForm.map((line) => `    ${line}`),
     "",
     ...proposingMemory("report"),
     ...withRoleProposals(input.agentMemory, "report"),

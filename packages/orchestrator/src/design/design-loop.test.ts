@@ -189,6 +189,8 @@ describe("the designer", () => {
 
     expect(setup.prompts).toHaveLength(1);
     expect(setup.designPrompts).toHaveLength(1);
+    // Its report was in its last message: it was not asked again.
+    expect(model.requestsOf(designer?.id ?? "")).toEqual([]);
     // Its fix is on the branch, as the Owner's commit with its trailer,
     // after the coder's and before the docs Agent's.
     expect(
@@ -295,19 +297,60 @@ describe("the designer", () => {
     ]);
   });
 
-  it("blocks, leaving the issue at needs-qa, when it gives no review", async () => {
+  it("asks once more for a review its run ended without", async () => {
     setup = await scenario({ design: [{ result: "pass", silent: true }] });
     const { model, grace, quinta, designer } = setup;
     model.answer(grace.id, approve());
     model.answer(quinta.id, approve());
+    model.answer(
+      designer?.id ?? "",
+      "<design-review>\nResult: pass\nSummary: The basket follows the style guide.\nFindings: none\n</design-review>",
+    );
     await setup.run();
+
+    // One call, as the designer, on the issue and its pull request,
+    // quoting its last message and giving the review's form.
+    const [request, ...more] = model.requestsOf(designer?.id ?? "");
+    expect(more).toEqual([]);
+    expect(request).toMatchObject({ issue: 1, pullRequest: 2 });
+    expect(request?.messages[0]?.content).toContain(
+      "<last-message>\nLooked.\n</last-message>",
+    );
+    expect(request?.messages[0]?.content).toContain(
+      "    Result: pass or changes",
+    );
+    // Its answer is the round's review: on to ready-to-merge, unblocked.
+    const [comment] = await designComments(setup);
+    expect(comment?.body).toContain("The basket follows the style guide.");
+    expect(await labelsOf(setup, 1)).toEqual(["ai-office", "ready-to-merge"]);
+    expect(
+      (await actionNotices(setup)).map(({ title }) => title),
+    ).not.toContainEqual(expect.stringContaining("Agent blocked"));
+    expect(workDone(setup)).toEqual([
+      "needs-work finished",
+      "needs-review finished",
+      "needs-qa finished",
+      "needs-qa (designer) finished",
+      "ready-to-merge finished",
+    ]);
+  });
+
+  it("blocks, leaving the issue at needs-qa, when it gives no review, even when asked again", async () => {
+    setup = await scenario({ design: [{ result: "pass", silent: true }] });
+    const { model, grace, quinta, designer } = setup;
+    model.answer(grace.id, approve());
+    model.answer(quinta.id, approve());
+    model.answer(designer?.id ?? "", "The UI looks fine.");
+    await setup.run();
+
+    expect(model.requestsOf(designer?.id ?? "")).toHaveLength(1);
 
     expect(await labelsOf(setup, 1)).toEqual(["ai-office", "needs-qa"]);
     expect(await designComments(setup)).toEqual([]);
     expect(ofType(await setup.events(), "design.reported")).toEqual([]);
     const notices = await actionNotices(setup);
     expect(notices.map(({ title }) => title)).toEqual([
-      "Agent blocked: Dee on the design review of #1: Dee gave no design review on PR #2.",
+      "Agent blocked: Dee on the design review of #1: Dee gave no design review on PR #2, even when asked again.",
     ]);
     expect(notices[0]).toMatchObject({
       agentId: designer?.id,

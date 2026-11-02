@@ -18,6 +18,7 @@ import { keepProposals } from "../memory/memory.ts";
 import { keepRoleProposals, memoryFiles } from "../memory/shared.ts";
 import { stageAfter } from "../pipeline/pipeline.ts";
 import type { ProgressComment, ProgressSummary } from "../progress/progress.ts";
+import { askAgain } from "../qa/ask-again.ts";
 import { everyRoundLinks } from "../qa/caps.ts";
 import type { QaFlowOptions } from "../qa/qa.ts";
 import { createEscalation } from "../review/escalation.ts";
@@ -26,7 +27,7 @@ import type { ExecuteWork } from "../work/queue.ts";
 import type { WorkItem } from "../work/store.ts";
 import { designRoundCap } from "./caps.ts";
 import { designChangesHandoff, designPassedHandoff } from "./handoff.ts";
-import { designPrompt } from "./prompt.ts";
+import { designPrompt, designReviewForm } from "./prompt.ts";
 import { parseDesignReport, type DesignReport } from "./report.ts";
 
 // The designer flow (PRD FR-10, FR-18, FR-19): on a Floor with a designer,
@@ -37,7 +38,8 @@ import { parseDesignReport, type DesignReport } from "./report.ts";
 // screenshots of what the change touches with Playwright, and reviews them
 // against the guide. Small styling fixes it commits itself (AI Office
 // pushes them); what it cannot fix it reports as changes for the coder.
-// The App comments its result on the pull request.
+// The App comments its result on the pull request. A run that ends
+// without its report is asked for it once more, as QA's is.
 //
 // A pass moves the issue on (to docs, or `ready-to-merge`). Changes go back
 // to the coder as a Handoff, which is then reviewed, checked by QA and
@@ -432,10 +434,24 @@ export function createDesignFlow(options: DesignFlowOptions): ExecuteWork {
         await push();
         return await pausedAt(floor, agent, issue.number, progress);
       }
-      const found = parseDesignReport(run.lastText);
+      // A run that ends without its report is asked for it once more.
+      const found =
+        parseDesignReport(run.lastText) ??
+        (await askAgain({
+          models: options.models,
+          agent,
+          model: trailer.model,
+          issue: issue.number,
+          pullRequest: pullRequest.number,
+          tag: "design-review",
+          form: designReviewForm,
+          lastText: run.lastText,
+          parse: parseDesignReport,
+          signal,
+        }));
       if (found === undefined) {
         throw new AgentBlockedError(
-          `${agent.name} gave no design review on PR #${String(pullRequest.number)}.`,
+          `${agent.name} gave no design review on PR #${String(pullRequest.number)}, even when asked again.`,
         );
       }
       // The fixes it made go on the pull request's branch first.

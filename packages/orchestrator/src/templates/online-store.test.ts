@@ -489,6 +489,7 @@ async function scenario(
     notices,
     events: bus,
     runner,
+    models: model,
     gitIdentity: (floor: string) => office.floorGitIdentity(floor),
     defaultModels,
     scratchDir: root,

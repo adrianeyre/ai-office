@@ -1434,6 +1434,7 @@ export async function startOffice(
               notices,
               events,
               runner,
+              models,
               gitIdentity: (floorId) =>
                 officeSettings.floorGitIdentity(floorId),
               defaultModels: () => aiProviders.defaultModels(),
@@ -1490,6 +1491,7 @@ export async function startOffice(
               notices,
               events,
               runner,
+              models,
               gitIdentity: (floorId) =>
                 officeSettings.floorGitIdentity(floorId),
               defaultModels: () => aiProviders.defaultModels(),
