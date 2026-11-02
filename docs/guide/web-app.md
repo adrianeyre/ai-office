@@ -455,7 +455,7 @@ every other page's tab is simply **AI Office**.
 - **Tests** render scene components without WebGL with
   `@react-three/test-renderer`. The key scenes are also compared with
   reference pictures, drawn by real WebGL in software (see
-  [Scene screenshot tests](../../README.md#scene-screenshot-tests)).
+  [Scene screenshot tests](development.md#scene-screenshot-tests)).
 - A browser without WebGL 2 is told so; every other page works as usual.
 
 ### Seasonal events
@@ -1095,7 +1095,7 @@ picture to count.
 - **`pnpm scenes`** runs them (`e2e/playwright.scenes.config.ts`, its
   `chromium` project; `--project=chromium` runs them alone, without the
   3D Office's key scenes, the `key-scenes` project, described in
-  [Scene screenshot tests](../../README.md#scene-screenshot-tests)):
+  [Scene screenshot tests](development.md#scene-screenshot-tests)):
   Chromium is forced onto SwiftShader whatever the machine has, as CI
   draws it, and a screenshot may differ from its baseline in at most
   0.2% of its pixels, a pixel counting as changed at a small difference
