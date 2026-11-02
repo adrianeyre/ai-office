@@ -1,0 +1,230 @@
+/* The Manager chat demo, after the `ai-chat` gold, on the page's own
+   ground (no plate): the window across the column, a hair in for its
+   shadow, ending just under the composer, where it fades out; the thread
+   anchored over the composer, older content going up out of the window. */
+.mc {
+  & .ss-stage {
+    overflow: hidden;
+    background: transparent;
+  }
+
+  /* A short fade, under the composer only */
+  .mc-fade {
+    --aio-fade: 36px;
+  }
+
+  /* Runs 40px past the stage's foot, with the composer above the fade */
+  .mc-win {
+    height: calc(100% + 40px);
+    box-shadow: var(--ss-shadow-ground);
+  }
+
+  .mc-body {
+    display: grid;
+    grid-template-rows: 1fr auto;
+    height: 100%;
+    padding: 16px 24px 80px;
+    background: var(--ss-surface);
+  }
+
+  .mc-thread {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 12px;
+    min-height: 0;
+    padding-bottom: 16px;
+    overflow: hidden;
+  }
+
+  .mc-turn--past {
+    display: grid;
+    gap: 8px;
+    transition: opacity 0.4s ease;
+  }
+
+  /* The earlier turn fades before the Plan carries it up past the edge */
+  .mc-turn--past[data-gone] {
+    opacity: 0;
+  }
+
+  .mc-past-q {
+    justify-self: end;
+  }
+
+  .mc-q {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .mc-q .ss-text {
+    padding: 8px 14px;
+    border-radius: 16px;
+    background: var(--ss-accent);
+    color: var(--aio-on-accent);
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .mc-thinking {
+    color: var(--ss-text);
+    font-size: 13px;
+  }
+
+  .mc-stream {
+    color: var(--ss-text-strong);
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  /* ---- The Plan card ---- */
+
+  .mc-plan {
+    display: grid;
+    gap: 2px;
+    padding: 12px;
+    border-radius: 12px;
+    background: var(--ss-surface);
+    box-shadow:
+      inset 0 0 0 1px var(--ss-line),
+      0 1px 2px rgb(20 20 43 / 4%);
+  }
+
+  .mc-plan-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 0 4px 6px;
+  }
+
+  .mc-strong {
+    color: var(--ss-text-strong);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .mc-muted {
+    color: var(--ss-text-faint);
+    font-size: 11px;
+  }
+
+  .mc-plan-row {
+    display: grid;
+    grid-template-columns: 22px auto 1fr auto;
+    align-items: center;
+    gap: 10px;
+    height: 32px;
+    padding: 0 4px;
+    border-top: 1px solid var(--ss-line-faint);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .mc-plan-row--filler {
+    grid-template-columns: 22px 1fr auto;
+  }
+
+  .mc-issue {
+    color: var(--ss-text-faint);
+    font-family: var(--ss-mono);
+    font-size: 11px;
+  }
+
+  .mc-plan-title {
+    color: var(--ss-text-strong);
+    font-weight: 500;
+  }
+
+  .mc-after {
+    justify-self: start;
+    padding: 2px 8px;
+    border-radius: var(--ss-radius-pill);
+    background: var(--ss-warning-soft);
+    color: var(--ss-warning-text);
+    font-size: 10.5px;
+    font-weight: 500;
+  }
+
+  .mc-plan-row > .mc-who {
+    grid-column: -2;
+  }
+
+  .mc-who {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ss-text);
+    font-size: 11.5px;
+  }
+
+  .mc-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 10px;
+  }
+
+  .mc-button {
+    display: inline-grid;
+    place-items: center;
+    height: 32px;
+    padding: 0 14px;
+    border-radius: var(--ss-radius-md);
+    background: var(--ss-accent);
+    color: var(--aio-on-accent);
+    font-size: 12.5px;
+    font-weight: 600;
+    will-change: transform;
+    transition:
+      background 0.2s ease,
+      transform 0.12s ease;
+  }
+
+  .mc-button[data-pressed] {
+    transform: scale(0.97);
+  }
+
+  .mc-button[data-on] {
+    background: var(--ss-success);
+    color: #fff;
+  }
+
+  .ss-stage[data-theme="dark"] .mc-button[data-on] {
+    color: #052e16;
+  }
+
+  /* An even box, so the 14px tick sits on whole pixels */
+  .mc-done {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 80px;
+    height: 16px;
+  }
+
+  .mc-rest {
+    position: absolute;
+    top: 150px;
+    right: 24px;
+    width: 1px;
+    height: 1px;
+  }
+
+  /* Compact: a gutter each side, the window full width of the stage */
+  & .ss-stage[data-layout="compact"] .mc-body {
+    padding: 14px 14px 80px;
+  }
+
+  & .ss-stage[data-layout="compact"] .mc-plan-row {
+    grid-template-columns: 22px auto 1fr;
+  }
+
+  & .ss-stage[data-layout="compact"] .mc-after {
+    display: none;
+  }
+
+  & .ss-stage[data-layout="compact"] .mc-rest {
+    top: 60px;
+    right: 8px;
+  }
+}

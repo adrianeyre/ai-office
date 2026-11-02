@@ -9,3 +9,4 @@ pnpm-lock.yaml
 
 # Vendored as published, so it stays byte-identical with its source.
 docker/compose-spec.json
+site/stageshow/

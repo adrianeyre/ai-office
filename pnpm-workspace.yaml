@@ -2,6 +2,7 @@ packages:
   - apps/*
   - packages/*
   - e2e
+  - site
 
 # tsx depends on esbuild, whose postinstall fetches its platform binary.
 # Testcontainers pulls in ssh2 (and its optional cpu-features), whose install

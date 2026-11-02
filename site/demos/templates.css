@@ -1,0 +1,96 @@
+/* The Floor Templates still, as the `many-of-one` gold: five columns of
+   one card running off every edge, each edge cutting a card by a third or
+   more; the focus card a column right of the middle. */
+.ft {
+  & .ss-stage {
+    overflow: hidden;
+    border-radius: 20px;
+    background: var(--ss-well);
+  }
+
+  .ft-grid {
+    position: absolute;
+    top: -70px;
+    left: -116px;
+    display: grid;
+    grid-template-columns: repeat(5, 184px);
+    gap: 16px;
+  }
+
+  .ft-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    height: 160px;
+    padding: 14px;
+    border-radius: 14px;
+    background: var(--ss-surface);
+    box-shadow: var(--ss-shadow-card);
+  }
+
+  .ft-card[data-focus] {
+    position: relative;
+    z-index: 1;
+    box-shadow:
+      var(--ss-shadow-hero),
+      0 0 0 1.5px var(--ss-accent);
+  }
+
+  .ft-top {
+    display: flex;
+    align-self: stretch;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  .ft-icon {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    background: var(--ss-ink-1);
+    color: var(--ss-icon);
+  }
+
+  .ft-card[data-focus] .ft-icon {
+    background: var(--ss-accent-soft);
+    color: var(--ss-accent-text);
+  }
+
+  .ft-name {
+    color: var(--ss-text-strong);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .ft-line {
+    color: var(--ss-text);
+    font-size: 11.5px;
+  }
+
+  .ft-roles {
+    display: flex;
+    gap: 6px;
+    margin-top: auto;
+  }
+
+  .ft-role {
+    display: inline-flex;
+    align-items: center;
+    height: 18px;
+    padding: 0 8px;
+    border-radius: var(--ss-radius-pill);
+    background: var(--ss-ink-2);
+    color: var(--ss-text);
+    font-size: 10.5px;
+    font-weight: 500;
+  }
+
+  /* Narrow: the same grid, shifted so the focus card sits in the middle */
+  & .ss-stage[data-layout="compact"] .ft-grid {
+    left: -321px;
+  }
+}

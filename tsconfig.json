@@ -12,7 +12,7 @@
     "vitest.config.ts",
     "docker/**/*.ts",
     "test/**/*.ts",
-    "site/**/*.ts",
+    "site/build.ts",
     "release/**/*.ts"
   ]
 }
