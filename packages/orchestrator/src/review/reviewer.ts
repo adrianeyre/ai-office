@@ -27,6 +27,7 @@ import {
   type BatchBranches,
 } from "../batches/one-pull-request.ts";
 import type { RepositoryMemory } from "../memory/memory.ts";
+import type { PromptBudgetOf } from "../memory/budget.ts";
 import type { SharedMemory } from "../memory/shared.ts";
 import type { ModelClient, ModelMessage } from "../models/client.ts";
 import type { Notices } from "../notices/notices.ts";
@@ -159,6 +160,11 @@ export interface ReviewFlowOptions {
    * prompt (FR-54, FR-55).
    */
   readonly sharedMemory?: Pick<SharedMemory, "forAgent">;
+  /**
+   * How much of the memory each reviewer's prompt carries, for its Model
+   * (the prompt budget); as much as AI Office keeps without it.
+   */
+  readonly promptBudget?: PromptBudgetOf;
   /**
    * The office Role library (FR-98): each reviewer's Role is read from it
    * every round. The built-in Roles when absent.
@@ -393,6 +399,9 @@ export function createReviewFlow(options: ReviewFlowOptions): ExecuteWork {
       ...(round.handoff === undefined ? {} : { handoff: round.handoff }),
       ...(round.memory === undefined ? {} : { memory: round.memory }),
       ...(agentMemory === undefined ? {} : { agentMemory }),
+      ...(options.promptBudget === undefined
+        ? {}
+        : { budget: await options.promptBudget(agent.aiProvider, model) }),
       // As much of the diff as its own Model's context window holds.
       ...(options.contextWindow === undefined
         ? {}

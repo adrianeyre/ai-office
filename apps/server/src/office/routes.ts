@@ -8,6 +8,7 @@ import {
   lobbyCharacterSchema,
   lobbyRoles,
   ownerProfileSchema,
+  promptBudgetSettingsSchema,
   setFloorActivitiesRequestSchema,
   promptCacheKeepAliveSettingsSchema,
   promptCacheSettingsSchema,
@@ -37,9 +38,10 @@ import { sendFloorError } from "../floors/routes.ts";
 // (FR-40), whose chains are the Gateway's own routes; the outbound HTTP
 // proxy every upstream request goes through (FR-35), whose password goes
 // in and never comes back out; the Decision Model (FR-17, FR-89); how long
-// records are kept (retention, §7); the Owner's profile, which the lobby's
-// receptionist greets them by; and the lobby's cast, the receptionist and
-// the visitor.
+// records are kept (retention, §7); the prompt budgets, the most of each
+// memory and of the Skills listing an Agent's prompt carries; the Owner's
+// profile, which the lobby's receptionist greets them by; and the lobby's
+// cast, the receptionist and the visitor.
 
 export function registerOfficeRoutes(
   app: FastifyInstance,
@@ -419,6 +421,24 @@ export function registerOfficeRoutes(
       const retention = await settings.setRetentionSettings(parsed.data);
       request.log.info(retention, "Retention was set.");
       return retention;
+    },
+  );
+
+  app.get("/api/office/prompt-budget", { config: { access: "owner" } }, () =>
+    settings.promptBudgetSettings(),
+  );
+
+  app.put(
+    "/api/office/prompt-budget",
+    { config: { access: "owner" } },
+    async (request, reply) => {
+      const parsed = promptBudgetSettingsSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return sendInvalidRequest(reply, parsed.error);
+      }
+      const budget = await settings.setPromptBudgetSettings(parsed.data);
+      request.log.info(budget, "The prompt budgets were set.");
+      return budget;
     },
   );
 }

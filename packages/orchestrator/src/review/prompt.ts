@@ -3,6 +3,7 @@ import { maxReviewComments } from "@ai-office/shared";
 
 import { roleLines, type RoleInstructions } from "../coder/prompt.ts";
 import { charactersIn } from "../context/window.ts";
+import { agentMemoryWithin, type PromptBudget } from "../memory/budget.ts";
 import { memorySection } from "../memory/memory.ts";
 import {
   holdsMemory,
@@ -77,6 +78,11 @@ export interface ReviewerPromptInput {
    * context window; `maxDiffCharacters` when absent.
    */
   readonly diffLimit?: DiffLimit;
+  /**
+   * The most of each memory the prompt carries, for its Model (the prompt
+   * budget); as much as AI Office keeps when absent.
+   */
+  readonly budget?: PromptBudget;
 }
 
 export interface ReviewerPrompt {
@@ -252,10 +258,17 @@ export function reviewerPrompt(input: ReviewerPromptInput): ReviewerPrompt {
   });
 
   const user = [
-    ...(input.memory === undefined ? [] : [...memorySection(input.memory), ""]),
+    ...(input.memory === undefined
+      ? []
+      : [...memorySection(input.memory, input.budget?.repositoryMemory), ""]),
     ...(input.agentMemory === undefined || !holdsMemory(input.agentMemory)
       ? []
-      : [...quotedMemorySection(input.agentMemory), ""]),
+      : [
+          ...quotedMemorySection(
+            agentMemoryWithin(input.agentMemory, input.budget),
+          ),
+          "",
+        ]),
     "## The issue",
     "",
     `<issue number="${number}">`,

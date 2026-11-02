@@ -5,6 +5,11 @@ import {
   type Role,
 } from "@ai-office/shared";
 
+import {
+  skillsLeftOutLine,
+  skillsWithin,
+  type PromptBudget,
+} from "../memory/budget.ts";
 import { memorySection } from "../memory/memory.ts";
 import type { ModelMessage } from "../models/client.ts";
 import type { ChatMessageRecord } from "./store.ts";
@@ -55,6 +60,12 @@ export interface ManagerPromptInput {
   }[];
   /** The Skill the Manager chose for the Owner's last message, now loaded. */
   readonly chosenSkill?: string;
+  /**
+   * The most of the repository's memory and the Skills listing the prompt
+   * carries, for the Manager's Model (the prompt budget); as much as AI
+   * Office keeps when absent.
+   */
+  readonly budget?: PromptBudget;
   /**
    * The running Grilling Session (FR-77), from its stored data, and what
    * the Manager is asked for in it: its lines, after the Skills.
@@ -124,7 +135,11 @@ export function readSkillChoice(
 
 function skillsSection(input: ManagerPromptInput): string[] {
   const loaded = input.loadedSkills ?? [];
-  const offered = input.offeredSkills ?? [];
+  // As many as the prompt budget's listing holds, first first.
+  const { skills: offered, leftOut } = skillsWithin(
+    input.offeredSkills ?? [],
+    input.budget?.skills,
+  );
   const lines: string[] = [];
   if (loaded.length > 0) {
     lines.push(
@@ -152,7 +167,7 @@ function skillsSection(input: ManagerPromptInput): string[] {
       );
     }
   }
-  if (offered.length > 0) {
+  if (offered.length > 0 || leftOut > 0) {
     lines.push(
       "",
       "## Skills you can choose",
@@ -163,6 +178,9 @@ function skillsSection(input: ManagerPromptInput): string[] {
         ({ name, description }) =>
           `- ${name}: ${description.replaceAll(/\s+/g, " ").trim()}`,
       ),
+      ...(leftOut === 0 || input.budget === undefined
+        ? []
+        : ["", skillsLeftOutLine(leftOut, input.budget.skills)]),
     );
   }
   return lines;
@@ -217,7 +235,9 @@ export function managerSystemPrompt(input: ManagerPromptInput): string {
     ...skillsSection(input),
     ...(input.requests === undefined ? [] : ["", ...input.requests]),
     ...(input.grilling === undefined ? [] : ["", ...input.grilling]),
-    ...(input.memory === undefined ? [] : ["", ...memorySection(input.memory)]),
+    ...(input.memory === undefined
+      ? []
+      : ["", ...memorySection(input.memory, input.budget?.repositoryMemory)]),
     ...(extra === ""
       ? []
       : ["", "## The Owner's instructions for you", "", extra]),

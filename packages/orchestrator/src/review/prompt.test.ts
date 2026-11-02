@@ -1,5 +1,8 @@
+import { defaultPromptBudgetSettings } from "@ai-office/shared";
 import { describe, expect, it } from "vitest";
 
+import { promptBudgetFor } from "../memory/budget.ts";
+import { longAgentMemory, longMemory } from "../memory/testing.ts";
 import { builtIn } from "../roles/testing.ts";
 import {
   diffLimitOf,
@@ -253,6 +256,46 @@ describe("the most of a diff a reviewer is shown, from its Model's context windo
     expect(before).not.toContain("the diff cut here");
     expect(before).toContain(
       `(the file cut here: it is longer than ${maxFileCharacters.toLocaleString("en-GB")} characters)`,
+    );
+  });
+});
+
+describe("the prompt budget (#20)", () => {
+  const memory = longMemory;
+  const agentMemory = longAgentMemory("reviewer");
+
+  it("leaves the prompt byte-identical with the default budget on a large context window", () => {
+    const before = reviewerPrompt({ ...input, memory, agentMemory });
+    for (const contextWindow of [null, 200_000, 1_048_576]) {
+      expect(
+        reviewerPrompt({
+          ...input,
+          memory,
+          agentMemory,
+          budget: promptBudgetFor(defaultPromptBudgetSettings, contextWindow),
+        }),
+      ).toEqual(before);
+    }
+  });
+
+  it("truncates each quoted memory over a small window's budget, saying so, the same every time", () => {
+    const budget = promptBudgetFor(defaultPromptBudgetSettings, 32_768);
+    const { user } = reviewerPrompt({ ...input, memory, agentMemory, budget });
+    expect(user).toContain(
+      "\n… (the memory cut here: it is longer than 5,734 characters)\n</memory>",
+    );
+    expect(user).toContain(
+      "\n… (the office-wide memory cut here: it is longer than the 5,734 characters a prompt carries)\n</office-memory>",
+    );
+    expect(user).toContain(
+      "\n(21 older entries were left out: the Role's memory is longer than the 5,734 characters a prompt carries.)\n</role-memory>",
+    );
+    // The newest entries are kept.
+    expect(user).toContain("- Entry 40: ");
+    expect(user).toContain("- Entry 22: ");
+    expect(user).not.toContain("- Entry 21: ");
+    expect(reviewerPrompt({ ...input, memory, agentMemory, budget }).user).toBe(
+      user,
     );
   });
 });

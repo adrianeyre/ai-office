@@ -431,8 +431,8 @@ Each Floor's repository keeps what its Agents have learned about it in
   branch, through the GitHub App: the coder, the reviewers, QA and the docs
   Agent, and the Manager for triage, a Batch's Plan and its chat. It is
   untrusted input, like issue text (FR-56): redacted, cut at 12,000
-  characters, and quoted between `<memory>` markers it cannot close, as
-  background, never as rules. A repository without one, or memory that
+  characters (its [prompt budget](#prompt-budgets)), and quoted between
+  `<memory>` markers it cannot close, as background, never as rules. A repository without one, or memory that
   cannot be read, leaves it out, and the task goes on.
 - **Agents propose entries in their Handoff.** The coder and the docs
   Agent may end their `<handoff>` block, and QA its `<qa-report>`, with up
@@ -553,6 +553,53 @@ entry. Deciding on an entry the Owner decided already is `409
 role_memory_decided`, removing an entry
 that is not accepted `409 role_memory_not_accepted`, and accepting into a
 full Role memory `409 role_memory_full`.
+
+## Prompt budgets
+
+Prompts quote the repository's memory, the office-wide memory and the
+Role's memory, and agent tools list the Floor's Skills. On a Model with a
+32K or 64K context window these could crowd out the issue and the diff,
+so each has a **prompt budget**, in characters (`@ai-office/orchestrator`'s
+`promptBudgetFor`):
+
+| Part               | Default | What is kept when it is over                                  |
+| ------------------ | ------- | ------------------------------------------------------------- |
+| Repository memory  | 12,000  | its start, cut there                                          |
+| Office-wide memory | 12,000  | its start, cut there                                          |
+| Role memory        | 12,000  | its newest entries that fit (each entry's text counts)        |
+| Skills listing     | 40,000  | the first Skills that fit (each one's name and description)   |
+
+- **The defaults change nothing.** They hold all of each memory AI Office
+  keeps (12,000 characters of office-wide memory, 40 Role memory entries
+  of 300) and as much of the repository's memory as was always quoted, so
+  with them, and a large or unknown context window, every prompt is
+  byte for byte as before.
+- **A small window lowers them.** When an Agent's Model's effective
+  context window is known (the catalogue's, or the **Context window** set
+  on an AI Account: see [the AI Gateway](ai-gateway.md#context-windows)),
+  each memory gets at most a twentieth of it and the Skills a tenth, at
+  3.5 characters a token. A 32,768-token window carries 5,734 characters
+  of each memory and 11,468 of Skills; from about 69,000 tokens (memory)
+  and 115,000 (Skills) up, the budgets are the Owner's.
+- **Truncated, and said so.** A memory over its budget is cut, and its
+  quote (or `OFFICE.md`) ends "… (the office-wide memory cut here: it is
+  longer than the 5,734 characters a prompt carries)"; the Role's oldest
+  entries are left out, `ROLE.md` and the reviewer's quote saying how many,
+  and the sandbox prompt says "(19 entries, the newest: 21 older ones were
+  left out, over the prompt budget)". Skills over the budget are not
+  mounted in the sandbox, and the prompt ends with a **Skills left out**
+  section; the Manager's chat lists the Skills it can choose up to the
+  budget and says how many more there are. The same memory and budget
+  always give the same prompt.
+- **Where.** The coder, reviewer, QA, designer and docs Agents' prompts and
+  memory files, the sandbox's Skills, and the Manager chat's prompt.
+- **Settings.** General Settings' **Prompt budgets** card sets each, from 0
+  to 1,000,000 characters; changes apply from the next task. `GET` and
+  `PUT /api/office/prompt-budget` answer and take
+  `{"repositoryMemory","officeMemory","roleMemory","skills"}`. Each change
+  is a `config.changed` event naming the budgets that changed
+  (`promptBudget.roleMemory`…), never their values. They are kept in
+  `office_settings.prompt_budget_*`.
 
 ### The bookshelf: a Floor's memory
 

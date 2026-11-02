@@ -15,6 +15,7 @@ import type { TrailerAgent } from "../git/identity.ts";
 import { createPushRun } from "../git/push-run.ts";
 import { roleOfWork } from "../manager/dispatch.ts";
 import { keepProposals } from "../memory/memory.ts";
+import { agentMemoryWithin } from "../memory/budget.ts";
 import { keepRoleProposals, memoryFiles } from "../memory/shared.ts";
 import { stageAfter } from "../pipeline/pipeline.ts";
 import type { ProgressComment, ProgressSummary } from "../progress/progress.ts";
@@ -372,6 +373,11 @@ export function createDesignFlow(options: DesignFlowOptions): ExecuteWork {
       floor.id,
       agent.role,
     );
+    // How much of the memory and the Skills its Model's prompt carries.
+    const budget = await options.promptBudget?.(
+      agent.aiProvider,
+      trailer.model,
+    );
     let run: SandboxRun | undefined;
     try {
       run = await options.runner.run({
@@ -409,10 +415,12 @@ export function createDesignFlow(options: DesignFlowOptions): ExecuteWork {
           ...(handed === undefined ? {} : { handoff: handed.summary }),
           ...(memory === undefined ? {} : { memory }),
           ...(agentMemory === undefined ? {} : { agentMemory }),
+          ...(budget === undefined ? {} : { budget }),
         }),
         ...(agentMemory === undefined
           ? {}
-          : { memory: memoryFiles(agentMemory) }),
+          : { memory: memoryFiles(agentMemoryWithin(agentMemory, budget)) }),
+        ...(budget === undefined ? {} : { skillsBudget: budget.skills }),
         gitIdentity: await options.gitIdentity(floor.id),
         signal,
       });

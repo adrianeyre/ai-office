@@ -1170,6 +1170,14 @@ export const officeSettings = pgTable(
      * `seasonalEventsSchema` (packages/shared) checks them; null until set.
      */
     seasonalEvents: jsonb("seasonal_events"),
+    // Prompt budgets: the most characters of the repository's memory, the
+    // office-wide memory, the Role's memory and the Floor's Skills listing
+    // an Agent's prompt carries; each null for its default (12,000 for
+    // each memory, 40,000 for the Skills).
+    promptBudgetRepositoryMemory: integer("prompt_budget_repository_memory"),
+    promptBudgetOfficeMemory: integer("prompt_budget_office_memory"),
+    promptBudgetRoleMemory: integer("prompt_budget_role_memory"),
+    promptBudgetSkills: integer("prompt_budget_skills"),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
   },
   (table) => [
@@ -1201,6 +1209,10 @@ export const officeSettings = pgTable(
     check(
       "office_settings_gateway_retries",
       sql`(${table.gatewayRetryAttempts} IS NULL OR ${table.gatewayRetryAttempts} BETWEEN 1 AND 10) AND (${table.gatewayRetryDelayMs} IS NULL OR ${table.gatewayRetryDelayMs} BETWEEN 0 AND 60000) AND (${table.gatewayRetryMultiplier} IS NULL OR ${table.gatewayRetryMultiplier} BETWEEN 1 AND 10)`,
+    ),
+    check(
+      "office_settings_prompt_budgets",
+      sql`(${table.promptBudgetRepositoryMemory} IS NULL OR ${table.promptBudgetRepositoryMemory} BETWEEN 0 AND 1000000) AND (${table.promptBudgetOfficeMemory} IS NULL OR ${table.promptBudgetOfficeMemory} BETWEEN 0 AND 1000000) AND (${table.promptBudgetRoleMemory} IS NULL OR ${table.promptBudgetRoleMemory} BETWEEN 0 AND 1000000) AND (${table.promptBudgetSkills} IS NULL OR ${table.promptBudgetSkills} BETWEEN 0 AND 1000000)`,
     ),
     check(
       "office_settings_gateway_prompt_cache_ttl",

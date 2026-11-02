@@ -65,6 +65,7 @@ import {
   createGrillingDocuments,
   createGrillingIssues,
   createSandboxRunner,
+  promptBudgetOf,
   createToolCallScreens,
   createStatusReports,
   createStatusUpdates,
@@ -767,6 +768,12 @@ export async function startOffice(
     },
   });
   const memory = { memory: repositoryMemory };
+  // How much of the memory and the Skills each Agent's prompt carries:
+  // the Owner's prompt budgets, lowered for a small context window.
+  const promptBudget = promptBudgetOf(
+    () => officeSettings.promptBudgetSettings(),
+    contextWindow,
+  );
   // The office-wide and Role memory (PRD FR-54, FR-55), kept in AI Office:
   // mounted read-only into every sandbox and quoted in every reviewer's
   // prompt; Agents propose to their Role's, and the Manager or the Owner
@@ -1073,6 +1080,7 @@ export async function startOffice(
     defaultModels: () => aiProviders.defaultModels(),
     redactor,
     ...memory,
+    promptBudget,
     // "/skill-name" runs one of the Floor's Skills, and the Manager may
     // choose one (FR-74).
     skills: floorChatSkills(floorSkills),
@@ -1395,6 +1403,7 @@ export async function startOffice(
               capPaused: (agentId) => capEnforcement.isPaused(agentId),
               ...memory,
               sharedMemory,
+              promptBudget,
               roles: stores.roles,
               turns,
               batchBranches,
@@ -1425,6 +1434,7 @@ export async function startOffice(
               redactor,
               ...memory,
               sharedMemory,
+              promptBudget,
               roles: stores.roles,
               turns,
               batchBranches,
@@ -1455,6 +1465,7 @@ export async function startOffice(
               redactor,
               ...memory,
               sharedMemory,
+              promptBudget,
               roles: stores.roles,
               batchBranches,
               onError: (error) => {
@@ -1481,6 +1492,7 @@ export async function startOffice(
               capPaused: (agentId) => capEnforcement.isPaused(agentId),
               ...memory,
               sharedMemory,
+              promptBudget,
               roles: stores.roles,
               batchBranches,
               onError: (error) => {
@@ -1512,6 +1524,7 @@ export async function startOffice(
               redactor,
               ...memory,
               sharedMemory,
+              promptBudget,
               batchBranches,
               onError: (error) => {
                 logger.warn(

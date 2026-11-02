@@ -916,7 +916,10 @@ Model:
 
 A Model's **effective context window** is what AI Office sizes prompts by:
 how much of a pull request's diff a reviewer is shown (see
-[the issue pipeline](issue-pipeline.md)), and each Agent's Context Usage.
+[the issue pipeline](issue-pipeline.md)), how much memory and how many
+Skills an Agent's prompt carries (see
+[prompt budgets](batches-and-memory.md#prompt-budgets)), and each Agent's
+Context Usage.
 
 - **From the catalogue.** The model catalogue keeps each Model's context
   window where its AI Provider reports one (an endpoint's

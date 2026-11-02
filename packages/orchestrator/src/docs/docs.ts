@@ -26,6 +26,7 @@ import {
   memoryFiles,
   type SharedMemory,
 } from "../memory/shared.ts";
+import { agentMemoryWithin, type PromptBudgetOf } from "../memory/budget.ts";
 import type { Pipeline } from "../pipeline/pipeline.ts";
 import { roleOfAgent } from "../roles/roles.ts";
 import { memoryRoleStore, type RoleStore } from "../roles/store.ts";
@@ -85,6 +86,11 @@ export interface DocsFlowOptions {
    * Role's proposed to (FR-54, FR-55).
    */
   readonly sharedMemory?: SharedMemory;
+  /**
+   * How much of the memory and the Skills an Agent's prompt carries, for
+   * its Model (the prompt budget); as much as AI Office keeps without it.
+   */
+  readonly promptBudget?: PromptBudgetOf;
   /**
    * The office Role library (FR-98): each task reads its Agent's Role
    * from it as the task starts. The built-in Roles when absent.
@@ -307,6 +313,11 @@ export function createDocsFlow(options: DocsFlowOptions): ExecuteWork {
       floor.id,
       agent.role,
     );
+    // How much of the memory and the Skills its Model's prompt carries.
+    const budget = await options.promptBudget?.(
+      agent.aiProvider,
+      trailer.model,
+    );
     let run: SandboxRun | undefined;
     try {
       run = await options.runner.run({
@@ -343,10 +354,12 @@ export function createDocsFlow(options: DocsFlowOptions): ExecuteWork {
           ...(handed === undefined ? {} : { handoff: handed.summary }),
           ...(memory === undefined ? {} : { memory }),
           ...(agentMemory === undefined ? {} : { agentMemory }),
+          ...(budget === undefined ? {} : { budget }),
         }),
         ...(agentMemory === undefined
           ? {}
-          : { memory: memoryFiles(agentMemory) }),
+          : { memory: memoryFiles(agentMemoryWithin(agentMemory, budget)) }),
+        ...(budget === undefined ? {} : { skillsBudget: budget.skills }),
         gitIdentity: await options.gitIdentity(floor.id),
         signal,
       });

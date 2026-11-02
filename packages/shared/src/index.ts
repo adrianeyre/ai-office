@@ -306,6 +306,12 @@ export {
   type PipelineStage,
 } from "./pipeline.ts";
 export {
+  defaultPromptBudgetSettings,
+  maxPromptBudget,
+  promptBudgetSettingsSchema,
+  type PromptBudgetSettings,
+} from "./prompt-budget.ts";
+export {
   defaultSandboxConcurrencyLimit,
   maxSandboxConcurrencyLimit,
   sandboxSettingsSchema,

@@ -586,6 +586,15 @@ export {
   type ContextWindowOf,
 } from "./context/window.ts";
 export {
+  agentMemoryWithin,
+  defaultPromptBudget,
+  promptBudgetFor,
+  promptBudgetOf,
+  skillsWithin,
+  type PromptBudget,
+  type PromptBudgetOf,
+} from "./memory/budget.ts";
+export {
   databaseCapPauseStore,
   memoryCapPauseStore,
   type CapPause,
