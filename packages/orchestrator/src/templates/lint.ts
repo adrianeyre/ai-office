@@ -127,6 +127,10 @@ export const liveSystemsOf: Readonly<Record<string, LiveSystems>> = {
     named: [/\bapp stores?\b/i, /\bbeta-testing services?\b/i],
     says: "the app stores or a beta-testing service",
   },
+  local: {
+    named: [/\bproduction services?\b/i, /\bpackage registr(?:y|ies)\b/i],
+    says: "a production service or a package registry",
+  },
 };
 
 /**
