@@ -1,5 +1,7 @@
+import { defaultPromptBudgetSettings } from "@ai-office/shared";
 import { describe, expect, it } from "vitest";
 
+import { promptBudgetFor } from "../memory/budget.ts";
 import {
   conversation,
   managerSystemPrompt,
@@ -132,6 +134,33 @@ describe("Skills in the Manager's prompt", () => {
     );
     expect(prompt.indexOf("## Skills you can choose")).toBeLessThan(
       prompt.indexOf("## The Owner's instructions for you"),
+    );
+  });
+
+  it("lists as many Skills to choose as the prompt budget holds, first first, saying how many were left out; all of them by default", () => {
+    const offeredSkills = Array.from({ length: 30 }, (_, index) => ({
+      name: `skill-${String(index + 1).padStart(2, "0")}`,
+      description: "y".repeat(992),
+    }));
+    const all = managerSystemPrompt({ ...input, offeredSkills });
+    expect(
+      managerSystemPrompt({
+        ...input,
+        offeredSkills,
+        budget: promptBudgetFor(defaultPromptBudgetSettings, 200_000),
+      }),
+    ).toBe(all);
+    expect(all).toContain("- skill-30: ");
+    // 11,468 characters of listing on a 32,768-token window: 11 Skills.
+    const small = managerSystemPrompt({
+      ...input,
+      offeredSkills,
+      budget: promptBudgetFor(defaultPromptBudgetSettings, 32_768),
+    });
+    expect(small).toContain("- skill-11: ");
+    expect(small).not.toContain("- skill-12: ");
+    expect(small).toContain(
+      "(19 more Skills were left out: the list is longer than the 11,468 characters a prompt carries.)",
     );
   });
 

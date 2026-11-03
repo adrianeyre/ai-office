@@ -39,6 +39,7 @@ COPY packages/github/package.json packages/github/
 COPY packages/orchestrator/package.json packages/orchestrator/
 COPY packages/shared/package.json packages/shared/
 COPY e2e/package.json e2e/
+COPY site/package.json site/
 
 # The pnpm store is a build cache mount, which pnpm cannot hard-link from,
 # so packages are copied out of it (rather than pnpm making a second store

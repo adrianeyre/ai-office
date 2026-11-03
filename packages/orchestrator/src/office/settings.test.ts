@@ -252,6 +252,78 @@ const cases: Case[] = [
     },
   ],
   [
+    "stalls work after 20 minutes and kills a sandbox after an hour until the Owner chooses otherwise, per AI Provider too",
+    async ({ settings, bus }) => {
+      expect(await settings.watchdogSettings()).toEqual({
+        stallTimeoutMinutes: 20,
+        sandboxTimeLimitMinutes: 60,
+        providers: {},
+      });
+      const chosen = {
+        stallTimeoutMinutes: 20,
+        sandboxTimeLimitMinutes: 90,
+        providers: {
+          Ollama: { stallTimeoutMinutes: 60, sandboxTimeLimitMinutes: 240 },
+        },
+      };
+      expect(await settings.setWatchdogSettings(chosen)).toEqual(chosen);
+      // The same again changes nothing.
+      await settings.setWatchdogSettings(chosen);
+      expect(await settings.watchdogSettings()).toEqual(chosen);
+      // Ollama's own limit changed, Qwen given its own.
+      await settings.setWatchdogSettings({
+        ...chosen,
+        providers: {
+          Ollama: { stallTimeoutMinutes: 90 },
+          Qwen: { sandboxTimeLimitMinutes: 120 },
+        },
+      });
+      // Which changed, never their values.
+      expect(
+        (await configChanges(bus)).map(({ scope, keys }) => [scope, keys]),
+      ).toEqual([
+        [
+          "office",
+          ["watchdog.sandboxTimeLimitMinutes", "watchdog.providers.Ollama"],
+        ],
+        ["office", ["watchdog.providers.Ollama", "watchdog.providers.Qwen"]],
+      ]);
+    },
+  ],
+  [
+    "carries 12,000 characters of each memory and 40,000 of the Skills listing until the Owner chooses otherwise",
+    async ({ settings, bus }) => {
+      expect(await settings.promptBudgetSettings()).toEqual({
+        repositoryMemory: 12_000,
+        officeMemory: 12_000,
+        roleMemory: 12_000,
+        skills: 40_000,
+      });
+      const chosen = {
+        repositoryMemory: 4000,
+        officeMemory: 12_000,
+        roleMemory: 2000,
+        skills: 8000,
+      };
+      expect(await settings.setPromptBudgetSettings(chosen)).toEqual(chosen);
+      // The same again changes nothing.
+      await settings.setPromptBudgetSettings(chosen);
+      expect(await settings.promptBudgetSettings()).toEqual(chosen);
+      expect(
+        (await configChanges(bus)).map(({ scope, keys }) => [scope, keys]),
+      ).toEqual([
+        [
+          "office",
+          [
+            "promptBudget.repositoryMemory",
+            "promptBudget.roleMemory",
+            "promptBudget.skills",
+          ],
+        ],
+      ]);
+    },
+  ],
+  [
     "keeps bodies 7 days, records 90, activity a year and delivery logs 90 days until the Owner chooses otherwise",
     async ({ settings, bus }) => {
       expect(await settings.retentionSettings()).toEqual({

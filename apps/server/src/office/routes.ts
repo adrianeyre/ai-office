@@ -8,6 +8,7 @@ import {
   lobbyCharacterSchema,
   lobbyRoles,
   ownerProfileSchema,
+  promptBudgetSettingsSchema,
   setFloorActivitiesRequestSchema,
   promptCacheKeepAliveSettingsSchema,
   promptCacheSettingsSchema,
@@ -19,6 +20,7 @@ import {
   requestBodiesSettingsSchema,
   retentionSettingsSchema,
   sandboxSettingsSchema,
+  watchdogSettingsSchema,
 } from "@ai-office/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -29,7 +31,8 @@ import { sendFloorError } from "../floors/routes.ts";
 // The office admin's settings (PRD FR-65). So far: the Git identity agent
 // commits are by (FR-68), which each Floor can override in its own
 // settings; intake's (FR-8): the Owner's GitHub login and how often intake
-// checks for issues; how many sandboxes may run at once (FR-22); and
+// checks for issues; how many sandboxes may run at once (FR-22), how long
+// each may run and how long work may stall (FR-23); and
 // whether the AI Gateway keeps request and response bodies (FR-44); how it
 // balances requests (FR-37); how it retries them (FR-39); the TTL it
 // gives prompt-cache breakpoints (§6.8), and whether it keeps Agents'
@@ -37,9 +40,10 @@ import { sendFloorError } from "../floors/routes.ts";
 // (FR-40), whose chains are the Gateway's own routes; the outbound HTTP
 // proxy every upstream request goes through (FR-35), whose password goes
 // in and never comes back out; the Decision Model (FR-17, FR-89); how long
-// records are kept (retention, §7); the Owner's profile, which the lobby's
-// receptionist greets them by; and the lobby's cast, the receptionist and
-// the visitor.
+// records are kept (retention, §7); the prompt budgets, the most of each
+// memory and of the Skills listing an Agent's prompt carries; the Owner's
+// profile, which the lobby's receptionist greets them by; and the lobby's
+// cast, the receptionist and the visitor.
 
 export function registerOfficeRoutes(
   app: FastifyInstance,
@@ -175,6 +179,26 @@ export function registerOfficeRoutes(
       const sandboxes = await settings.setSandboxSettings(parsed.data);
       request.log.info("The office's sandbox limit was set.");
       return sandboxes;
+    },
+  );
+
+  // The watchdog's stall timeout and the sandbox time limit, and each AI
+  // Provider's own.
+  app.get("/api/office/watchdog", { config: { access: "owner" } }, () =>
+    settings.watchdogSettings(),
+  );
+
+  app.put(
+    "/api/office/watchdog",
+    { config: { access: "owner" } },
+    async (request, reply) => {
+      const parsed = watchdogSettingsSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return sendInvalidRequest(reply, parsed.error);
+      }
+      const watchdog = await settings.setWatchdogSettings(parsed.data);
+      request.log.info("The watchdog's time limits were set.");
+      return watchdog;
     },
   );
 
@@ -419,6 +443,24 @@ export function registerOfficeRoutes(
       const retention = await settings.setRetentionSettings(parsed.data);
       request.log.info(retention, "Retention was set.");
       return retention;
+    },
+  );
+
+  app.get("/api/office/prompt-budget", { config: { access: "owner" } }, () =>
+    settings.promptBudgetSettings(),
+  );
+
+  app.put(
+    "/api/office/prompt-budget",
+    { config: { access: "owner" } },
+    async (request, reply) => {
+      const parsed = promptBudgetSettingsSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return sendInvalidRequest(reply, parsed.error);
+      }
+      const budget = await settings.setPromptBudgetSettings(parsed.data);
+      request.log.info(budget, "The prompt budgets were set.");
+      return budget;
     },
   );
 }

@@ -6,6 +6,7 @@ import {
   withRoleProposals,
   type AgentMemory,
 } from "../memory/shared.ts";
+import type { PromptBudget } from "../memory/budget.ts";
 import type { HandoffSummary } from "../review/store.ts";
 import { repositoryAgentFilesNote } from "../sandbox/agent-tools.ts";
 import { sharedBranchLines, type SharedBranch } from "../sandbox/branch.ts";
@@ -55,7 +56,21 @@ export interface DesignPromptInput {
   readonly memory?: string;
   /** The office-wide and Role memory mounted in its sandbox (FR-54, FR-55). */
   readonly agentMemory?: AgentMemory;
+  /**
+   * The most of each memory the prompt carries, for its Model (the prompt
+   * budget); as much as AI Office keeps when absent.
+   */
+  readonly budget?: PromptBudget;
 }
+
+/** The form of the designer's report: in its prompt, and when asked again. */
+export const designReviewForm: readonly string[] = [
+  "<design-review>",
+  "Result: pass or changes",
+  "Summary: the style guide you used, the screens you took, and what you found, in a sentence or two.",
+  "Findings: for changes, numbered: the screen, what is wrong, what the style guide says, and the component or CSS change to make; for a pass, none.",
+  "</design-review>",
+];
 
 export function designPrompt(input: DesignPromptInput): string {
   const { floor, agent, issue, branch, round } = input;
@@ -93,8 +108,10 @@ export function designPrompt(input: DesignPromptInput): string {
           `Known risks: ${quotedIn("handoff", input.handoff.risks)}`,
           "</handoff>",
         ]),
-    ...(input.memory === undefined ? [] : ["", ...memorySection(input.memory)]),
-    ...withMountedMemory(input.agentMemory),
+    ...(input.memory === undefined
+      ? []
+      : ["", ...memorySection(input.memory, input.budget?.repositoryMemory)]),
+    ...withMountedMemory(input.agentMemory, input.budget),
     "",
     "## What to do",
     "",
@@ -122,11 +139,7 @@ export function designPrompt(input: DesignPromptInput): string {
     "",
     "Pass when the UI follows the style guide, counting the fixes you committed. Ask for changes only for what you could not fix yourself. End your last message with your report, in this form:",
     "",
-    "    <design-review>",
-    "    Result: pass or changes",
-    "    Summary: the style guide you used, the screens you took, and what you found, in a sentence or two.",
-    "    Findings: for changes, numbered: the screen, what is wrong, what the style guide says, and the component or CSS change to make; for a pass, none.",
-    "    </design-review>",
+    ...designReviewForm.map((line) => `    ${line}`),
     "",
     ...proposingMemory("report"),
     ...withRoleProposals(input.agentMemory, "report"),

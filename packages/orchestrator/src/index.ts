@@ -406,11 +406,14 @@ export {
 } from "./qa/caps.ts";
 export { commentableLines, unifiedDiff } from "./review/diff.ts";
 export {
+  diffLimitOf,
   retryMessage,
   reviewerPrompt,
+  type DiffLimit,
   type ReviewerPrompt,
   type ReviewerPromptInput,
 } from "./review/prompt.ts";
+export { reviewersDiffLimit } from "./review/diff-limit.ts";
 export { parseVerdict, type ParsedVerdict } from "./review/verdict.ts";
 export {
   changedLines,
@@ -577,6 +580,20 @@ export {
   type ContextUsageState,
   type ObservedModelCall,
 } from "./context/usage.ts";
+export {
+  charactersIn,
+  charactersPerToken,
+  type ContextWindowOf,
+} from "./context/window.ts";
+export {
+  agentMemoryWithin,
+  defaultPromptBudget,
+  promptBudgetFor,
+  promptBudgetOf,
+  skillsWithin,
+  type PromptBudget,
+  type PromptBudgetOf,
+} from "./memory/budget.ts";
 export {
   databaseCapPauseStore,
   memoryCapPauseStore,

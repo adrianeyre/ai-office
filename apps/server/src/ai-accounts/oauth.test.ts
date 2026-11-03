@@ -212,6 +212,8 @@ const cases: Case[] = [
         // No forced Model; a subscription's extra usage is off (FR-41).
         forcedModel: null,
         extraUsage: false,
+        // The model catalogue's context window.
+        contextWindow: null,
         rateLimits: null,
         balance: null,
         createdAt: new Date(start).toISOString(),

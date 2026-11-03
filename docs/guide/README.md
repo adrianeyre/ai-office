@@ -1,10 +1,14 @@
 # The AI Office guide
 
 How AI Office works, part by part. Start with the [README](../../README.md)
-for requirements and getting started.
+for an overview, and [Developing AI Office](development.md) for requirements
+and getting started.
 
 | Guide | What it covers |
 | --- | --- |
+| [Developing AI Office](development.md) | Requirements, every `pnpm` command, the tests, the end-to-end and scene screenshot tests, and working on AI Office with Sandcastle. |
+| [Roles, Stages and Floor Templates](roles-and-templates.md) | An overview of the Role library, the four Stages and the built-in and the Owner's own Floor Templates. |
+| [Screenshots](screenshots.md) | Every page of AI Office, as `pnpm screenshots` takes it. |
 | [Running AI Office](running.md) | Running AI Office in development, with docker compose, the server's first run and sign-in, freeing storage, retention, and configuration export and import. |
 | [The AI Gateway](ai-gateway.md) | The built-in AI Gateway: its endpoints, prices, analytics, request history, Gateway Keys, AI Accounts, the outbound proxy, the Decision Model and AI Providers. |
 | [Floors and Agents](floors-and-agents.md) | Floors and Floor Templates, Agents and their editors, the Role library, Token Caps and the Git identity. |

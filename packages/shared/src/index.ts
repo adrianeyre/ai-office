@@ -306,6 +306,12 @@ export {
   type PipelineStage,
 } from "./pipeline.ts";
 export {
+  defaultPromptBudgetSettings,
+  maxPromptBudget,
+  promptBudgetSettingsSchema,
+  type PromptBudgetSettings,
+} from "./prompt-budget.ts";
+export {
   defaultSandboxConcurrencyLimit,
   maxSandboxConcurrencyLimit,
   sandboxSettingsSchema,
@@ -372,6 +378,8 @@ export {
   completeOAuthLoginRequestSchema,
   maxPauseThreshold,
   minPauseThreshold,
+  minContextWindow,
+  maxContextWindow,
   usageHistorySchema,
   usageReadingSchema,
   usageWindowLabels,
@@ -970,14 +978,25 @@ export {
   defaultAgentFailures,
   defaultMaxFailures,
   defaultMaxStallRestarts,
+  defaultSandboxTimeLimitMinutes,
   defaultStallTimeoutMinutes,
+  defaultWatchdogSettings,
   forbiddenManagerActions,
   isManagerAction,
   managerActionLabels,
   managerActions,
+  maxSandboxTimeLimitMinutes,
+  maxStallTimeoutMinutes,
+  minSandboxTimeLimitMinutes,
+  minStallTimeoutMinutes,
+  watchdogLimitsFor,
+  watchdogOverrideSchema,
+  watchdogSettingsSchema,
   watchdogTriggers,
   type ForbiddenManagerAction,
   type ManagerAction,
+  type WatchdogOverride,
+  type WatchdogSettings,
   type WatchdogTrigger,
 } from "./watchdog.ts";
 export {

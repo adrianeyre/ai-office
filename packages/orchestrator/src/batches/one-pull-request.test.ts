@@ -1,3 +1,4 @@
+import type { RepositoryClient } from "@ai-office/github";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -9,7 +10,9 @@ import {
   oneAtATime,
   type BatchBranch,
   type BatchPullRequestIssue,
+  writeBatchPullRequest,
 } from "./one-pull-request.ts";
+import { diffLimitOf } from "../review/prompt.ts";
 
 // A Batch handed over "in one PR" (ADR 0010): where each issue's work
 // begins and ends on its shared branch, its Plan run one issue at a time,
@@ -178,5 +181,41 @@ describe("the one pull request", () => {
     expect(body).toContain(
       "1 issue and 40 files change in one merge, which waits until every issue of the Batch is ready to merge. It goes to you whatever the Merge Policy, as it changes what CI runs.",
     );
+  });
+
+  it("says it goes to the Owner when its reviewers' context window cannot hold its diff, as the Merge Policy judges it", async () => {
+    const bodies: string[] = [];
+    const client = {
+      getIssue: () => Promise.resolve({ state: "open", labels: [] }),
+      listPullRequests: () =>
+        Promise.resolve([{ number: 40, htmlUrl: "https://github.com/pr/40" }]),
+      listPullRequestFiles: () =>
+        Promise.resolve([
+          {
+            path: "src/catalogue.json",
+            status: "modified",
+            patch: `@@ -0,0 +1 @@
++${"x".repeat(50_000)}`,
+          },
+        ]),
+      updatePullRequest: (_number: number, { body }: { body: string }) => {
+        bodies.push(body);
+        return Promise.resolve();
+      },
+    } as unknown as RepositoryClient;
+    const write = (window: number | null) =>
+      writeBatchPullRequest({
+        client,
+        floorId: "web-shop",
+        base: "main",
+        batch,
+        diffLimit: diffLimitOf(window),
+      });
+    await write(32_768);
+    await write(200_000);
+    expect(bodies[0]).toContain(
+      "more than the 29,008 a 32,768-token context window holds",
+    );
+    expect(bodies[1]).not.toContain("It goes to you whatever the Merge Policy");
   });
 });

@@ -1,0 +1,185 @@
+/* AI Office's look for every demo on the page (stageshow/kit's tokens,
+   references/looks.md in the Stageshow skill). The values are the app's
+   own: apps/web/src/styles.css's ink neutrals (hue 275, a trace of the
+   logo's indigo), its Indigo theme's primary, its 0.75rem card radius, and
+   the page's Inter. Light and dark follow the page, which passes the
+   system's preference to each Stage as its theme. */
+
+.aio .ss-stage {
+  --ss-font:
+    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+  --ss-mono:
+    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Surfaces: --background, --card and the page's tinted wells */
+  --ss-canvas: #f6f6fb;
+  --ss-surface: #ffffff;
+  --ss-chrome: #ffffff;
+  --ss-raised: #ffffff;
+  --ss-well: #e7e9f8;
+
+  /* Ink: --foreground and --muted-foreground */
+  --ss-text-strong: #14142b;
+  --ss-text: #5b5d78;
+  --ss-text-faint: #8c8ea8;
+  --ss-icon: #5b5d78;
+  --ss-icon-faint: #b9bbd0;
+  --ss-line: rgb(20 20 80 / 9%);
+  --ss-line-faint: rgb(20 20 80 / 5%);
+  --ss-ink-1: rgb(30 30 90 / 4%);
+  --ss-ink-2: rgb(30 30 90 / 6%);
+  --ss-ink-3: rgb(30 30 90 / 9%);
+  --ss-ink-4: rgb(30 30 90 / 11%);
+  --ss-ink-5: rgb(30 30 90 / 16%);
+
+  /* The Indigo theme's primary and accent */
+  --ss-accent: #4338ca;
+  --ss-accent-2: #7c3aed;
+  --ss-accent-soft: #eef2ff;
+  --ss-accent-text: #3730a3;
+  --aio-on-accent: #ffffff;
+
+  /* The app's tones, for status */
+  --ss-success: #16a34a;
+  --ss-success-soft: #dcfce7;
+  --ss-success-text: #166534;
+  --ss-warning: #d97706;
+  --ss-warning-soft: #fef3c7;
+  --ss-warning-text: #92400e;
+  --ss-danger: #dc2626;
+  --ss-danger-soft: #fee2e2;
+  --ss-danger-text: #991b1b;
+  --aio-info-soft: #e0f2fe;
+  --aio-info-text: #075985;
+  --aio-violet-soft: #ede9fe;
+  --aio-violet-text: #5b21b6;
+
+  /* Shape: the app's --radius (12px) and the steps shadcn/ui takes off it */
+  --ss-radius-sm: 6px;
+  --ss-radius-md: 8px;
+  --ss-radius-lg: 10px;
+  --ss-radius-window: 14px;
+
+  --ss-shadow-hero:
+    0 0 0 1px rgb(20 20 80 / 7%), 0 30px 60px -12px rgb(67 56 202 / 22%),
+    0 18px 36px -18px rgb(20 20 43 / 28%);
+  --ss-shadow-satellite:
+    0 0 0 1px rgb(20 20 80 / 6%), 0 14px 32px -8px rgb(67 56 202 / 24%),
+    0 4px 10px -4px rgb(20 20 43 / 10%);
+  --ss-shadow-card: 0 0 0 1px rgb(20 20 80 / 6%), 0 1px 2px rgb(20 20 43 / 4%);
+
+  /* The Agent's live view is the app's dark terminal */
+  --ss-term-bg: #0f1024;
+  --ss-term-path: #a5b4fc;
+  --ss-term-sigil: #818cf8;
+  --ss-term-ok: #4ade80;
+  --ss-term-dim: #8b8fb8;
+}
+
+.aio .ss-stage[data-theme="dark"] {
+  --ss-canvas: #13141f;
+  --ss-surface: #191a26;
+  --ss-chrome: #1c1d2b;
+  --ss-raised: #23243a;
+  --ss-well: #0f1019;
+
+  --ss-text-strong: #eeeef8;
+  --ss-text: #a6a8c2;
+  --ss-text-faint: #7a7c98;
+  --ss-icon: #a6a8c2;
+  --ss-icon-faint: #4b4d68;
+  --ss-line: rgb(200 200 255 / 10%);
+  --ss-line-faint: rgb(200 200 255 / 6%);
+  --ss-ink-1: rgb(200 200 255 / 5%);
+  --ss-ink-2: rgb(200 200 255 / 8%);
+  --ss-ink-3: rgb(200 200 255 / 11%);
+  --ss-ink-4: rgb(200 200 255 / 14%);
+  --ss-ink-5: rgb(200 200 255 / 20%);
+
+  --ss-accent: #a5b4fc;
+  --ss-accent-2: #c4b5fd;
+  --ss-accent-soft: #272463;
+  --ss-accent-text: #c7d2fe;
+  --aio-on-accent: #1e1b4b;
+
+  --ss-success: #4ade80;
+  --ss-success-soft: #0b3a22;
+  --ss-success-text: #bbf7d0;
+  --ss-warning: #fbbf24;
+  --ss-warning-soft: #4a2a06;
+  --ss-warning-text: #fde68a;
+  --ss-danger-soft: #4c1414;
+  --ss-danger-text: #fecaca;
+  --aio-info-soft: #0c3a57;
+  --aio-info-text: #bae6fd;
+  --aio-violet-soft: #33195e;
+  --aio-violet-text: #ddd6fe;
+
+  --ss-shadow-hero:
+    0 0 0 1px rgb(200 200 255 / 10%), 0 30px 60px -12px rgb(0 0 0 / 60%);
+  --ss-shadow-satellite:
+    0 0 0 1px rgb(200 200 255 / 12%), 0 14px 32px -8px rgb(0 0 0 / 60%);
+  --ss-shadow-card: 0 0 0 1px rgb(200 200 255 / 8%);
+  --ss-term-bg: #08091a;
+}
+
+/* The fade crop (the `fade-crop` gold): a window a full gutter in from
+   the stage's top and sides runs off its foot, and this wrapper's mask
+   fades it out over the last stretch, so the window keeps its shadow on
+   three sides and is never sliced by a hard edge on the page. */
+.aio .aio-fade {
+  --aio-fade: 150px;
+  position: absolute;
+  inset: 0;
+  padding: 16px 16px 0;
+  mask-image: linear-gradient(
+    to bottom,
+    #000 calc(100% - var(--aio-fade)),
+    transparent
+  );
+  mask-repeat: no-repeat;
+}
+
+/* A GitHub label, as the app shows a Stage's: a tinted pill in its tone */
+.aio .aio-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: var(--ss-radius-pill);
+  font-family: var(--ss-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  text-box: trim-both cap alphabetic;
+}
+
+.aio .aio-label[data-tone="neutral"] {
+  background: var(--ss-ink-2);
+  color: var(--ss-text);
+}
+.aio .aio-label[data-tone="warning"] {
+  background: var(--ss-warning-soft);
+  color: var(--ss-warning-text);
+}
+.aio .aio-label[data-tone="info"] {
+  background: var(--aio-info-soft);
+  color: var(--aio-info-text);
+}
+.aio .aio-label[data-tone="violet"] {
+  background: var(--aio-violet-soft);
+  color: var(--aio-violet-text);
+}
+.aio .aio-label[data-tone="success"] {
+  background: var(--ss-success-soft);
+  color: var(--ss-success-text);
+}
+.aio .aio-label[data-tone="accent"] {
+  background: var(--ss-accent);
+  color: var(--aio-on-accent);
+  font-family: var(--ss-font);
+  font-weight: 600;
+}

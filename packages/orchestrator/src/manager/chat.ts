@@ -82,6 +82,7 @@ import {
 } from "../grilling/session.ts";
 import { grillingSkillInstructions } from "../grilling/skill.ts";
 import type { GrillingStore } from "../grilling/store.ts";
+import type { PromptBudgetOf } from "../memory/budget.ts";
 import type { RepositoryMemory } from "../memory/memory.ts";
 import type {
   ModelClient,
@@ -418,6 +419,11 @@ export interface ManagerChatOptions {
   ) => Promise<ChatMessageRecord>;
   /** The repository's memory, which the Manager reads for each reply (FR-53). */
   readonly memory?: Pick<RepositoryMemory, "read">;
+  /**
+   * How much of the memory and the Skills listing the Manager's prompt
+   * carries, for its Model (the prompt budget); all of them without it.
+   */
+  readonly promptBudget?: PromptBudgetOf;
   /**
    * The Floor's Skills (FR-74): what `/name` runs, and what the Manager
    * may choose. Without it, the Floor has none.
@@ -1209,6 +1215,10 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
       } else {
         const callModel = model;
         const memory = await options.memory?.read(floor);
+        const budget = await options.promptBudget?.(
+          manager.aiProvider,
+          callModel,
+        );
         const given = await conversationFor(
           floor,
           manager,
@@ -1272,6 +1282,7 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
               model: modelOf(agent, defaults),
             })),
             ...(memory === undefined ? {} : { memory }),
+            ...(budget === undefined ? {} : { budget }),
             loadedSkills: prompt.loadedSkills,
             offeredSkills: prompt.offeredSkills.map(
               ({ name, description }) => ({
@@ -1796,6 +1807,7 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
         kept = reply("error", cannot ?? "", null);
       } else {
         const memory = await options.memory?.read(floor);
+        const budget = await options.promptBudget?.(manager.aiProvider, model);
         const given = await conversationFor(
           floor,
           manager,
@@ -1819,6 +1831,7 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
               model: modelOf(agent, defaults),
             })),
             ...(memory === undefined ? {} : { memory }),
+            ...(budget === undefined ? {} : { budget }),
             ...(given.summary === undefined ? {} : { summary: given.summary }),
             loadedSkills: withGrilling(given.loaded, current),
             grilling: [
@@ -2086,6 +2099,10 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
       } else {
         const callModel = model;
         const memory = await options.memory?.read(floor);
+        const budget = await options.promptBudget?.(
+          manager.aiProvider,
+          callModel,
+        );
         const given = await conversationFor(
           floor,
           manager,
@@ -2104,6 +2121,7 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
             model: modelOf(agent, defaults),
           })),
           ...(memory === undefined ? {} : { memory }),
+          ...(budget === undefined ? {} : { budget }),
           ...(given.summary === undefined ? {} : { summary: given.summary }),
           loadedSkills: withGrilling(given.loaded, session),
           grilling: [

@@ -206,7 +206,7 @@ docker compose version
 
 Building the sandbox images (`pnpm sandbox:build`, for Agents) also needs
 Node 26 and pnpm 12 on the instance, as the README's
-[Requirements](../../README.md#requirements) say. The stack itself needs
+[Requirements](../guide/development.md#requirements) say. The stack itself needs
 neither: it builds in Docker.
 
 ```bash

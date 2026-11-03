@@ -1,0 +1,53 @@
+# The Local Floor Template (PRD FR-100): a software team on the Owner's own
+# Models, through their Ollama server. Every Role suggests the Ollama AI
+# Provider and the same Model, so that one GPU never swaps Models between
+# Agents. A local coder changes the code, a local reviewer reviews each pull
+# request and local QA runs the checks. Smaller Models do best with small,
+# exact issues, so the Manager plans them so. The Floor works on the
+# repository only, never on a production service or a package registry
+# (PRD §4). packages/orchestrator/src/templates/local.test.ts checks its
+# Roles and settings. The format is in docs/guide/floors-and-agents.md,
+# under "Floor Templates".
+name: Local
+description: A software team on your own Models through Ollama, sharing one Model, that makes one small change per pull request in its repository, reviews it and tests it.
+icon: server
+theme: office
+roles:
+  - role: local-coder
+    count: 1
+  - role: local-reviewer
+    count: 1
+  - role: local-qa
+    count: 1
+settings:
+  setupCommand: if [ -f package.json ]; then npm install; fi
+  testCommand: npm run check
+  mergePolicy: send_to_me
+  roundCap: 3
+  requiredReviewers: [local-reviewer]
+manager:
+  planningGuidance: |-
+    This Floor started from the Local Floor Template. Its Agents run on the Owner's own Models through Ollama, all on the same Model, which is smaller than a hosted one and reads less at once. It works on its repository only: its code, tests and docs. It never acts on a production service or a package registry: nothing here deploys, publishes a package or changes live data. An issue that needs one is for the Owner: say so on the issue and ask the Owner with a Notice rather than planning it.
+
+    The local coder changes the code. The local reviewer reviews every pull request, and local QA checks what the local reviewer approves: the Floor's checks, and tests for the change.
+
+    Plan for a smaller Model:
+
+    - Keep each issue small: one change, which a person could make in an hour. Split anything larger into issues that each stand on their own, one after another.
+    - Name the files each issue changes, and the function or section in each, so that no Agent has to search the whole repository for them.
+    - Give each issue explicit acceptance criteria, as a checklist that a test or a look at the change can tick off: what the code does afterwards, and what it does with a bad input.
+    - One change per pull request: never a One-pull-request Batch on this Floor, and never a refactor beside a fix.
+    - Say in the issue what to leave alone, where a nearby change would be tempting.
+  firstIssue:
+    title: Set up the repository's checks
+    body: |-
+      Add a `check` script to `package.json` (making one if the repository has none), so that the Floor's check command, `npm run check`, runs every check the repository has, one after another: its tests, its linter and its compiler's checks, in whatever language the repository is written. It exits with an error, naming the file and the test or rule, when one fails.
+
+      Say in the README how to run it, and what it runs.
+
+      ## Acceptance criteria
+
+      - [ ] `npm run check` runs and passes on the default branch
+      - [ ] It fails, naming the file and the test, when a test fails
+      - [ ] The README says how to run it, and what it runs
+labels: []

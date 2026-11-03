@@ -6,6 +6,7 @@ import {
   withRoleProposals,
   type AgentMemory,
 } from "../memory/shared.ts";
+import type { PromptBudget } from "../memory/budget.ts";
 import { describeComment, type BlockingComment } from "../review/handoff.ts";
 import type { HandoffSummary } from "../review/store.ts";
 import { repositoryAgentFilesNote } from "../sandbox/agent-tools.ts";
@@ -109,6 +110,11 @@ export interface CoderPromptInput {
   readonly memory?: string;
   /** The office-wide and Role memory mounted in its sandbox (FR-54, FR-55). */
   readonly agentMemory?: AgentMemory;
+  /**
+   * The most of each memory the prompt carries, for its Model (the prompt
+   * budget); as much as AI Office keeps when absent.
+   */
+  readonly budget?: PromptBudget;
 }
 
 /** Text that cannot close the `<issue>` quote it is put in. */
@@ -284,8 +290,10 @@ export function coderPrompt(input: CoderPromptInput): string {
     ...(input.designFeedback === undefined
       ? []
       : designFeedbackSection(input.designFeedback)),
-    ...(input.memory === undefined ? [] : ["", ...memorySection(input.memory)]),
-    ...withMountedMemory(input.agentMemory),
+    ...(input.memory === undefined
+      ? []
+      : ["", ...memorySection(input.memory, input.budget?.repositoryMemory)]),
+    ...withMountedMemory(input.agentMemory, input.budget),
     "",
     "## How to work",
     "",

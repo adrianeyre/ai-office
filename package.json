@@ -12,7 +12,7 @@
     "db:reset": "docker compose -f docker-compose.dev.yml down --volumes && pnpm db:up && pnpm db:schema",
     "build": "pnpm --recursive --if-present build",
     "lint": "eslint . && prettier --check .",
-    "typecheck": "tsc && tsc -p site && pnpm --recursive typecheck",
+    "typecheck": "tsc && pnpm --recursive typecheck",
     "test": "vitest run",
     "format": "prettier --write . && eslint --fix .",
     "db:schema": "pnpm --filter @ai-office/db db:schema",
@@ -21,7 +21,9 @@
     "sandbox:ensure": "node docker/sandbox-build.ts --missing",
     "screenshots": "pnpm build && pnpm --filter @ai-office/e2e screenshots",
     "scenes": "pnpm --filter @ai-office/e2e scenes",
-    "site:build": "node site/build.ts"
+    "site:build": "node site/build.ts",
+    "site:dev": "node site/build.ts --dev",
+    "site:preview": "node site/build.ts --preview"
   },
   "engines": {
     "node": ">=26",

@@ -60,7 +60,15 @@ interface Setup {
   review(): Promise<readonly string[]>;
 }
 
-async function setUp(options: { small?: boolean } = {}): Promise<Setup> {
+async function setUp(
+  options: {
+    small?: boolean;
+    /** One page of the catalogue, about 34,000 characters, not all of it. */
+    page?: boolean;
+    /** The reviewer's Model's context window, in tokens; null for unknown. */
+    contextWindow?: number | null;
+  } = {},
+): Promise<Setup> {
   const fake = createFakeGitHub();
   fake.installRepository(repository);
   fake.pushCommit(repository, "main", {
@@ -91,7 +99,11 @@ async function setUp(options: { small?: boolean } = {}): Promise<Setup> {
   // The work Agent's pull request: the catalogue, then package.json.
   fake.pushCommit(repository, branch, {
     files: {
-      ...(options.small === true ? {} : catalogue),
+      ...(options.small === true
+        ? {}
+        : options.page === true
+          ? { "assets/catalogue-1.json": page }
+          : catalogue),
       "package.json": hostile,
     },
   });
@@ -121,6 +133,12 @@ async function setUp(options: { small?: boolean } = {}): Promise<Setup> {
         events: bus,
         models: model,
         reviews: stores.reviews,
+        ...(options.contextWindow === undefined
+          ? {}
+          : {
+              contextWindow: () =>
+                Promise.resolve(options.contextWindow ?? null),
+            }),
       }),
     }),
   });
@@ -196,5 +214,39 @@ describe("P1-11: a change the reviewer is never shown", () => {
     const verdicts = await s.stores.reviews.verdicts("web-shop", 1);
     expect(verdicts.map(({ verdict }) => verdict.verdict)).toEqual(["approve"]);
     expect(labels).toContain("needs-qa");
+  });
+});
+
+describe("P1-11: in full, for the reviewer's Model's context window", () => {
+  it("sends a diff its small context window cannot hold to the Owner, naming the window, with no reviewer asked", async () => {
+    const s = await setUp({ page: true, contextWindow: 32_768 });
+    const labels = await s.review();
+    expect(asked(s)).toBe("");
+    expect(await s.stores.reviews.verdicts("web-shop", 1)).toEqual([]);
+    expect(labels).toContain("needs-human");
+    const [notice] = await s.stores.notices.open();
+    expect(notice?.title).toMatch(
+      /^Too large to review: PR #2 \(#1\) cannot be shown to a reviewer in full \(its diff is [\d,]+ characters, more than the 29,008 a 32,768-token context window holds\), so it is yours to review\.$/,
+    );
+  });
+
+  it("reviews the same diff as before when the window is large, or unknown", async () => {
+    for (const contextWindow of [200_000, null]) {
+      const s = await setUp({ page: true, contextWindow });
+      const labels = await s.review();
+      expect(asked(s)).toContain(canary("cut"));
+      expect(labels).toContain("needs-qa");
+    }
+  });
+
+  it("still sends a diff over 100,000 characters to the Owner with a large window, as before", async () => {
+    const s = await setUp({ contextWindow: 1_048_576 });
+    const labels = await s.review();
+    expect(asked(s)).toBe("");
+    expect(labels).toContain("needs-human");
+    const [notice] = await s.stores.notices.open();
+    expect(notice?.title).toMatch(
+      /more than the 100,000 a reviewer is shown\), so it is yours to review\.$/,
+    );
   });
 });

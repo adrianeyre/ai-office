@@ -297,8 +297,13 @@ AI Office does that later.
    screened by AI Office's rules the same way, before each call runs where
    Claude Code asks, and keep no answer from a sandbox one stopped.
 5. It returns the commits and the tokens used. On cancellation (an
-   `AbortSignal`) or after an hour, the sandbox is killed and the clone
-   deleted.
+   `AbortSignal`) or at its time limit, the sandbox is killed and the
+   clone deleted ("The sandbox for issue #N ran out of time"). The time
+   limit is an hour by default, set in General Settings' **Watchdog** card
+   (`GET` and `PUT /api/office/watchdog`, `sandboxTimeLimitMinutes`, 10 to
+   480 minutes), and may be longer or shorter for one AI Provider's Agents
+   (`providers`, below). It is read as each sandbox starts, so a change
+   applies from the next run; a run already going keeps its limit.
 
 **The sandbox's environment holds only:**
 
@@ -603,13 +608,27 @@ holds the issue while they review, all at once:
    **Only a pull request shown in full is reviewed** (pen-test finding
    P1-11). Before any reviewer is asked, `notShownInFull` checks that the
    prompt can carry the whole diff: every file's diff, as GitHub gives
-   it, and no more than 100,000 characters of it. A pull request whose
-   diff is longer, or with a file GitHub shows no diff of (binary, or too
-   large), goes to the Owner: it is labelled `needs-human`, and an action
-   Notice says why ("Too large to review: PR #N (#I) cannot be shown to a
-   reviewer in full (…), so it is yours to review."). No reviewer is
-   asked and no approval is recorded, so the Merge Policy never merges it
-   on an approval of part of it.
+   it, and no more of it than every required reviewer can be shown. That
+   limit is sized from each reviewer's Model's effective context window
+   (`diffLimitOf`): the **Context window** set on one of its AI
+   Provider's AI Accounts, else the model catalogue's (see
+   [the AI Gateway](ai-gateway.md)). From the window are taken the
+   answer (8,192 tokens) and 8,000 tokens for the rest of the prompt
+   (its instructions, the memory, the issue and the Handoff); half of
+   what is left, at 3.5 characters a token, is for the diff, and the
+   other half for the files it changes. It is never more than 100,000
+   characters, which is also the limit when no window is known, so a
+   hosted Model's large window changes nothing: a 32,768-token window
+   holds 29,008 characters of diff, a 65,536-token one 86,352, and from
+   about 73,000 tokens up it is 100,000. The smallest limit among the
+   reviewers counts. A pull request whose diff is longer, or with a file
+   GitHub shows no diff of (binary, or too large), goes to the Owner: it
+   is labelled `needs-human`, and an action Notice says why ("Too large
+   to review: PR #N (#I) cannot be shown to a reviewer in full (…), so it
+   is yours to review.", naming the window when one set the limit: "its
+   diff is 50,124 characters, more than the 29,008 a 32,768-token context
+   window holds"). No reviewer is asked and no approval is recorded, so
+   the Merge Policy never merges it on an approval of part of it.
 3. **A verdict, checked.** The answer must be one JSON object that
    `reviewVerdictSchema` (`@ai-office/shared`) accepts: `approve` or
    `changes_requested`, a summary, and comments, each `blocking` or
@@ -721,8 +740,15 @@ Floor without a QA Agent skips the stage: approval moves the issue on to
    has one. The issue and the Handoff are quoted, as for the coder.
 2. **Its report.** It ends with a `<qa-report>` block: `Result: pass` or
    `fail`, a summary, and for a failure the steps that reproduce it
-   (`parseQaReport`). A run without one blocks the Agent ("Agent blocked:
-   … gave no QA result"), and the issue stays at `needs-qa`.
+   (`parseQaReport`). A run without a valid one is asked for it once
+   more, as a reviewer's answer that is not a verdict is: one model call
+   through the AI Gateway with the Agent's own Gateway Key, quoting its
+   last message and asking for the block alone, in its form (`askAgain`).
+   The call is attributed to the Agent and the issue and counts against
+   its Token Caps like any other; a run that ended with its report makes
+   none. If the answer has no valid block either, the Agent is blocked
+   ("Agent blocked: … gave no QA result …, even when asked again"), and
+   the issue stays at `needs-qa`.
 3. **Tests it added are pushed** as the coder's commits are (as the Owner,
    with its `Agent:` trailer), and the App comments the result on the
    pull request ("**QA passed**" or "**QA failed**", with the steps). Each
@@ -809,8 +835,11 @@ without a designer skips it.
 3. **Its report.** It ends with a `<design-review>` block: `Result: pass`
    or `changes`, a summary, and for changes the numbered findings (screen,
    what is wrong, what the guide says, the component or CSS change)
-   (`parseDesignReport`). A run without one blocks the Agent ("Agent
-   blocked: … gave no design review"), and the issue stays at `needs-qa`.
+   (`parseDesignReport`). A run without a valid one is asked for it once
+   more, as QA's is, through the AI Gateway with the designer's own
+   Gateway Key. If the answer has no valid block either, the Agent is
+   blocked ("Agent blocked: … gave no design review …, even when asked
+   again"), and the issue stays at `needs-qa`.
 4. **The App comments the result** on the pull request ("**Design
    approved**" or "**Design changes requested**", with any fixes it made
    and the changes for the coder). Each round is kept in `design_reviews`
@@ -942,10 +971,12 @@ Floor's **Merge Policy** is in its settings (`mergePolicy` in `PATCH
   it leaves out could be anything.
 - **What no reviewer could be shown is the Owner's to merge.** A pull
   request whose whole diff a reviewer's prompt cannot carry (longer than
-  100,000 characters, or with a file GitHub shows no diff of) goes to the
+  100,000 characters, or than the Floor's required reviewers' context
+  windows hold, or with a file GitHub shows no diff of) goes to the
   Owner, "… not merged automatically, as no reviewer can be shown it in
   full (…)", whatever approvals it has (pen-test finding P1-11;
-  `notShownInFull`). The review round sends it to the Owner before any
+  `notShownInFull`, with the review Stage's own limit,
+  `reviewersDiffLimit`, so the two never disagree). The review round sends it to the Owner before any
   reviewer is asked, so this catches an approval recorded otherwise, such
   as before the check existed.
 - **What later Agents read is the Owner's to merge.** In the same way, a
@@ -1003,8 +1034,8 @@ has the protection for each Merge Policy, setting by setting.
 Each Floor's Manager watches its work, every minute, by rules in plain
 code (PRD FR-23; `createWatchdog` in `@ai-office/orchestrator`):
 
-- **Stalled work.** Work running with no sign of progress for 20
-  minutes (the Merge Policy's work, which waits on CI and bounds its own
+- **Stalled work.** Work running with no sign of progress for the stall
+  timeout, 20 minutes by default (the Merge Policy's work, which waits on CI and bounds its own
   wait, aside) (since it started, or since the last output, tool call, model
   call, review or push on its issue) is stopped and given to a free Agent
   of its Role (enabled, not paused, with nothing queued or running), or
@@ -1021,6 +1052,23 @@ code (PRD FR-23; `createWatchdog` in `@ai-office/orchestrator`):
 - **Loops near their cap.** When a Review Loop sends an issue back to
   its coder with one round left before the Round Cap, an action Notice
   tells the Owner, who can step in before it ends at `needs-human`.
+
+**Its time limits.** General Settings' **Watchdog** card sets the stall
+timeout (5 to 240 minutes; 20 by default) and the sandbox time limit (10
+to 480 minutes; 60 by default), kept in `office_settings` (`GET` and `PUT
+/api/office/watchdog`; anything outside those bounds is a `400`). Local
+Models (Ollama on one GPU, say) are slower than hosted ones, so each AI
+Provider may have its own limits (`providers`, such as `{"Ollama":
+{"stallTimeoutMinutes": 60, "sandboxTimeLimitMinutes": 240}}`; one left
+out is the office's), which win for its Agents. Work is judged by the AI
+Provider of the Agent working it (for an Agent on "Any AI Provider", the
+one it was given); work held by no Agent has the office's limits. The
+watchdog reads the limits at each check, and the sandbox
+runner as each sandbox starts, so a change needs no restart. Each change
+is a `config.changed` event naming what changed (such as
+`watchdog.stallTimeoutMinutes` or `watchdog.providers.Ollama`), never the
+values. The third stall still hands an issue to the Owner, whatever the
+timeout.
 
 **Its authority.** The Manager may retry, reassign, relabel, pause and
 escalate with a Notice; for the Owner's requests in its chat, it may also

@@ -2,6 +2,7 @@ import { isGitHubError, type RepositoryClient } from "@ai-office/github";
 import type { PipelineStage } from "@ai-office/shared";
 
 import { ownerOnly } from "../merge/owner-only.ts";
+import type { DiffLimit } from "../review/prompt.ts";
 import { issueList } from "../manager/commands.ts";
 import { PipelineError, positionOf } from "../pipeline/pipeline.ts";
 import type { ReviewLoopStore } from "../review/store.ts";
@@ -298,6 +299,11 @@ export async function writeBatchPullRequest(input: {
   /** The Floor's default branch, which it merges into. */
   readonly base: string;
   readonly batch: BatchBranch;
+  /**
+   * The most of a diff the Floor's reviewers can be shown, as the Merge
+   * Policy has it (`reviewersDiffLimit`); 100,000 characters when not given.
+   */
+  readonly diffLimit?: DiffLimit;
 }): Promise<{
   readonly number: number;
   readonly htmlUrl: string;
@@ -350,7 +356,7 @@ export async function writeBatchPullRequest(input: {
       branch: batch.branch,
       issues,
       files,
-      ownerOnly: ownerOnly(files),
+      ownerOnly: ownerOnly(files, input.diffLimit),
     });
   const pullRequest =
     open ??

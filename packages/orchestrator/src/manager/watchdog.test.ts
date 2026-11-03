@@ -7,7 +7,11 @@ import {
   type OfficeEvent,
 } from "@ai-office/events";
 import { createFakeGitHub, type FakeGitHub } from "@ai-office/github/testing";
-import type { ReviewVerdict } from "@ai-office/shared";
+import {
+  defaultWatchdogSettings,
+  type ReviewVerdict,
+  type WatchdogSettings,
+} from "@ai-office/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { createAgents } from "../agents/agents.ts";
@@ -59,6 +63,8 @@ interface Setup {
   readonly ran: { issue: number; agentId: string | null }[];
   /** Moves the clock on. */
   advance(ms: number): void;
+  /** Sets the Owner's time limits, as General Settings would. */
+  setTimeLimits(settings: WatchdogSettings): void;
   /** Ends the running work for an issue. */
   finish(issue: number, outcome?: "finished" | "failed"): void;
   /** Opens an issue at `needs-work`, as intake would leave it. */
@@ -120,6 +126,8 @@ async function setUp(
       }),
     now,
   });
+  // The defaults, until a case sets its own: 20 minutes to stall.
+  let timeLimits = defaultWatchdogSettings;
   const watchdog = createWatchdog({
     floors: stores.floors,
     agents: stores.agents,
@@ -130,7 +138,7 @@ async function setUp(
     notices,
     events: bus,
     decisions: stores.decisions,
-    limits: { stallTimeoutMs: minutes(20) },
+    timeLimits: () => Promise.resolve(timeLimits),
     now,
   });
   const repository = github.repository(webShop);
@@ -148,6 +156,9 @@ async function setUp(
     ran,
     advance(ms) {
       clock += ms;
+    },
+    setTimeLimits(settings) {
+      timeLimits = settings;
     },
     finish(issue, outcome = "finished") {
       running.get(issue)?.(outcome);
@@ -302,6 +313,53 @@ const cases: Case[] = [
       // Alan's run has just started: nothing more to decide.
       expect(await setup.watchdog.check()).toEqual([]);
       expect(await setup.notices.open()).toEqual([]);
+      await setup.watchdog.stop();
+      await setup.queue.stop();
+    },
+  ],
+  [
+    "an AI Provider's own stall timeout wins for its Agents, and a change applies from the next check",
+    async (setup) => {
+      const { ada, alan } = setup;
+      // Ada is a Claude Agent; Claude is given 45 minutes, the office 10.
+      expect(ada.aiProvider).toBe("Claude");
+      setup.setTimeLimits({
+        stallTimeoutMinutes: 10,
+        sandboxTimeLimitMinutes: 60,
+        providers: { Claude: { stallTimeoutMinutes: 45 } },
+      });
+      await setup.queue.start();
+      const issue = setup.openIssue("Add a basket");
+      await setup.queue.enqueue({
+        floorId: "web-shop",
+        issue,
+        stage: "needs-work",
+      });
+      await ranAs(setup, [{ issue, agentId: ada.id }]);
+
+      // Past the office's 10 minutes and the default 20: not stalled.
+      setup.advance(minutes(21));
+      expect(await setup.watchdog.check()).toEqual([]);
+
+      // Only Ollama has its own now: Claude's Agents have the office's.
+      setup.setTimeLimits({
+        stallTimeoutMinutes: 10,
+        sandboxTimeLimitMinutes: 60,
+        providers: { Ollama: { stallTimeoutMinutes: 120 } },
+      });
+      expect(await setup.watchdog.check()).toEqual([
+        expect.objectContaining({
+          issue,
+          action: "reassign",
+          trigger: "stalled",
+          fromAgentId: ada.id,
+          toAgentId: alan.id,
+        }),
+      ]);
+      const [comment] = await setup.decisionComments(issue);
+      expect(comment).toContain(
+        `> ${ada.name}'s work on it at needs-work showed no progress for 10 minutes`,
+      );
       await setup.watchdog.stop();
       await setup.queue.stop();
     },

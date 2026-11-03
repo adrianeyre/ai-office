@@ -296,7 +296,7 @@ describe("contextWindowOf", () => {
           ]);
         },
       },
-      () => clock,
+      { now: () => clock },
     );
     expect(await windowOf("Claude", "claude-opus-5-5")).toBe(200_000);
     expect(await windowOf("Claude", "grok-4")).toBeNull();
@@ -306,5 +306,31 @@ describe("contextWindowOf", () => {
     clock = 60_000;
     await windowOf("Claude", "claude-opus-5-5");
     expect(reads).toBe(2);
+  });
+
+  it("takes the smallest Context window set on one of the AI Provider's AI Accounts over the catalogue's", async () => {
+    const windowOf = contextWindowOf(
+      {
+        list: () =>
+          Promise.resolve([
+            entry("claude-opus-5-5", 200_000),
+            entry("qwen3-coder", null, "Ollama"),
+          ]),
+      },
+      {
+        accounts: {
+          list: () =>
+            Promise.resolve([
+              { aiProvider: "Claude", contextWindow: null },
+              { aiProvider: "Ollama", contextWindow: 65_536 },
+              { aiProvider: "Ollama", contextWindow: 32_768 },
+              { aiProvider: "Ollama" },
+            ]),
+        },
+      },
+    );
+    expect(await windowOf("Claude", "claude-opus-5-5")).toBe(200_000);
+    expect(await windowOf("Ollama", "qwen3-coder")).toBe(32_768);
+    expect(await windowOf("Ollama", "llama4")).toBe(32_768);
   });
 });

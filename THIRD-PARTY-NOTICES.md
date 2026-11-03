@@ -16,7 +16,10 @@ list.
 | Inter Display Bold, as outlines in `apps/web/src/brand/logo.svg` | The "AI Office" wordmark in the default company logo | [rsms/inter v4.1](https://github.com/rsms/inter/releases/tag/v4.1) | The Inter Project Authors | OFL-1.1 |
 | Inter (variable, Latin subset), `site/fonts/inter-latin-wght-normal.woff2` | The website's text | [@fontsource-variable/inter v5.3.0](https://github.com/fontsource/font-files/tree/main/fonts/variable/inter) | The Inter Project Authors | OFL-1.1 |
 | JetBrains Mono (variable, Latin subset), `site/fonts/jetbrains-mono-latin-wght-normal.woff2` | The website's code and commands | [@fontsource-variable/jetbrains-mono v5.3.0](https://github.com/fontsource/font-files/tree/main/fonts/variable/jetbrains-mono) | The JetBrains Mono Project Authors | OFL-1.1 |
-| Lucide icons, as SVG paths in `site/index.html` | The website's icons | [lucide-icons/lucide (lucide-react v1.55.0)](https://github.com/lucide-icons/lucide) | Lucide Contributors | ISC |
+| Lucide icons, as SVG paths in `site/index.html` (and through lucide-react in `site/demos/`) | The website's icons | [lucide-icons/lucide (lucide-react v1.55.0)](https://github.com/lucide-icons/lucide) | Lucide Contributors | ISC |
+| Stageshow kit, `site/stageshow/kit/` (with `LICENSE` and `NOTICE.md`) | The website's product demos: their stages, windows, cursor, motion and small parts; unmodified, styled by `site/demos/look.css` | Stageshow skill (`stageshow`), by Benji Taylor | Benji Taylor | MIT (below, and `site/stageshow/LICENSE`) |
+| Product marks for Slack, Gmail, Notion, Google Sheets, Slides, Drive and Calendar in `site/stageshow/kit/brands/` (sources and hashes in its `SOURCES.md`) | The website's Connections tile; unmodified | [pheralb/svgl@f9b726c](https://github.com/pheralb/svgl/tree/f9b726cee1d1f3c697a18c880185e89d9a55bb70/static/library) | SVGL contributors; the marks belong to their owners | MIT (`site/stageshow/kit/brands/LICENSE-SVGL.txt`); the brands' own usage terms |
+| Google Docs mark, `site/stageshow/kit/brands/google-docs.svg` | The website's Connections tile; Simple Icons' glyph with the brand's hex as its fill | [simple-icons/simple-icons@90646e4](https://github.com/simple-icons/simple-icons/blob/90646e4bf7f3b89df6c37e65baf3e7bc759a517c/icons/googledocs.svg) | Simple Icons contributors; the mark belongs to Google | CC0-1.0 (`site/stageshow/kit/brands/LICENSE-SIMPLE-ICONS.txt`); Google's brand terms |
 | Furniture Kit models in `apps/web/src/scene/models/`: `coffee-machine.glb`, `fridge.glb`, `bookcase.glb`, `books.glb`, `laptop.glb`, `potted-plant.glb` (from `kitchenCoffeeMachine`, `kitchenFridge`, `bookcaseOpen`, `books`, `laptop` and `pottedPlant`) | A Floor's canteen (coffee machine, fridge), bookshelf and books, a QA Agent's test laptop, a docs Agent's books and the plants; modified: scaled to real size, recoloured to the palette, Meshopt-compressed (`apps/web/scripts/prepare-models.ts`) | [Kenney Furniture Kit 2.0](https://kenney.nl/assets/furniture-kit) | Kenney | CC0-1.0 |
 | Matt Pocock's skills, adapted, in `packages/orchestrator/src/skills/built-in/`: `grill-with-docs`, `wayfinder`, `to-tickets`, `to-spec`, `pr` (with `CREDITS.md`), `domain-modeling` (with `ADR-FORMAT.md`, `GLOSSARY-FORMAT.md`), `research`, `prototype` (with `UI.md`, `LOGIC.md`), `tdd` (with `tests.md`, `mocking.md`), `codebase-design` (with `DEEPENING.md`, `DESIGN-IT-TWICE.md`), `diagnosing-bugs` and `code-review`; modified: adapted to AI Office's Grilling Sessions, Manager chat and document folders, each saying so | AI Office's built-in Skills (PRD FR-83b) | [mattpocock/skills@f3fc563](https://github.com/mattpocock/skills/tree/f3fc5632f401156837ee3872f14fe33ccf1024ea/skills) | Matt Pocock; `pr`'s Summary section from [Dex Horthy](https://github.com/dexhorthy)'s `show-me` skill (Humanlayer), as `pr/CREDITS.md` credits it | MIT (below, and `packages/orchestrator/src/skills/built-in/LICENSE`) |
 
@@ -26,6 +29,32 @@ list.
 MIT License
 
 Copyright (c) 2026 Matt Pocock
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## The MIT licence of the Stageshow kit
+
+```text
+MIT License
+
+Copyright (c) 2026 Benji Taylor
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

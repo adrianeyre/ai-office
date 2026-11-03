@@ -22,6 +22,7 @@ import {
   type FreshStarts,
   type FreshStartWatch,
 } from "../context/fresh-start.ts";
+import { skillsLeftOutLine, skillsWithin } from "../memory/budget.ts";
 import type { MemoryFile } from "../memory/shared.ts";
 
 import { runGit } from "../git/command.ts";
@@ -59,9 +60,9 @@ import { makeWorkDir } from "./work-dir.ts";
 // pull request; never an AI Account's credential), runs the Floor's setup command when the sandbox is ready,
 // then the agent tool of the Agent's AI Provider (FR-16), with the Floor's
 // Skills on for the Agent's Role mounted read-only where that tool finds
-// them (FR-75), and the office-wide and Role memory mounted read-only
-// (FR-54, FR-55), and streams what the Agent says and the tools it calls
-// to the event bus. Each tool call is screened (FR-17: AI Office's rules,
+// them (FR-75), as many as its prompt budget lists, and the office-wide
+// and Role memory mounted read-only (FR-54, FR-55), and streams what the
+// Agent says and the tools it calls to the event bus. Each tool call is screened (FR-17: AI Office's rules,
 // and the Decision Model while it is on), and one judged unsafe stops the
 // run: its work is thrown away and the run fails, saying why. With the
 // screens open to the sandboxes (P1-8), Claude Code asks about each call
@@ -111,6 +112,13 @@ export interface SandboxTask {
    * says (FR-54, FR-55); none when absent or empty.
    */
   readonly memory?: readonly MemoryFile[];
+  /**
+   * The most characters of its Skills' listing (each one's name and
+   * description) the Agent's tool is given, its prompt budget's: the
+   * first that fit are mounted, and its prompt says how many were left
+   * out. Every Skill when absent.
+   */
+  readonly skillsBudget?: number;
   /** Who its commits are by: the Floor's identity (FR-68). */
   readonly gitIdentity: GitIdentity;
   /** Cancels the run, killing the sandbox. */
@@ -246,8 +254,12 @@ export interface SandboxRunnerOptions {
   readonly screens?: ToolCallScreens;
   /** Where clones are made, one directory per run. */
   readonly workDir: string;
-  /** How long a run may take in all; an hour by default. */
-  readonly timeoutMs?: number;
+  /**
+   * How long a run may take in all; an hour by default. As a function,
+   * asked as each run starts (the Owner's sandbox time limit for the
+   * task's AI Provider), so a change applies from the next run.
+   */
+  readonly timeoutMs?: number | ((task: SandboxTask) => Promise<number>);
   /** How long the Agent may be silent; 10 minutes by default. */
   readonly idleTimeoutSeconds?: number;
   /** How long the setup command may take; 15 minutes by default. */
@@ -469,7 +481,10 @@ export function createSandboxRunner(
   // Sandcastle's own Git on the host runs nothing the Agent's repository
   // names (S1-2).
   guardSandcastleGit();
-  const timeoutMs = options.timeoutMs ?? 60 * 60 * 1000;
+  const timeoutMs = async (task: SandboxTask): Promise<number> =>
+    typeof options.timeoutMs === "function"
+      ? options.timeoutMs(task)
+      : (options.timeoutMs ?? 60 * 60 * 1000);
 
   return {
     async run(task) {
@@ -601,7 +616,7 @@ export function createSandboxRunner(
         }
       };
 
-      const timeout = AbortSignal.timeout(timeoutMs);
+      const timeout = AbortSignal.timeout(await timeoutMs(task));
       const signal = AbortSignal.any([
         ...(task.signal === undefined ? [] : [task.signal]),
         timeout,
@@ -726,7 +741,15 @@ export function createSandboxRunner(
             workspace,
           );
 
-        const skills = (await options.skills?.(task, workspace)) ?? [];
+        const { skills, leftOut } = skillsWithin(
+          (await options.skills?.(task, workspace)) ?? [],
+          task.skillsBudget,
+        );
+        // What its prompt says of the Skills over its budget.
+        const given =
+          leftOut === 0 || task.skillsBudget === undefined
+            ? task.prompt
+            : `${task.prompt}\n## Skills left out\n\nYour Role has more Skills on this Floor than your prompt has room for: only the first are mounted. ${skillsLeftOutLine(leftOut, task.skillsBudget)}\n`;
         let mounts: SkillMount[] = [];
         if (skills.length > 0) {
           await writeSkills(skillsDir, skills);
@@ -745,7 +768,7 @@ export function createSandboxRunner(
             throw new Error(reason);
           }
         }
-        let prompt = task.prompt;
+        let prompt = given;
         // How many Fresh Starts it has made, and the sessions' usage before.
         let made = 0;
         let earlierUsage: SandboxUsage | null = null;
@@ -929,7 +952,7 @@ export function createSandboxRunner(
             trigger: why.trigger,
             contextUsage: why.contextUsage,
           });
-          prompt = freshStartPrompt(task.prompt, summary, {
+          prompt = freshStartPrompt(given, summary, {
             number: made,
             cap: freshStarts.cap,
           });

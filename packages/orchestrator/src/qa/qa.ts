@@ -31,6 +31,7 @@ import type { FloorRecord, FloorStore } from "../floors/store.ts";
 import type { TrailerAgent } from "../git/identity.ts";
 import { createPushRun } from "../git/push-run.ts";
 import type { IntakeQueue } from "../intake/intake.ts";
+import type { ModelClient } from "../models/client.ts";
 import type { Notices } from "../notices/notices.ts";
 import { keepProposals, type RepositoryMemory } from "../memory/memory.ts";
 import {
@@ -38,6 +39,7 @@ import {
   memoryFiles,
   type SharedMemory,
 } from "../memory/shared.ts";
+import { agentMemoryWithin, type PromptBudgetOf } from "../memory/budget.ts";
 import { nextRoleAt, stageAfter, type Pipeline } from "../pipeline/pipeline.ts";
 import { roleOfAgent } from "../roles/roles.ts";
 import { memoryRoleStore, type RoleStore } from "../roles/store.ts";
@@ -61,8 +63,9 @@ import {
   qaRoundCap,
   roundsSoFar,
 } from "./caps.ts";
+import { askAgain } from "./ask-again.ts";
 import { qaFailedHandoff, qaPassedHandoff } from "./handoff.ts";
-import { qaPrompt } from "./prompt.ts";
+import { qaPrompt, qaReportForm } from "./prompt.ts";
 import { parseQaReport, type QaReport } from "./report.ts";
 
 // The QA flow (PRD FR-19, FR-28; §5 scenario 4): work queued at `needs-qa`
@@ -71,7 +74,9 @@ import { parseQaReport, type QaReport } from "./report.ts";
 // Handoff, runs the Floor's test command, adds tests where the change has
 // none (AI Office pushes them), exercises a web UI with Playwright when
 // there is one, and reports pass, or fail with the steps that reproduce
-// it. The App comments the result on the pull request.
+// it. The App comments the result on the pull request. A run that ends
+// without its report is asked for it once more (`ask-again.ts`); a second
+// answer without one blocks the Agent.
 //
 // A pass moves the issue on (to docs, or `ready-to-merge` when the Floor
 // has no docs Agent), or, on a Floor with a designer, hands it to the
@@ -98,6 +103,11 @@ export interface QaFlowOptions {
   readonly notices: Notices;
   readonly events: EventBus;
   readonly runner: SandboxRunner;
+  /**
+   * Asks an Agent whose run ended without its report for it once more,
+   * through the AI Gateway (`ask-again.ts`).
+   */
+  readonly models: ModelClient;
   /** Who a Floor's commits are by (FR-68). */
   readonly gitIdentity: (floorId: string) => Promise<GitIdentity>;
   /** Each AI Provider's default Model, for commits' `Agent:` trailers. */
@@ -123,6 +133,11 @@ export interface QaFlowOptions {
    * Role's proposed to (FR-54, FR-55).
    */
   readonly sharedMemory?: SharedMemory;
+  /**
+   * How much of the memory and the Skills an Agent's prompt carries, for
+   * its Model (the prompt budget); as much as AI Office keeps without it.
+   */
+  readonly promptBudget?: PromptBudgetOf;
   /**
    * The office Role library (FR-98): each task reads its Agent's Role
    * from it as the task starts. The built-in Roles when absent.
@@ -493,6 +508,11 @@ export function createQaFlow(options: QaFlowOptions): ExecuteWork {
       floor.id,
       agent.role,
     );
+    // How much of the memory and the Skills its Model's prompt carries.
+    const budget = await options.promptBudget?.(
+      agent.aiProvider,
+      trailer.model,
+    );
     let run: SandboxRun | undefined;
     try {
       run = await options.runner.run({
@@ -530,10 +550,12 @@ export function createQaFlow(options: QaFlowOptions): ExecuteWork {
           ...(handed === undefined ? {} : { handoff: handed.summary }),
           ...(memory === undefined ? {} : { memory }),
           ...(agentMemory === undefined ? {} : { agentMemory }),
+          ...(budget === undefined ? {} : { budget }),
         }),
         ...(agentMemory === undefined
           ? {}
-          : { memory: memoryFiles(agentMemory) }),
+          : { memory: memoryFiles(agentMemoryWithin(agentMemory, budget)) }),
+        ...(budget === undefined ? {} : { skillsBudget: budget.skills }),
         gitIdentity: await options.gitIdentity(floor.id),
         signal,
       });
@@ -561,10 +583,24 @@ export function createQaFlow(options: QaFlowOptions): ExecuteWork {
         await push();
         return await pausedAt(floor, agent, issue.number, progress);
       }
-      const found = parseQaReport(run.lastText);
+      // A run that ends without its report is asked for it once more.
+      const found =
+        parseQaReport(run.lastText) ??
+        (await askAgain({
+          models: options.models,
+          agent,
+          model: trailer.model,
+          issue: issue.number,
+          pullRequest: pullRequest.number,
+          tag: "qa-report",
+          form: qaReportForm,
+          lastText: run.lastText,
+          parse: parseQaReport,
+          signal,
+        }));
       if (found === undefined) {
         throw new AgentBlockedError(
-          `${agent.name} gave no QA result on PR #${String(pullRequest.number)}.`,
+          `${agent.name} gave no QA result on PR #${String(pullRequest.number)}, even when asked again.`,
         );
       }
       // The tests it added go on the pull request's branch first.

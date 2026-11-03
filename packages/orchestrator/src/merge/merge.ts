@@ -16,6 +16,7 @@ import {
 } from "@ai-office/shared";
 
 import type { AgentStore } from "../agents/store.ts";
+import type { DefaultModels } from "../ai-providers/ai-providers.ts";
 import {
   endOf,
   writeBatchPullRequest,
@@ -23,6 +24,7 @@ import {
   type BatchBranches,
 } from "../batches/one-pull-request.ts";
 import type { BatchStore } from "../batches/store.ts";
+import type { ContextWindowOf } from "../context/window.ts";
 import type { FloorRecord, FloorStore } from "../floors/store.ts";
 import type { IntakeQueue } from "../intake/intake.ts";
 import type { NoticeRecord } from "../notices/store.ts";
@@ -33,6 +35,8 @@ import {
   type Pipeline,
 } from "../pipeline/pipeline.ts";
 import { everyRoundLinks } from "../qa/caps.ts";
+import { reviewersDiffLimit } from "../review/diff-limit.ts";
+import type { DiffLimit } from "../review/prompt.ts";
 import type {
   QaReportRecord,
   ReviewLoopStore,
@@ -148,6 +152,14 @@ export interface MergeFlowOptions {
   readonly queue?: IntakeQueue;
   /** The Owner's GitHub login (FR-8): whose `ai-office:auto-merge` counts. */
   readonly ownerLogin: () => Promise<string>;
+  /** Each AI Provider's default Model, for reviewers without their own. */
+  readonly defaultModels?: () => Promise<DefaultModels>;
+  /**
+   * Each reviewer's Model's effective context window: a diff more than a
+   * reviewer can be shown sends the pull request to the Owner, as the
+   * review Stage does.
+   */
+  readonly contextWindow?: ContextWindowOf;
   /** How long to wait for CI; the defaults otherwise. */
   readonly ci?: Partial<CiWait>;
   /** Waits `ms`, or rejects once `signal` aborts. */
@@ -431,16 +443,31 @@ export function createMergeFlow(options: MergeFlowOptions): MergeFlow {
   const changesOwnerOnly = async (
     client: RepositoryClient,
     pullRequest: PullRequest,
+    diffLimit: DiffLimit,
   ): Promise<string[]> => {
     const files = await client.listPullRequestFiles(pullRequest.number);
     const { head } = await client.getPullRequest(pullRequest.number);
     return [
-      ...ownerOnly(files),
+      ...ownerOnly(files, diffLimit),
       ...(head.sha === pullRequest.head.sha
         ? []
         : ["its head commit changed as it was being checked"]),
     ];
   };
+
+  /**
+   * The most of a diff the Floor's reviewers can be shown, as the review
+   * Stage has them: the gate and the Batch's pull request body both ask it.
+   */
+  const diffLimitFor = async (floor: FloorRecord) =>
+    reviewersDiffLimit(
+      (await options.agents.list(floor.id)).filter(
+        (agent) =>
+          agent.enabled && floor.requiredReviewerAgentIds.includes(agent.id),
+      ),
+      await options.defaultModels?.(),
+      options.contextWindow,
+    );
 
   /**
    * What the gate makes of the pull request at its head, CI aside: why it
@@ -461,7 +488,11 @@ export function createMergeFlow(options: MergeFlowOptions): MergeFlow {
   }> => {
     const team = await options.agents.list(floor.id);
     const head = pullRequest.head.sha;
-    const common = await changesOwnerOnly(client, pullRequest);
+    const common = await changesOwnerOnly(
+      client,
+      pullRequest,
+      await diffLimitFor(floor),
+    );
     const reasons = [...common];
     const again: Issue[] = [];
     let onlyAgain = common.length === 0;
@@ -740,6 +771,7 @@ export function createMergeFlow(options: MergeFlowOptions): MergeFlow {
         floorId: floor.id,
         base: floor.defaultBranch,
         batch,
+        diffLimit: await diffLimitFor(floor),
       });
     }
     const policy =

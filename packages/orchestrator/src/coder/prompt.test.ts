@@ -1,5 +1,8 @@
+import { defaultPromptBudgetSettings } from "@ai-office/shared";
 import { describe, expect, it } from "vitest";
 
+import { promptBudgetFor } from "../memory/budget.ts";
+import { longAgentMemory, longMemory } from "../memory/testing.ts";
 import { builtIn } from "../roles/testing.ts";
 import { coderPrompt, type CoderPromptInput } from "./prompt.ts";
 
@@ -247,5 +250,39 @@ describe("the coder's prompt", () => {
       floor: { ...input.floor, testCommand: "pnpm lint\npnpm test" },
     });
     expect(prompt).toContain("```sh\npnpm lint\npnpm test\n```");
+  });
+});
+
+describe("the prompt budget (#20)", () => {
+  const memory = longMemory;
+  const agentMemory = longAgentMemory("coder");
+
+  it("leaves the prompt byte-identical with the default budget on a large context window", () => {
+    const before = coderPrompt({ ...input, memory, agentMemory });
+    for (const contextWindow of [null, 200_000, 1_048_576]) {
+      expect(
+        coderPrompt({
+          ...input,
+          memory,
+          agentMemory,
+          budget: promptBudgetFor(defaultPromptBudgetSettings, contextWindow),
+        }),
+      ).toBe(before);
+    }
+  });
+
+  it("truncates the memory over a small window's budget, saying so, the same every time", () => {
+    const budget = promptBudgetFor(defaultPromptBudgetSettings, 32_768);
+    const prompt = coderPrompt({ ...input, memory, agentMemory, budget });
+    expect(prompt).toContain(
+      "\n… (the memory cut here: it is longer than 5,734 characters)\n</memory>",
+    );
+    expect(prompt).toContain(
+      "office-wide memory the Owner keeps for every Agent, such as coding standards, preferred libraries and review rules, cut at the 5,734 characters a prompt carries.",
+    );
+    expect(prompt).toContain(
+      "(19 entries, the newest: 21 older ones were left out, over the prompt budget).",
+    );
+    expect(coderPrompt({ ...input, memory, agentMemory, budget })).toBe(prompt);
   });
 });
