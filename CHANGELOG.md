@@ -1,3 +1,20 @@
+## [1.5.0](https://github.com/adrianeyre/ai-office/compare/v1.4.2...v1.5.0) (2026-11-03)
+
+### Features
+
+* **memory:** cap the memory and Skills injected into Agent prompts ([bfb7b66](https://github.com/adrianeyre/ai-office/commit/bfb7b660de934e424cc93c542adccfc8a3c9d0ac)), closes [#20](https://github.com/adrianeyre/ai-office/issues/20)
+* **qa:** retry once when a QA report or design review cannot be parsed ([88595c4](https://github.com/adrianeyre/ai-office/commit/88595c4cee58aeff600c1c8e678e356917a9b04a)), closes [#18](https://github.com/adrianeyre/ai-office/issues/18)
+* **review:** size the reviewer's diff limit from the model's context window ([fb51dd7](https://github.com/adrianeyre/ai-office/commit/fb51dd7492727d81a4c8a248c1a4f72db1237057)), closes [#17](https://github.com/adrianeyre/ai-office/issues/17)
+* **site:** overhaul the website with stageshow product demos ([e198fbf](https://github.com/adrianeyre/ai-office/commit/e198fbf1dd23e6dd233b4aec266211a088ed80a1))
+* **templates:** add a built-in Local Floor template for Ollama and other local models ([0552c31](https://github.com/adrianeyre/ai-office/commit/0552c316b06fab7772a481c45366fdaa3d052e70)), closes [#19](https://github.com/adrianeyre/ai-office/issues/19)
+* **watchdog:** make the stall timeout and sandbox time limit configurable ([b116e09](https://github.com/adrianeyre/ai-office/commit/b116e09ef7aec1bcc8655fae728b4ca63f5d78c6)), closes [#16](https://github.com/adrianeyre/ai-office/issues/16)
+
+### Bug Fixes
+
+* **docker:** copy the website's manifest before installing ([71660b9](https://github.com/adrianeyre/ai-office/commit/71660b94e2bd2188bc484725eab35a86e4e7bffd))
+* **merge:** judge a Batch's pull request body by its reviewers' diff limit ([14000bf](https://github.com/adrianeyre/ai-office/commit/14000bfa04450d435c0389ce8f5d81ccf34d8fe4)), closes [#17](https://github.com/adrianeyre/ai-office/issues/17)
+* **site:** take the demos off their plates and settle the bento tiles ([21c5fd5](https://github.com/adrianeyre/ai-office/commit/21c5fd53aaac6fa1456a91bdf5f4b378788955af))
+
 ## [1.4.2](https://github.com/adrianeyre/ai-office/compare/v1.4.1...v1.4.2) (2026-10-20)
 
 ### Reverts
