@@ -1,3 +1,9 @@
+## [1.6.0](https://github.com/adrianeyre/ai-office/compare/v1.5.0...v1.6.0) (2026-11-06)
+
+### Features
+
+* **site:** add a sitemap, robots.txt, llms.txt, structured data and full link previews ([5d8dc8a](https://github.com/adrianeyre/ai-office/commit/5d8dc8ad7d439fc2f5dd11b2e441bf94cf303e44))
+
 ## [1.5.0](https://github.com/adrianeyre/ai-office/compare/v1.4.2...v1.5.0) (2026-11-03)
 
 ### Features
