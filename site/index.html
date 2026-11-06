@@ -16,13 +16,25 @@
     <script>
       document.documentElement.classList.replace("no-js", "js");
     </script>
-    <title>
-      AI Office: a 3D office where AI Agents work your GitHub issues
-    </title>
+    <!--
+      What search engines and link previews show. The title and description
+      are kept under the lengths Google shows in full (60 and 160
+      characters), and the share image is 1200 by 630, the size every
+      preview (Open Graph, X, LinkedIn, Slack) crops cleanly; the tests in
+      test/site-seo.test.ts hold all of this.
+    -->
+    <title>AI Office: self-hosted AI coding agents for GitHub issues</title>
     <meta
       name="description"
-      content="AI Office is a self-hosted 3D office where AI Agents work your GitHub issues in sandboxes, with a Manager to chat to and a built-in AI Gateway that pools your Claude, ChatGPT and other AI Accounts."
+      content="AI Office is a self-hosted 3D office where AI coding agents work your GitHub issues in sandboxes, using your Claude, ChatGPT and local-model accounts."
     />
+    <meta
+      name="robots"
+      content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+    />
+    <meta name="author" content="Adrian Eyre" />
+    <meta name="application-name" content="AI Office" />
+    <meta name="apple-mobile-web-app-title" content="AI Office" />
     <meta name="color-scheme" content="light dark" />
     <meta
       name="theme-color"
@@ -39,14 +51,42 @@
     <link rel="icon" href="brand/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="AI Office" />
+    <meta property="og:site_name" content="AI Office" />
+    <meta property="og:locale" content="en_GB" />
+    <meta property="og:url" content="{{SITE_URL}}/" />
+    <meta
+      property="og:title"
+      content="AI Office: AI coding agents that work your GitHub issues"
+    />
     <meta
       property="og:description"
-      content="A self-hosted 3D office where AI Agents work your GitHub issues."
+      content="A self-hosted 3D office where AI Agents plan, code, review and merge your GitHub issues in sandboxes, on the AI accounts you already pay for."
     />
-    <meta property="og:url" content="{{SITE_URL}}/" />
     <meta property="og:image" content="{{SITE_URL}}/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="AI Office: AI agents work your GitHub issues in a 3D office. Self-hosted, with load-balanced AI accounts."
+    />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="AI Office: AI coding agents that work your GitHub issues"
+    />
+    <meta
+      name="twitter:description"
+      content="A self-hosted 3D office where AI Agents plan, code, review and merge your GitHub issues in sandboxes, on the AI accounts you already pay for."
+    />
+    <meta name="twitter:image" content="{{SITE_URL}}/og-image.png" />
+    <meta
+      name="twitter:image:alt"
+      content="AI Office: AI agents work your GitHub issues in a 3D office. Self-hosted, with load-balanced AI accounts."
+    />
+    <script type="application/ld+json">
+      {{STRUCTURED_DATA}}
+    </script>
     <link
       rel="preload"
       href="fonts/inter-latin-wght-normal.woff2"

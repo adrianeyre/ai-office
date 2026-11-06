@@ -13,6 +13,7 @@
     "docker/**/*.ts",
     "test/**/*.ts",
     "site/build.ts",
+    "site/seo.ts",
     "release/**/*.ts"
   ]
 }

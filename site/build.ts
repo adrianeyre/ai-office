@@ -6,12 +6,26 @@
 // kept twice in Git. `.github/workflows/pages.yml` runs it and publishes
 // `site/dist/`. Run it yourself with `pnpm site:build`, then serve
 // `site/dist/` (`pnpm site:preview`); `pnpm site:dev` serves the page as you
-// edit it.
-import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+// edit it. The files for search engines (the sitemap, `robots.txt`,
+// `llms.txt`) and the page's structured data come from `site/seo.ts`.
+import {
+  cpSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import react from "@vitejs/plugin-react";
 import { build, createServer, preview, type InlineConfig } from "vite";
+import {
+  llmsTxt,
+  pageImages,
+  robotsTxt,
+  sitemapXml,
+  structuredData,
+} from "./seo.ts";
 
 /** The repository, named once: every link to it on the page comes from here. */
 export const repositoryUrl = "https://github.com/adrianeyre/ai-office";
@@ -23,16 +37,24 @@ const root = join(import.meta.dirname, "..");
 const source = import.meta.dirname;
 const output = join(source, "dist");
 
+const siteUrl = `https://${siteDomain}`;
+const page = readFileSync(join(source, "index.html"), "utf8");
+const images = pageImages(page);
+const { version } = JSON.parse(
+  readFileSync(join(root, "package.json"), "utf8"),
+) as { version: string };
+
 /** Each `{{NAME}}` placeholder in the page, and what it becomes. */
 const placeholders: Record<string, string> = {
   REPO_URL: repositoryUrl,
   REPO_NAME: repositoryUrl.split("/").at(-1) ?? "ai-office",
-  SITE_URL: `https://${siteDomain}`,
+  SITE_URL: siteUrl,
+  STRUCTURED_DATA: structuredData({ siteUrl, repositoryUrl, version, images }),
 };
 
 /**
  * The files the page names by absolute path (`/images/…`, `/brand/…`, the
- * icons and `CNAME`), gathered in a folder of their own that Vite serves
+ * icons and `CNAME`) and the files for crawlers, gathered in a folder of their own that Vite serves
  * and copies into `dist/` as they are.
  */
 function gatherPublicFiles(): string {
@@ -47,6 +69,13 @@ function gatherPublicFiles(): string {
     cpSync(join(root, "apps/web/public", file), join(folder, file));
   }
   writeFileSync(join(folder, "CNAME"), `${siteDomain}\n`);
+  const today = new Date().toISOString().slice(0, 10);
+  writeFileSync(
+    join(folder, "sitemap.xml"),
+    sitemapXml(siteUrl, today, images),
+  );
+  writeFileSync(join(folder, "robots.txt"), robotsTxt(siteUrl));
+  writeFileSync(join(folder, "llms.txt"), llmsTxt(siteUrl, repositoryUrl));
   return folder;
 }
 
