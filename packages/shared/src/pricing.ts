@@ -8,7 +8,7 @@ import { z } from "zod";
 // information only (FR-31).
 
 const dollars = z
-  .number({ error: "Each price is a number of dollars." })
+  .number({ error: "Each price is a number." })
   .min(0, { error: "A price cannot be negative." })
   .max(10_000, { error: "That price is too high." });
 

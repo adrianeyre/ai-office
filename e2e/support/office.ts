@@ -308,6 +308,9 @@ export const test = base.extend<{ office: Office }>({
               GATEWAY_PORT: String(gatewayPort),
               LOG_LEVEL: "info",
               GITHUB_API_URL: githubServer.url,
+              // Nothing beyond the machine: no day's exchange rates, so
+              // costs show in US dollars until a test gives a rate.
+              EXCHANGE_RATES_URL: "off",
               // The tests' fake AI Providers and webhook receivers are on
               // loopback, which they allow (ADR 0007).
               ALLOWED_INTERNAL_HOSTS: "127.0.0.1",

@@ -53,6 +53,38 @@ pnpm --filter server dev   # the API, on PORT (3046)
 pnpm --filter web dev      # the app on :3045, proxying /api and /health to it
 ```
 
+### Waiting on the server: spinners and the Activity indicator
+
+Whenever the Owner is waiting on something they asked for, the app says so,
+what it is doing and for how long:
+
+- **The button pressed** shows a spinner in place of its icon, and is busy
+  (`aria-busy`) and disabled until the answer comes (`<Button pending>`). A
+  switch or checkbox shows a spinner and "Saving…" beside it. Where one
+  form has several buttons, only the one pressed spins.
+- **The Activity indicator** (`activity-indicator.tsx`) tracks every request
+  a click sends: each save, add, delete or action (everything through
+  `sendJson` and `sendDelete` in `api.ts`) and each **Refresh** or **Try
+  again**. A progress bar runs along the top of the page, and a panel in the
+  bottom corner lists each one: what it is doing in words ("Saving the
+  office's currency", "Rotate gateway key"), the request behind it (`PUT
+  /api/office/currency`), "Waiting for AI Office to answer" with the time
+  so far, its own progress bar, and how it ended ("Done", or the server's
+  answer, such as "The server answered 409."). After 8 seconds it says the
+  work can take a while (some actions reach GitHub or an AI Provider). An
+  ended one stays for 2.5 seconds, so its outcome can be read.
+- **No flashing.** Work answered within 400 ms shows nothing; a failure
+  always shows, however quick.
+- **Honest progress.** Neither the server nor the browser says how far a
+  request has got, so the bars show time passing (filling quickly, then
+  slowly, never past 90% until the answer comes), and are indeterminate
+  progress bars to assistive technology.
+- **Screen readers** hear what started and how it ended, once each, from
+  one polite live region, never the ticking time.
+- Background reads (queries, live streams) are not tracked: the Owner did
+  not ask for them. To track other work, wrap its promise in `track({
+  label, detail }, promise)` from `activity.ts`.
+
 ### The navigation
 
 The navigation on the left of every page (`apps/web/src/layout.tsx`) is

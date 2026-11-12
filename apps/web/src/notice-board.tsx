@@ -50,7 +50,8 @@ export function NoticeItem({
   const queryClient = useQueryClient();
   const router = useRouter();
   const { data: session } = useQuery(sessionQuery);
-  const [busy, setBusy] = useState(false);
+  // What is being sent (an action's id, or "dismiss"), so its button shows it.
+  const [busy, setBusy] = useState<string | false>(false);
   const [problem, setProblem] = useState<string>();
   const item = useRef<HTMLLIElement>(null);
   const titleId = `${notice.id}-title`;
@@ -63,7 +64,9 @@ export function NoticeItem({
   }, [highlighted]);
 
   const send = async (path: "dismiss" | "act", body: object) => {
-    setBusy(true);
+    setBusy(
+      path === "act" ? String((body as { action?: string }).action) : path,
+    );
     setProblem(undefined);
     const response = await postJson(
       `/api/notices/${encodeURIComponent(notice.id)}/${path}`,
@@ -169,7 +172,8 @@ export function NoticeItem({
             <Button
               key={id}
               size="sm"
-              disabled={busy || session === undefined}
+              disabled={busy !== false || session === undefined}
+              pending={busy === id}
               onClick={() => void send("act", { action: id })}
             >
               {label}
@@ -191,7 +195,8 @@ export function NoticeItem({
         <Button
           size="sm"
           variant="outline"
-          disabled={busy || session === undefined}
+          disabled={busy !== false || session === undefined}
+          pending={busy === "dismiss"}
           onClick={() => void send("dismiss", {})}
         >
           Dismiss

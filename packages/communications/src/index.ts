@@ -122,6 +122,8 @@ export {
   reportSystemPrompt,
   reportTitle,
   templateReportSummary,
+  usDollarCost,
+  type CostFormat,
   type BatchReport,
   type GatewayReportWriterOptions,
   type ReportData,

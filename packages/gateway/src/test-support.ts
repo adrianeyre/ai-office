@@ -149,6 +149,8 @@ export async function startGateway(
     fetch?: GatewayOptions["fetch"];
     /** AI Office's tool-call screen, for Agents' sandboxes to ask. */
     toolCallScreen?: GatewayOptions["toolCallScreen"];
+    /** The Models `GET /v1/models` lists. */
+    models?: GatewayOptions["models"];
   } = {},
 ): Promise<RunningGateway> {
   const requestLog = options.requestLog ?? memoryRequestLog();
@@ -193,6 +195,7 @@ export async function startGateway(
     ...(options.toolCallScreen === undefined
       ? {}
       : { toolCallScreen: options.toolCallScreen }),
+    ...(options.models === undefined ? {} : { models: options.models }),
   });
   const url = await app.listen({ port: 0, host: "127.0.0.1" });
   return { url, requestLog, close: () => app.close() };

@@ -14,7 +14,7 @@ import { location } from "./totp-settings.tsx";
 
 const opus = { input: 4, output: 20, cacheWrite: 5, cacheRead: 0.2 };
 
-function stubServer() {
+function stubServer(currency?: { currency: string; rate: number }) {
   const overrides = new Map<string, ModelPriceEntry["price"]>();
   const sent: { method: string; url: string; body: unknown }[] = [];
   const list = (): ModelPriceEntry[] => {
@@ -50,6 +50,16 @@ function stubServer() {
         }
         overrides.delete(model);
         return Promise.resolve(new Response(null, { status: 204 }));
+      }
+      if (url === "/api/office/currency" && currency !== undefined) {
+        return Promise.resolve(
+          Response.json({
+            currency: currency.currency,
+            manualRate: null,
+            rates: { USD: 1, [currency.currency]: currency.rate },
+            ratesUpdatedAt: "2026-11-12T00:00:00.000Z",
+          }),
+        );
       }
       if (url === "/api/gateway/prices") {
         return Promise.resolve(Response.json({ prices: list() }));
@@ -165,7 +175,7 @@ describe("Model prices in AI Settings", () => {
     await user.type(within(form).getByLabelText("Input"), "1.25");
     await user.click(within(form).getByRole("button", { name: "Save price" }));
     expect((await within(form).findByRole("alert")).textContent).toContain(
-      "Each price is a number of dollars.",
+      "Each price is a number.",
     );
     expect(sent).toEqual([]);
 
@@ -187,5 +197,34 @@ describe("Model prices in AI Settings", () => {
         name: "Use the default price for openai/gpt-5.5",
       }).textContent,
     ).toBe("Remove");
+  });
+
+  it("shows and takes prices in the office's currency, keeping them in US dollars", async () => {
+    const { sent } = stubServer({ currency: "GBP", rate: 0.75 });
+    const user = userEvent.setup();
+    const view = await card();
+    const row = await view.findByRole("row", { name: "claude-opus-5-5" });
+    await vi.waitFor(() => {
+      expect(cells(row).slice(1, 5)).toEqual(["£3", "£15", "£3.75", "£0.15"]);
+    });
+
+    await user.click(
+      view.getByRole("button", { name: "Edit claude-opus-5-5's price" }),
+    );
+    const form = view.getByRole("form", { name: "Price claude-opus-5-5" });
+    const input = within(form).getByLabelText<HTMLInputElement>("Input");
+    expect(input.value).toBe("3");
+    await user.clear(input);
+    await user.type(input, "1.5");
+    await user.click(within(form).getByRole("button", { name: "Save price" }));
+
+    // The price changed is converted; those left as they were are kept exactly.
+    await vi.waitFor(() => {
+      expect(sent[0]).toEqual({
+        method: "PUT",
+        url: "/api/gateway/prices/claude-opus-5-5",
+        body: { ...opus, input: 2 },
+      });
+    });
   });
 });

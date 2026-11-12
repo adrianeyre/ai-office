@@ -295,11 +295,13 @@ const cases: Case[] = [
           endpoint: "responses_compact",
         }),
       ).toMatchObject({ name: "ChatGPT Plus" });
-      // Not another tool's, nor no tool's.
+      // Not another tool's, nor no tool's: refused, saying why.
       for (const agentTool of [null, "Claude Code", "opencode"] as const) {
-        expect(
-          await setup.accounts.select({ ...fromCodex, agentTool }),
-        ).toBeUndefined();
+        await expect(
+          setup.accounts.select({ ...fromCodex, agentTool }),
+        ).rejects.toThrow(
+          "a subscription serves only its own agent tool (Codex)",
+        );
       }
       // Not Chat Completions, nor a request translated from Messages.
       for (const endpoint of ["chat_completions", "messages"] as const) {

@@ -131,6 +131,7 @@ function AwaitingSkillReview({
           size="sm"
           variant="secondary"
           disabled={busy || floor.archivedAt !== null}
+          pending={busy}
           onClick={() => void open()}
         >
           Read {skill.name} to review it
@@ -148,7 +149,12 @@ function AwaitingSkillReview({
               </pre>
             </div>
           ))}
-          <Button size="sm" disabled={busy} onClick={() => void review(read)}>
+          <Button
+            size="sm"
+            disabled={busy}
+            pending={busy}
+            onClick={() => void review(read)}
+          >
             I have read {read.files.length === 1 ? "it" : "every file"}: use{" "}
             {read.name} on this Floor
           </Button>

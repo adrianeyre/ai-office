@@ -9,6 +9,8 @@ import { atDetailLevel, officeUrl } from "./messages.ts";
 import {
   reportCounts,
   reportMarkdown,
+  usDollarCost,
+  type CostFormat,
   reportTitle,
   type BatchReport,
 } from "./report.ts";
@@ -197,6 +199,7 @@ export function reportMessage(
   summary: string,
   aiOfficeUrl: string,
   occurredAt: Date,
+  cost: CostFormat = usDollarCost,
 ): OutboundMessage {
   return {
     kind: "report",
@@ -209,7 +212,7 @@ export function reportMessage(
     aiOfficeUrl,
     githubUrl: null,
     occurredAt: occurredAt.toISOString(),
-    document: reportMarkdown(report, detailLevel, summary, aiOfficeUrl),
+    document: reportMarkdown(report, detailLevel, summary, aiOfficeUrl, cost),
   };
 }
 
@@ -223,3 +226,24 @@ export const changelogMessage = (
     { ...message, occurredAt: occurredAt.toISOString() },
     detailLevel,
   );
+
+/**
+ * A completed issue's row with its estimated cost written in the office's
+ * currency, for a work log to show as it is.
+ */
+export function withCost(
+  row: WorkLogPublication | undefined,
+  cost: CostFormat,
+): WorkLogPublication | undefined {
+  const workLog = row?.message.workLog;
+  if (row === undefined || workLog === undefined) {
+    return row;
+  }
+  return {
+    ...row,
+    message: {
+      ...row.message,
+      workLog: { ...workLog, estimatedCost: cost(workLog.estimatedCostUsd) },
+    },
+  };
+}

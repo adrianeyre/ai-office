@@ -18,9 +18,11 @@ export {
   type ChosenAccount,
   type ComboChoice,
   type GatewayAccount,
+  type GatewayModel,
   type GatewayOptions,
   maxStoredBodyBytes,
 } from "./gateway.ts";
+export { gatewayModels } from "./models/listing.ts";
 export {
   ComboError,
   comboSlotKey,

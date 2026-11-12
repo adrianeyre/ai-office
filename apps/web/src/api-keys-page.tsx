@@ -30,6 +30,7 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { selectClass } from "@/lib/utils.ts";
 
 import { getJson, readApiError, sendDelete, sendJson } from "./api.ts";
+import { formatMoney, useMoney } from "./money.ts";
 import {
   CreateForm,
   gatewayKeysQuery,
@@ -472,19 +473,14 @@ function RevokeKey({ gatewayKey }: { gatewayKey: GatewayKey }) {
 }
 
 const integer = new Intl.NumberFormat("en-GB");
-const dollars = new Intl.NumberFormat("en-GB", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 2,
-});
-
 /** What a key's requests added up to. */
 function KeyUsageFacts({ usage }: { usage: GatewayKeyUsage | undefined }) {
+  const money = useMoney();
   const facts = [
     ["Requests", integer.format(usage?.requests ?? 0)],
     ["Input tokens", integer.format(usage?.inputTokens ?? 0)],
     ["Output tokens", integer.format(usage?.outputTokens ?? 0)],
-    ["Estimated cost", dollars.format(usage?.estimatedCostUsd ?? 0)],
+    ["Estimated cost", formatMoney(usage?.estimatedCostUsd ?? 0, money)],
   ] as const;
   return (
     <dl

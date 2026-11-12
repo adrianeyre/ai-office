@@ -12,8 +12,8 @@ export function PrivacyPolicy() {
         decides what it holds and who can see it, and is responsible for it. The
         software sends nothing to its authors: there is no analytics, no
         tracking and no advertising, and the web app loads nothing from other
-        sites. Its server only asks GitHub which version is the latest, as set
-        out below.
+        sites. Its server only asks GitHub which version is the latest, and
+        ExchangeRate-API for the day&apos;s exchange rates, as set out below.
       </p>
 
       <h3>What AI Office keeps</h3>
@@ -106,6 +106,13 @@ export function PrivacyPolicy() {
           server), ntfy, Pushover, webhooks, Confluence, Notion, or Google
           Sheets, Docs, Slides, Drive and Calendar, as links only or with titles
           and summaries.
+        </li>
+        <li>
+          <strong>ExchangeRate-API</strong> — to show costs in the office&apos;s
+          currency, the server fetches the day&apos;s exchange rates from{" "}
+          <code>open.er-api.com</code> at most once a day, through the outbound
+          proxy when one is set. It is a plain request for the day&apos;s table:
+          nothing about the office is sent with it.
         </li>
       </ul>
       <p>

@@ -30,6 +30,7 @@ import { cn, selectClass } from "@/lib/utils.ts";
 
 import { AgentLink } from "./agent-link.tsx";
 import { getJson } from "./api.ts";
+import { formatPrecise, useMoney, type Money } from "./money.ts";
 import { eventSources, type EventSourceLike } from "./event-stream.ts";
 import { useFloorNames } from "./floors.ts";
 
@@ -137,10 +138,8 @@ export function useServerSentData(
 const formatNumber = (value: number | null): string =>
   value === null ? "–" : value.toLocaleString("en-GB");
 
-const formatCost = (value: number | null): string =>
-  value === null
-    ? "–"
-    : `$${value.toLocaleString("en-US", { maximumFractionDigits: 6 })}`;
+const formatCost = (value: number | null, money: Money): string =>
+  value === null ? "–" : formatPrecise(value, money);
 
 const endpointLabel: Record<GatewayEndpointName, string> = {
   messages: "Messages",
@@ -367,6 +366,7 @@ export function GatewayRequestsPage({
   onFiltersChange: (next: RequestFilters) => void;
 }) {
   const first = useQuery(requestsQuery(filters));
+  const money = useMoney();
   const [live, setLive] = useState<GatewayRequestSummary[]>([]);
   const [older, setOlder] = useState<GatewayRequestSummary[]>([]);
   const [nextBefore, setNextBefore] = useState<number | null | undefined>();
@@ -523,7 +523,7 @@ export function GatewayRequestsPage({
                     {formatNumber(request.outputTokens)}
                   </td>
                   <td className="py-2 pr-4 tabular-nums">
-                    {formatCost(request.estimatedCostUsd)}
+                    {formatCost(request.estimatedCostUsd, money)}
                   </td>
                   <td className="py-2 tabular-nums">
                     {formatNumber(request.latencyMs)} ms
@@ -593,6 +593,7 @@ function HeadersTable({
 /** One request's detail (PRD FR-44). */
 export function GatewayRequestPage({ requestId }: { requestId: number }) {
   const { data: request, isError } = useQuery(requestQuery(requestId));
+  const money = useMoney();
   if (isError) {
     return (
       <p role="alert" className="text-sm text-destructive">
@@ -645,7 +646,7 @@ export function GatewayRequestPage({ requestId }: { requestId: number }) {
               {formatNumber(request.cacheCreationInputTokens)}
             </Field>
             <Field label="Estimated cost">
-              {formatCost(request.estimatedCostUsd)}
+              {formatCost(request.estimatedCostUsd, money)}
             </Field>
             <Field label="AI Account">{request.account ?? "–"}</Field>
             <Field label="Caller">

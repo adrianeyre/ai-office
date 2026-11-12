@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
 import { Label } from "@/components/ui/label.tsx";
+import { Spinner } from "@/components/ui/spinner.tsx";
 import { selectClass } from "@/lib/utils.ts";
 
 import { aiProvidersQuery, optionLabel } from "./ai-providers-card.tsx";
@@ -178,6 +179,12 @@ export function ManagerModelPicker({
         {efforts.length === 0 &&
           ` ${manager.aiProvider}'s agent tool takes no effort level.`}
       </p>
+      {saving && (
+        <p className="flex basis-full items-center gap-1 text-xs text-muted-foreground">
+          <Spinner className="size-3" />
+          Saving…
+        </p>
+      )}
       {said !== undefined && (
         <p
           role={said.ok ? "status" : "alert"}

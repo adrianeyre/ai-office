@@ -1,4 +1,4 @@
-import { officeSettings, type Database } from "@ai-office/db";
+import { officeSettings, schemaMeta, type Database } from "@ai-office/db";
 import type { EventBus } from "@ai-office/events";
 import {
   defaultAutoRefreshSettings,
@@ -53,6 +53,9 @@ import {
   defaultWatchdogSettings,
   watchdogSettingsSchema,
   type WatchdogSettings,
+  currencySettingsSchema,
+  defaultCurrencySettings,
+  type CurrencySettings,
 } from "@ai-office/shared";
 import type { Encryptor } from "@ai-office/shared/crypto";
 import { eq } from "drizzle-orm";
@@ -170,7 +173,18 @@ export interface OfficeSettingsStore {
   /** The watchdog's time limits as set; undefined until set. */
   watchdog(): Promise<WatchdogSettings | undefined>;
   setWatchdog(settings: WatchdogSettings, at: Date): Promise<void>;
+  /** The currency costs are shown in, as set; undefined until set. */
+  currency(): Promise<CurrencySettings | undefined>;
+  setCurrency(settings: CurrencySettings, at: Date): Promise<void>;
 }
+
+/**
+ * Where the currency is kept: `schema_meta`, as JSON, under this key. It
+ * has no column of its own in `office_settings`, so that adding it did not
+ * change the schema (which has no migrations: a database made from another
+ * schema must be made again).
+ */
+export const currencySettingKey = "setting:currency";
 
 /** The webhook settings as kept: off, and no secret, until set. */
 export interface StoredWebhooks {
@@ -202,6 +216,7 @@ export function memoryOfficeSettingsStore(): OfficeSettingsStore {
   let cast: Partial<LobbyCast> = {};
   let activities: Record<string, string[]> = {};
   let watchdog: WatchdogSettings | undefined;
+  let currency: CurrencySettings | undefined;
   return {
     gitIdentity: () =>
       Promise.resolve(
@@ -313,6 +328,12 @@ export function memoryOfficeSettingsStore(): OfficeSettingsStore {
     watchdog: () => Promise.resolve(structuredClone(watchdog)),
     setWatchdog(set) {
       watchdog = structuredClone(set);
+      return Promise.resolve();
+    },
+    currency: () =>
+      Promise.resolve(currency === undefined ? undefined : { ...currency }),
+    setCurrency(set) {
+      currency = { ...set };
       return Promise.resolve();
     },
   };
@@ -834,6 +855,30 @@ export function databaseOfficeSettingsStore(db: Database): OfficeSettingsStore {
         .values({ id: 1, ...values })
         .onConflictDoUpdate({ target: officeSettings.id, set: values });
     },
+    async currency() {
+      const [row] = await db
+        .select({ value: schemaMeta.value })
+        .from(schemaMeta)
+        .where(eq(schemaMeta.key, currencySettingKey));
+      if (row === undefined) {
+        return undefined;
+      }
+      let value: unknown;
+      try {
+        value = JSON.parse(row.value);
+      } catch {
+        return undefined;
+      }
+      const parsed = currencySettingsSchema.safeParse(value);
+      return parsed.success ? parsed.data : undefined;
+    },
+    async setCurrency(currency, at) {
+      const values = { value: JSON.stringify(currency), updatedAt: at };
+      await db
+        .insert(schemaMeta)
+        .values({ key: currencySettingKey, ...values })
+        .onConflictDoUpdate({ target: schemaMeta.key, set: values });
+    },
   };
 }
 
@@ -965,6 +1010,13 @@ export interface OfficeSettings {
   watchdogSettings(): Promise<WatchdogSettings>;
   /** Sets them, recording which changed. */
   setWatchdogSettings(settings: WatchdogSettings): Promise<WatchdogSettings>;
+  /**
+   * The currency costs are shown in: British pounds, at the day's rate,
+   * until set.
+   */
+  currencySettings(): Promise<CurrencySettings>;
+  /** Sets it, recording which changed. */
+  setCurrencySettings(settings: CurrencySettings): Promise<CurrencySettings>;
   /**
    * The prompt budgets, in characters: 12,000 of each memory and 40,000
    * of the Skills listing, until set.
@@ -1564,6 +1616,27 @@ export function createOfficeSettings(options: {
         });
       }
       return structuredClone(settings);
+    },
+
+    async currencySettings() {
+      return (await store.currency()) ?? { ...defaultCurrencySettings };
+    },
+
+    async setCurrencySettings(settings) {
+      const current = (await store.currency()) ?? defaultCurrencySettings;
+      const keys = (["currency", "manualRate"] as const)
+        .filter((key) => current[key] !== settings[key])
+        .map((key) => `currency.${key}`);
+      await store.setCurrency(settings, now());
+      if (keys.length > 0) {
+        await events.publish({
+          type: "config.changed",
+          version: 1,
+          scope: "office",
+          keys,
+        });
+      }
+      return { ...settings };
     },
 
     async setLobbyCharacter(role, character) {

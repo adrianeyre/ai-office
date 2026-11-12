@@ -1165,7 +1165,7 @@ describe("the AI Accounts in AI Settings", () => {
     expect(
       view.getByRole("list", { name: "DeepSeek's limits and credit" })
         .textContent,
-    ).toContain("Credit: US$15.40 left");
+    ).toContain("Credit: $15.40 left");
     expect(meters("Ollama")).toEqual([
       ["Share of the AI Gateway's tokens today", "25"],
     ]);

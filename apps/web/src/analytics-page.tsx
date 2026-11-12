@@ -44,6 +44,7 @@ import {
 import { AgentLink } from "./agent-link.tsx";
 import { getJson } from "./api.ts";
 import { useFloorNames } from "./floors.ts";
+import { currencyName, formatTotal, useMoney, type Money } from "./money.ts";
 import { useStoredLayout, WidgetGrid, type Widget } from "./widget-grid.tsx";
 import type { WidgetLayout } from "./widget-layout.ts";
 
@@ -143,15 +144,6 @@ const compactFormat = new Intl.NumberFormat("en-US", {
 });
 const wholeFormat = new Intl.NumberFormat("en-US");
 export const compact = (value: number): string => compactFormat.format(value);
-export const dollars = (value: number): string =>
-  value === 0
-    ? "$0"
-    : value < 0.01
-      ? "<$0.01"
-      : `$${value.toLocaleString("en-US", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })}`;
 export const latency = (ms: number): string =>
   ms >= 1_000 ? `${(ms / 1_000).toFixed(1)} s` : `${String(Math.round(ms))} ms`;
 export const percent = (share: number): string =>
@@ -209,7 +201,7 @@ function ChartCard({
 }
 
 /** The charts over time, from the series: a widget each. */
-function overTimeWidgets(series: AnalyticsSeries): Widget[] {
+function overTimeWidgets(series: AnalyticsSeries, money: Money): Widget[] {
   const times = series.points.map(({ at }) => at);
   const { bucket, points } = series;
   const one = (
@@ -292,14 +284,14 @@ function overTimeWidgets(series: AnalyticsSeries): Widget[] {
       content: (
         <ChartCard
           title="Estimated cost"
-          description="In US dollars, from each Model's price; for information only."
+          description={`In ${currencyName(money.currency)} (${money.currency}), from each Model's price; for information only.`}
         >
           <TimeChart
             label="Estimated cost"
             times={times}
             bucket={bucket}
             kind="lines"
-            format={dollars}
+            format={(value) => formatTotal(value, money)}
             series={one(
               "cost",
               "Estimated cost",
@@ -444,6 +436,7 @@ function Breakdown({
   onByChange: (by: AnalyticsDimension) => void;
 }) {
   const { data, isFetching } = useQuery(breakdownQuery(from, to, by));
+  const money = useMoney();
   const name = analyticsDimensionLabels[by];
   return (
     <section className="h-full space-y-3" aria-labelledby="breakdown-heading">
@@ -495,7 +488,7 @@ function Breakdown({
                     },
                     {
                       label: "estimated cost",
-                      value: dollars(item.estimatedCostUsd),
+                      value: formatTotal(item.estimatedCostUsd, money),
                     },
                   ],
                 }))}
@@ -518,7 +511,7 @@ function Breakdown({
                   wholeFormat.format(item.tokens),
                   wholeFormat.format(item.cacheReadTokens),
                   wholeFormat.format(item.cacheWriteTokens),
-                  dollars(item.estimatedCostUsd),
+                  formatTotal(item.estimatedCostUsd, money),
                   item.averageLatencyMs === null
                     ? "–"
                     : latency(item.averageLatencyMs),
@@ -563,6 +556,7 @@ function Performance({
   description: string;
 }) {
   const { data, isFetching } = useQuery(breakdownQuery(from, to, by));
+  const money = useMoney();
   const name = analyticsDimensionLabels[by];
   const allTokens =
     data?.items.reduce((sum, { tokens }) => sum + tokens, 0) ?? 0;
@@ -653,7 +647,7 @@ function Performance({
                         </td>
                         <td className="py-1 pr-3">{compact(item.tokens)}</td>
                         <td className="py-1 pr-3">
-                          {dollars(item.estimatedCostUsd)}
+                          {formatTotal(item.estimatedCostUsd, money)}
                         </td>
                         <td className="py-1 pr-3">
                           {item.averageLatencyMs === null
@@ -969,6 +963,7 @@ export function AnalyticsPage({
   const [anchor, setAnchor] = useState(now);
   const { from, to, bucket } = rangeBounds(range, anchor);
   const series = useQuery(seriesQuery(from, to, bucket));
+  const money = useMoney();
   const totals = series.data?.totals;
   const { layout, setLayout, reset, changed } = useStoredLayout(
     analyticsLayoutKey,
@@ -1064,7 +1059,7 @@ export function AnalyticsPage({
                   value={
                     totals === undefined
                       ? "–"
-                      : dollars(totals.estimatedCostUsd)
+                      : formatTotal(totals.estimatedCostUsd, money)
                   }
                 />
                 <StatTile
@@ -1085,7 +1080,7 @@ export function AnalyticsPage({
                   note={
                     totals === undefined
                       ? undefined
-                      : `${dollars(totals.keepAliveCostUsd)} to keep prompt caches warm`
+                      : `${formatTotal(totals.keepAliveCostUsd, money)} to keep prompt caches warm`
                   }
                 />
                 <StatTile
@@ -1102,7 +1097,7 @@ export function AnalyticsPage({
           },
           ...(series.data === undefined
             ? []
-            : overTimeWidgets(series.data).map((widget) => ({
+            : overTimeWidgets(series.data, money).map((widget) => ({
                 ...widget,
                 content: (
                   <div

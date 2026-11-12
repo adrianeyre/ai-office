@@ -514,6 +514,7 @@ export function DirectChatPanel({
               session === undefined ||
               !chat.isSuccess
             }
+            pending={sending}
           >
             <Send aria-hidden />
             Send

@@ -34,6 +34,7 @@ import { cn, selectClass } from "@/lib/utils.ts";
 
 import { AgentLink } from "./agent-link.tsx";
 import { getJson, postJson, readApiError } from "./api.ts";
+import { formatMoney, useMoney } from "./money.ts";
 import { useEventStream } from "./event-stream.ts";
 import { floorQuery } from "./floors.ts";
 import { GrillingWhiteboard } from "./grilling.tsx";
@@ -307,9 +308,6 @@ function Kickoff({
   );
 }
 
-/** An estimated cost, in US dollars. */
-const usd = (amount: number): string => `$${amount.toFixed(2)}`;
-
 const tokens = (count: number): string => count.toLocaleString("en-GB");
 
 /** A finished Batch's Wrap-up: each issue's outcome, and the totals. */
@@ -327,6 +325,9 @@ function WrapUpView({
   Heading: "h3" | "h4";
 }) {
   const { totals } = wrapUp;
+  // An estimated cost, in the office's currency.
+  const money = useMoney();
+  const cost = (amount: number): string => formatMoney(amount, money);
   const blocked = wrapUp.issues.filter(
     ({ outcome }) => outcome === "blocked" || outcome === "not_started",
   );
@@ -338,7 +339,7 @@ function WrapUpView({
       <p className="text-xs text-muted-foreground">
         Finished {when(finishedAt)}, on version {wrapUp.planVersion} of the
         Plan. {tokens(totals.tokens)} tokens, about{" "}
-        {usd(totals.estimatedCostUsd)} (estimated).
+        {cost(totals.estimatedCostUsd)} (estimated).
         {totals.closed > 0 && <> {totals.closed} closed without merging.</>}
       </p>
       <div className="overflow-x-auto">
@@ -405,7 +406,7 @@ function WrapUpView({
                   {tokens(issue.tokens)}
                 </td>
                 <td className="py-1 text-right tabular-nums">
-                  {usd(issue.estimatedCostUsd)}
+                  {cost(issue.estimatedCostUsd)}
                 </td>
               </tr>
             ))}

@@ -58,6 +58,7 @@ import {
   changelogMessage,
   publicationFor,
   reportMessage,
+  withCost,
   workLogFor,
   type CompletedIssue,
   type Publication,
@@ -67,6 +68,8 @@ import {
 import {
   reportData,
   templateReportSummary,
+  usDollarCost,
+  type CostFormat,
   type BatchReport,
   type ReportWriter,
 } from "./report.ts";
@@ -265,6 +268,12 @@ export interface CommunicationsOptions {
    * when it fails, they come from a template.
    */
   readonly reportWriter?: ReportWriter;
+  /**
+   * How estimated costs are written in reports and calendar events: in the
+   * office's currency. US dollars, as costs are kept, without it, or when
+   * it fails.
+   */
+  readonly costFormat?: () => Promise<CostFormat>;
   /** The Communications Agent's name when it is made. */
   readonly agentName?: () => string;
   /** Removes credentials from every message and error kept. */
@@ -815,24 +824,35 @@ export function createCommunications(
   const reportSummary = async (
     batchReport: BatchReport,
     detailLevel: DetailLevel,
+    cost: CostFormat,
   ): Promise<string> => {
     const writer = options.reportWriter;
     if (writer === undefined || detailLevel === "links_only") {
-      return templateReportSummary(batchReport, detailLevel);
+      return templateReportSummary(batchReport, detailLevel, cost);
     }
     const agent = await agentInfo();
     if (agent.model === null) {
-      return templateReportSummary(batchReport, detailLevel);
+      return templateReportSummary(batchReport, detailLevel, cost);
     }
     try {
       return await writer.write({
         agentName: agent.name,
         model: agent.model,
-        data: reportData(batchReport),
+        data: reportData(batchReport, cost),
       });
     } catch (error) {
       report(error);
-      return templateReportSummary(batchReport, detailLevel);
+      return templateReportSummary(batchReport, detailLevel, cost);
+    }
+  };
+
+  /** How costs are written: the office's currency, or US dollars. */
+  const costFormat = async (): Promise<CostFormat> => {
+    try {
+      return (await options.costFormat?.()) ?? usDollarCost;
+    } catch (error) {
+      report(error);
+      return usDollarCost;
     }
   };
 
@@ -845,6 +865,7 @@ export function createCommunications(
     publication: Publication,
     connections: readonly ConnectionRecord[],
     occurredAt: Date,
+    cost: CostFormat,
   ): Promise<Map<string, OutboundMessage>> => {
     const made = new Map<DetailLevel, OutboundMessage>();
     const messageAt = async (detailLevel: DetailLevel) => {
@@ -858,7 +879,7 @@ export function createCommunications(
         // credential so the redactor no longer matched it.
         const batchReport = redactor.redact(publication.report);
         const summary = redactor.redactText(
-          await reportSummary(batchReport, detailLevel),
+          await reportSummary(batchReport, detailLevel, cost),
         );
         message = redactor.redact(
           reportMessage(
@@ -867,6 +888,7 @@ export function createCommunications(
             summary,
             publication.aiOfficeUrl,
             occurredAt,
+            cost,
           ),
         );
       } else {
@@ -897,6 +919,7 @@ export function createCommunications(
     publication: CalendarPublication,
     connections: readonly ConnectionRecord[],
     occurredAt: Date,
+    cost: CostFormat,
   ): Map<string, OutboundMessage> => {
     // Redacted before its Markdown is written, as a report is.
     const redacted = redactor.redact(publication);
@@ -906,7 +929,7 @@ export function createCommunications(
         messages.set(
           connection.id,
           redactor.redact(
-            calendarMessage(redacted, connection.detailLevel, occurredAt),
+            calendarMessage(redacted, connection.detailLevel, occurredAt, cost),
           ),
         );
       }
@@ -1004,7 +1027,10 @@ export function createCommunications(
           const row =
             workLogs.length === 0
               ? undefined
-              : await workLogFor(stored, publicationSources);
+              : withCost(
+                  await workLogFor(stored, publicationSources),
+                  await costFormat(),
+                );
           const calendarPublication =
             calendars.length === 0
               ? undefined
@@ -1040,6 +1066,7 @@ export function createCommunications(
                     publication,
                     publishing,
                     stored.occurredAt,
+                    await costFormat(),
                   )),
                 ].map(([connectionId, message]) =>
                   deliveryOf(connectionId, stored.id, message),
@@ -1051,6 +1078,7 @@ export function createCommunications(
                     calendarPublication,
                     calendars,
                     stored.occurredAt,
+                    await costFormat(),
                   ),
                 ].map(([connectionId, message]) =>
                   deliveryOf(connectionId, stored.id, message),

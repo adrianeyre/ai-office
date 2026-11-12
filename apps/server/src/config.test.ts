@@ -240,6 +240,24 @@ describe("loadConfig", () => {
     expect(config.githubApiUrl).toBe("https://github.example.com/api/v3");
   });
 
+  it("fetches the day's exchange rates from ExchangeRate-API, another URL, or not at all", () => {
+    expect(loadConfig(validEnv).exchangeRatesUrl).toBe(
+      "https://open.er-api.com/v6/latest/USD",
+    );
+    expect(
+      loadConfig({
+        ...validEnv,
+        EXCHANGE_RATES_URL: "https://rates.example.com/usd",
+      }).exchangeRatesUrl,
+    ).toBe("https://rates.example.com/usd");
+    expect(
+      loadConfig({ ...validEnv, EXCHANGE_RATES_URL: "off" }).exchangeRatesUrl,
+    ).toBeNull();
+    expect(() =>
+      loadConfig({ ...validEnv, EXCHANGE_RATES_URL: "ftp://rates.example" }),
+    ).toThrow(/EXCHANGE_RATES_URL/);
+  });
+
   it("names the GitHub variables it no longer reads, but not their values, and still starts: GitHub is set up in Floor Settings", () => {
     const env = {
       ...validEnv,

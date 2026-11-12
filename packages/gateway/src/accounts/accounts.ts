@@ -6,6 +6,7 @@ import {
   aiAccountKindOf,
   autoRefreshBufferMs,
   defaultAutoRefreshSettings,
+  type AgentTool,
   type AutoRefreshSettings,
   type UsageWindow,
   maxAiAccountPriority,
@@ -593,6 +594,35 @@ interface PendingLogin {
   readonly target:
     | { readonly kind: "add"; readonly request: StartOAuthLoginRequest }
     | { readonly kind: "reauthenticate"; readonly accountId: string };
+}
+
+/**
+ * Why no AI Account served a request when the only ones that could are
+ * subscriptions for another agent tool (FR-35): a subscription serves only
+ * its own agent tool's requests, as its AI Provider's terms require, so a
+ * request from any other client (curl, an editor, an SDK) gets none. The
+ * message names the tools, and what would serve it: that tool, or an API
+ * key. Undefined when there are no such accounts, or any is not a
+ * subscription, or one is the request's own tool's (its token expired).
+ */
+export function subscriptionsOnly(
+  accounts: readonly Pick<AiAccountRecord, "aiProvider" | "accountType">[],
+  agentTool: AgentTool | null,
+): string | undefined {
+  const tools = accounts.map(
+    (account) => aiAccountKindOf(account)?.servesOnly ?? null,
+  );
+  if (
+    tools.length === 0 ||
+    tools.some((tool) => tool === null || tool === agentTool)
+  ) {
+    return undefined;
+  }
+  const names = [...new Set(tools)].join(" or ");
+  const baseUrl = tools.includes("Claude Code")
+    ? " (Claude Code's ANTHROPIC_BASE_URL is AI Office's address, without /v1)"
+    : "";
+  return `No AI Account can serve this request: the only ones that could are subscriptions, and a subscription serves only its own agent tool (${names}), as its AI Provider's terms require. This request ${agentTool === null ? "is not from one" : `is from ${agentTool}`}. Send it from ${names}${baseUrl}, or add an API key AI Account to serve other tools.`;
 }
 
 export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
@@ -2158,9 +2188,12 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
       }
       // A Model of a known AI Provider is served only by its accounts, and
       // by compatible endpoints, which are sent any Model.
+      // `anyTool` asks it as if the request came from the agent tool a
+      // subscription serves, to say why none could.
       const servable = (
         account: AiAccountRecord,
         model: string | null,
+        anyTool = false,
       ): boolean => {
         const kind = aiAccountKindOf(account);
         return (
@@ -2169,6 +2202,7 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
           (request.endpoint === undefined ||
             kindServes(kind, request.endpoint)) &&
           (kind.servesOnly === null ||
+            anyTool ||
             (kind.servesOnly === request.agentTool &&
               account.tokenExpiresAt !== null &&
               account.tokenExpiresAt > at))
@@ -2375,6 +2409,16 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
         (account) => !account.paused && canServe(account, mapped(account)),
       );
       if (serving.length === 0) {
+        const onlySubscriptions = subscriptionsOnly(
+          accounts.filter(
+            (account) =>
+              !account.paused && servable(account, mapped(account), true),
+          ),
+          request.agentTool,
+        );
+        if (onlySubscriptions !== undefined) {
+          throw new AccountsUnavailableError(503, onlySubscriptions, undefined);
+        }
         return undefined;
       }
       const working = serving.filter(

@@ -132,6 +132,7 @@ import {
   createUsageTracker,
   createGatewayKeys,
   createModelCatalogue,
+  gatewayModels,
   createPricing,
   createRequestHistory,
   databaseAiAccountStore,
@@ -153,6 +154,11 @@ import { catalogueOf } from "./ai-providers/routes.ts";
 import { contextWindowOf, observeModelCalls } from "./context-usage/routes.ts";
 import { createOAuthCallbacks } from "./ai-accounts/oauth-callback.ts";
 import { buildApp } from "./app.ts";
+import {
+  createExchangeRates,
+  officeCostFormat,
+  type ExchangeRates,
+} from "./office/exchange-rates.ts";
 import { writeSetupToken } from "./auth/setup-token.ts";
 import { databaseAuthStore } from "./auth/store.ts";
 import {
@@ -289,6 +295,18 @@ export async function startOffice(
     logger.warn({ err: error }, "The outbound proxy could not be read.");
   });
   const upstream = createUpstreamFetch({ proxy: () => outboundProxy });
+  // The day's exchange rates, for costs in the office's currency, fetched
+  // through the outbound proxy like every other upstream request.
+  // None at all when EXCHANGE_RATES_URL is off: costs then show in US
+  // dollars unless the Owner gives a rate of their own.
+  const exchangeRates: ExchangeRates =
+    config.exchangeRatesUrl === null
+      ? { current: () => Promise.resolve(undefined) }
+      : createExchangeRates({
+          fetch: upstream.fetch,
+          url: config.exchangeRatesUrl,
+          logger: logger.child({ component: "exchange-rates" }),
+        });
   // Load balancing (FR-37): the Owner's strategy, read at start and again
   // whenever it changes, and the tokens each AI Account used lately.
   let balancing = defaultLoadBalancingSettings;
@@ -666,6 +684,9 @@ export async function startOffice(
     logger: logger.child({ component: "gateway" }),
     toolCallScreen: (request) => toolCallScreens.answer(request),
     accounts: aiAccounts,
+    // `GET /v1/models`: the catalogue's Models of the accounts there are.
+    models: async () =>
+      gatewayModels(await modelCatalogue.list(), await aiAccounts.list()),
     // A paused Agent's key, an archived Floor's and a paused
     // Communications Agent's call no model (pen-testing G1-4).
     keys: keysAtWork({
@@ -1156,6 +1177,11 @@ export async function startOffice(
     notice: (noticeId) => notices.get(noticeId).catch(() => undefined),
     raiseNotice: (notice) => notices.raise(notice),
     defaultModels: () => aiProviders.defaultModels(),
+    // Reports' and calendar events' costs, in the office's currency.
+    costFormat: officeCostFormat(
+      () => officeSettings.currencySettings(),
+      exchangeRates,
+    ),
     agentName: () => agentName(Math.random, []),
     // Digests are written by its Model through this process's own AI
     // Gateway, with its own Gateway Key (FR-90, ADR 0001).
@@ -1231,6 +1257,7 @@ export async function startOffice(
     requestHistory,
     gatewayLogs,
     modelCatalogue,
+    exchangeRates,
     contextUsage,
     freshStarts,
     aiProviders,

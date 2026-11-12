@@ -185,9 +185,11 @@ const cases: Case[] = [
         betas: [],
       });
       for (const agentTool of [null, "Claude Code", "Codex"] as const) {
-        expect(
-          await setup.accounts.select({ agentTool, model: "grok-4" }),
-        ).toBeUndefined();
+        await expect(
+          setup.accounts.select({ agentTool, model: "grok-4" }),
+        ).rejects.toThrow(
+          "a subscription serves only its own agent tool (opencode)",
+        );
       }
       // Nor a Claude Model, from opencode or anyone.
       expect(
