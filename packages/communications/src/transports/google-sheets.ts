@@ -5,6 +5,7 @@ import {
   type OutboundMessage,
 } from "@ai-office/shared";
 
+import { usDollarCost } from "../report.ts";
 import type { GoogleAccess } from "../google.ts";
 import {
   DeliveryError,
@@ -36,7 +37,7 @@ export const workLogHeader = [
   "Agents",
   "Review Loop rounds",
   "Tokens",
-  "Estimated cost (USD)",
+  "Estimated cost",
   "AI Office",
   "AI Office ID",
 ] as const;
@@ -78,7 +79,9 @@ export function workLogRow(message: OutboundMessage, id: string): Cell[] {
       workLog.agents.join(", "),
       workLog.reviewRounds,
       workLog.tokens,
-      Math.round(workLog.estimatedCostUsd * 100) / 100,
+      // In the office's currency, as written: each row says its own, so
+      // rows written before the currency changed stay right.
+      workLog.estimatedCost ?? usDollarCost(workLog.estimatedCostUsd),
       message.aiOfficeUrl,
       id,
     ];

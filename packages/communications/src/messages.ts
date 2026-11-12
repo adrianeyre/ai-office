@@ -257,6 +257,9 @@ export function atDetailLevel(
             reviewRounds: message.workLog.reviewRounds,
             tokens: message.workLog.tokens,
             estimatedCostUsd: message.workLog.estimatedCostUsd,
+            ...(message.workLog.estimatedCost === undefined
+              ? {}
+              : { estimatedCost: message.workLog.estimatedCost }),
           },
         }),
   };

@@ -863,6 +863,11 @@ export const workLogEntrySchema = z.object({
   reviewRounds: z.number().int().min(0),
   tokens: z.number().int().min(0),
   estimatedCostUsd: z.number().min(0),
+  /**
+   * The estimated cost in the office's currency, as written (`£1.23`);
+   * absent in a row made before there was one, which is in US dollars.
+   */
+  estimatedCost: z.string().min(1).max(40).optional(),
 });
 export type WorkLogEntry = z.infer<typeof workLogEntrySchema>;
 

@@ -58,6 +58,7 @@ import {
   changelogMessage,
   publicationFor,
   reportMessage,
+  withCost,
   workLogFor,
   type CompletedIssue,
   type Publication,
@@ -1026,7 +1027,10 @@ export function createCommunications(
           const row =
             workLogs.length === 0
               ? undefined
-              : await workLogFor(stored, publicationSources);
+              : withCost(
+                  await workLogFor(stored, publicationSources),
+                  await costFormat(),
+                );
           const calendarPublication =
             calendars.length === 0
               ? undefined

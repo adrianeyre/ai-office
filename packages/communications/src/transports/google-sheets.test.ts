@@ -124,8 +124,13 @@ interface Setup {
 }
 
 async function setUp(
-  options: { readonly accessTokenSeconds?: number } = {},
+  options: {
+    readonly accessTokenSeconds?: number;
+    /** How costs are written: the office's currency; dollars without. */
+    readonly costFormat?: (usd: number) => string;
+  } = {},
 ): Promise<Setup> {
+  const { costFormat, ...fakeOptions } = options;
   const clock = { time: start };
   const now = () => clock.time;
   const google = await serveFakeGoogle({
@@ -137,7 +142,7 @@ async function setUp(
       { id: otherSpreadsheetId, tabs: ["Sheet1"] },
     ],
     now,
-    ...options,
+    ...fakeOptions,
   });
   servers.push(google);
   const bus = createEventBus({ store: memoryEventStore(), now });
@@ -183,6 +188,9 @@ async function setUp(
     redactor,
     now,
     retry: { initialDelayMs: 1000 },
+    ...(costFormat === undefined
+      ? {}
+      : { costFormat: () => Promise.resolve(costFormat) }),
   });
   return {
     google,
@@ -527,7 +535,7 @@ describe("the work log", () => {
         "Ada, Alan, Grace",
         2,
         152_340,
-        1.23,
+        "$1.23",
         `${publicUrl}/activity?floorId=web-shop&issue=5`,
         delivery?.id,
       ],
@@ -638,7 +646,7 @@ describe("the work log", () => {
       "",
       1,
       40_000,
-      0.4,
+      "$0.40",
       `${publicUrl}/activity?floorId=web-shop&issue=6`,
       delivery?.id,
     ]);
@@ -651,6 +659,27 @@ describe("the work log", () => {
       setup.google.rows(spreadsheetId, "Work log"),
     ]);
     expect(everything).not.toContain("sk-ant-");
+  });
+
+  it("writes each row's estimated cost in the office's currency", async () => {
+    const setup = await setUp({
+      costFormat: (usd) => `£${(usd * 0.75).toFixed(2)}`,
+    });
+    await setup.auth.configure({ clientId, clientSecret });
+    await setup.agent.add(
+      sheetsRequest(
+        "Links",
+        { detailLevel: "links_only" },
+        { spreadsheetId: otherSpreadsheetId, tab: "Sheet1" },
+      ),
+    );
+    await setup.signIn();
+    await setup.bus.publish(merged(16, 6));
+    await setup.run();
+
+    const rows = setup.google.rows(otherSpreadsheetId, "Sheet1");
+    expect(rows?.[0]?.[9]).toBe("Estimated cost");
+    expect(dataRows(rows)[0]?.[9]).toBe("£0.30");
   });
 
   it("a 429 is retried after its Retry-After; an unknown spreadsheet says so", async () => {

@@ -226,3 +226,24 @@ export const changelogMessage = (
     { ...message, occurredAt: occurredAt.toISOString() },
     detailLevel,
   );
+
+/**
+ * A completed issue's row with its estimated cost written in the office's
+ * currency, for a work log to show as it is.
+ */
+export function withCost(
+  row: WorkLogPublication | undefined,
+  cost: CostFormat,
+): WorkLogPublication | undefined {
+  const workLog = row?.message.workLog;
+  if (row === undefined || workLog === undefined) {
+    return row;
+  }
+  return {
+    ...row,
+    message: {
+      ...row.message,
+      workLog: { ...workLog, estimatedCost: cost(workLog.estimatedCostUsd) },
+    },
+  };
+}

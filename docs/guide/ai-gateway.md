@@ -152,8 +152,10 @@ circulating ISO 4217 currency).
   it was shown is kept exactly), an AI Account's prepaid balance (from the
   AI Provider's own currency, when the rate is known), and the Batch
   reports, decks, documents and calendar events the Communications Agent
-  sends through Connections. A Google Sheets work log's **Estimated cost
-  (USD)** column stays in US dollars, so its rows never mix currencies.
+  sends through Connections. A Google Sheets work log's **Estimated
+  cost** column has each row's cost written in the office's currency with
+  its symbol (`£1.23`), so rows written before the currency changed stay
+  right.
 - **The rate.** The day's rate, which the server fetches from
   ExchangeRate-API's open endpoint (`open.er-api.com`, no key, some 160
   currencies) when it is first asked for, then once a day, through the
