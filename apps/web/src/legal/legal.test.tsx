@@ -9,6 +9,7 @@ import { useSceneSettings } from "../scene/scene-settings.ts";
 import { useSoundSettings } from "../scene/sound-settings.ts";
 import { AccessibilityStatement } from "./accessibility-statement.tsx";
 import { Changelog } from "./changelog.tsx";
+import { versionCheckedOnKey } from "../version-check.tsx";
 import { CookiePolicy } from "./cookie-policy.tsx";
 import { PrivacyPolicy } from "./privacy-policy.tsx";
 import { TermsAndConditions } from "./terms-and-conditions.tsx";
@@ -50,8 +51,37 @@ describe("the cookie policy", () => {
         "ai-office:analytics-layout",
         // The 3D Office's inspector panels (scene/panel-layout.ts).
         panelLayoutKey,
+        "ai-office:navigation-menu-height",
+        "ai-office:branches-floor",
+        versionCheckedOnKey,
+        "ai-office:still-sign-in",
       ].sort(),
     );
+  });
+
+  it("lists every key the web app keeps in the browser, so none is missed", () => {
+    // Every `ai-office:…` key named anywhere in the web app's code.
+    const sources = import.meta.glob<string>(
+      ["../**/*.{ts,tsx}", "!../**/*.test.{ts,tsx}"],
+      { query: "?raw", import: "default", eager: true },
+    );
+    const keys = new Set(
+      Object.values(sources).flatMap((source) =>
+        [...source.matchAll(/["'`](ai-office:[a-z0-9-]+)["'`]/g)].map(
+          (match) => match[1],
+        ),
+      ),
+    );
+    render(<CookiePolicy />);
+    const listed = screen
+      .getAllByRole("rowheader")
+      .map((cell) => cell.textContent);
+    expect(keys.size).toBeGreaterThan(10);
+    for (const key of keys) {
+      expect(listed, `${String(key)} is not in the cookie policy`).toContain(
+        key,
+      );
+    }
   });
 });
 

@@ -8,6 +8,8 @@ import {
   StartupVersionCheck,
   VersionCard,
   forgetStartupVersionCheck,
+  today,
+  versionCheckedOnKey,
 } from "./version-check.tsx";
 
 // The version check, against a stubbed server: Admin's "Check for latest
@@ -67,6 +69,7 @@ const newer = (version: string) => {
 
 beforeEach(() => {
   forgetStartupVersionCheck();
+  localStorage.clear();
 });
 
 afterEach(() => {
@@ -221,12 +224,61 @@ describe("the check as the app opens", () => {
     expect(within(dialog).getByText(/is out of date\./).textContent).toBe(
       `AI Office ${__APP_VERSION__} is out of date.`,
     );
+    // The version running and the latest, side by side.
+    expect(
+      within(dialog).getByText("You are on").nextSibling?.textContent,
+    ).toBe(`AI Office ${__APP_VERSION__}`);
+    expect(
+      within(dialog).getByText("The latest is").nextSibling?.textContent,
+    ).toBe(`AI Office ${latest}`);
+    // And a button to the latest release on GitHub, in a new tab.
+    const release = within(dialog).getByRole("link", {
+      name: "View the release on GitHub, opens in a new tab",
+    });
+    expect(release.getAttribute("href")).toBe(
+      `https://github.com/adrianeyre/ai-office/releases/tag/v${latest}`,
+    );
+    expect(release.getAttribute("target")).toBe("_blank");
     expect(asked).toHaveLength(1);
 
     await userEvent
       .setup()
-      .click(within(dialog).getByRole("button", { name: "Close" }));
+      .click(within(dialog).getByRole("button", { name: "Not now" }));
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("asks only the first time the app opens each day", async () => {
+    const { asked } = stubServer({ version: newer(__APP_VERSION__) });
+    renderWithQueries(<StartupVersionCheck />);
+    await screen.findByRole("dialog");
+    expect(localStorage.getItem(versionCheckedOnKey)).toBe(today());
+    cleanup();
+
+    // Opened again today: no question, no dialog.
+    forgetStartupVersionCheck();
+    renderWithQueries(<StartupVersionCheck />);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(asked).toHaveLength(1);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    cleanup();
+
+    // Opened on another day: it asks again.
+    localStorage.setItem(versionCheckedOnKey, "2000-01-01");
+    forgetStartupVersionCheck();
+    renderWithQueries(<StartupVersionCheck />);
+    await screen.findByRole("dialog");
+    expect(asked).toHaveLength(2);
+  });
+
+  it("asks again next time when GitHub could not be asked", async () => {
+    stubServer({
+      status: 502,
+      error: "version_check_failed",
+      message: "GitHub could not be reached.",
+    });
+    renderWithQueries(<StartupVersionCheck />);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(localStorage.getItem(versionCheckedOnKey)).toBeNull();
   });
 
   it.each([

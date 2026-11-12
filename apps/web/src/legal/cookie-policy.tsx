@@ -40,6 +40,33 @@ const storage = [
     lasts: "Until you clear your browser's site data",
   },
   {
+    name: "ai-office:navigation-menu-height",
+    kind: "Local storage",
+    purpose:
+      "How tall you made the navigation's list of pages, above Sign out.",
+    lasts: "Until you clear your browser's site data",
+  },
+  {
+    name: "ai-office:branches-floor",
+    kind: "Local storage",
+    purpose: "The Floor you last looked at on the Branches page.",
+    lasts: "Until you clear your browser's site data",
+  },
+  {
+    name: "ai-office:version-checked-on",
+    kind: "Local storage",
+    purpose:
+      "The day AI Office last checked for a newer version, so it checks only the first time you open it each day.",
+    lasts: "Until you clear your browser's site data",
+  },
+  {
+    name: "ai-office:still-sign-in",
+    kind: "Session storage",
+    purpose:
+      "After Sign out everywhere: the names (never the secrets) of the passwords and API keys that still sign in, for the login page to tell you once.",
+    lasts: "Until the tab is closed",
+  },
+  {
     name: "ai-office:scene-settings",
     kind: "Local storage",
     purpose:
@@ -79,17 +106,18 @@ const storage = [
 export function CookiePolicy() {
   return (
     <>
-      <p className="policy-updated">Last updated: October 2026</p>
+      <p className="policy-updated">Last updated: November 2026</p>
 
       <h3>Strictly necessary only</h3>
       <p>
         AI Office sets two cookies, which sign you in and keep you signed in,
-        and remembers your settings in your browser&apos;s local storage. All of
-        them are needed for the features you use, so none needs your consent,
-        and nothing is used for analytics, tracking or advertising. The token
-        that guards your changes against other sites (CSRF) is kept only in the
-        open page&apos;s memory, and whether this browser may show notifications
-        is kept by the browser itself.
+        remembers your settings in your browser&apos;s local storage, and keeps
+        one note for the open tab in its session storage. All of them are needed
+        for the features you use, so none needs your consent, and nothing is
+        used for analytics, tracking or advertising. The token that guards your
+        changes against other sites (CSRF) is kept only in the open page&apos;s
+        memory, and whether this browser may show notifications is kept by the
+        browser itself.
       </p>
 
       <h3>What is stored</h3>
@@ -122,8 +150,9 @@ export function CookiePolicy() {
       <h3>Removing them</h3>
       <p>
         Signing out removes the session cookie; the sign-in cookie goes once
-        your code is accepted, or after 5 minutes. To remove the settings, clear
-        this site&apos;s data in your browser; each goes back to its default.
+        your code is accepted, or after 5 minutes, and the session storage goes
+        when you close the tab. To remove the settings, clear this site&apos;s
+        data in your browser; each goes back to its default.
       </p>
     </>
   );
