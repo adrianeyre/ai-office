@@ -27,8 +27,8 @@ import { sessionQuery } from "./session.ts";
 // shows) is the latest, from the root package.json on GitHub's `main`,
 // which the server asks for (`GET /api/version/latest`), so the browser
 // loads nothing from other sites. Admin's "Check for latest version" asks
-// on demand; the app asks once as it opens, and says so only when a newer
-// version is out. An answer that is not a version number is shown as a
+// on demand; the app asks the first time it opens each day, and says so
+// only when a newer version is out. An answer that is not a version number is shown as a
 // check that failed, never as a version.
 
 export type VersionCheck =
@@ -207,18 +207,63 @@ export function VersionCheckDialog({
   );
 }
 
-// Once per page load, however often the layout is drawn.
+// Once a day: the first time the app opens each day (in this browser's
+// time zone), it asks; the day is kept in this browser's local storage
+// once an answer comes, so a check that failed is tried again the next
+// time the app opens. Once per page load at most, however often the
+// layout is drawn.
 let askedAtStart = false;
+
+/** Where the day of the last answered check is kept, as `YYYY-MM-DD`. */
+export const versionCheckedOnKey = "ai-office:version-checked-on";
+
+/** Today, in this browser's time zone, as `YYYY-MM-DD`. */
+export const today = (at: Date = new Date()): string =>
+  [
+    String(at.getFullYear()),
+    String(at.getMonth() + 1).padStart(2, "0"),
+    String(at.getDate()).padStart(2, "0"),
+  ].join("-");
+
+const checkedOn = (): string | null => {
+  try {
+    return globalThis.localStorage.getItem(versionCheckedOnKey);
+  } catch {
+    return null;
+  }
+};
+
+const rememberChecked = (day: string): void => {
+  try {
+    globalThis.localStorage.setItem(versionCheckedOnKey, day);
+  } catch {
+    // Without storage it asks again next time: no harm.
+  }
+};
 
 /** Lets tests ask at start again, as a new page load would. */
 export function forgetStartupVersionCheck(): void {
   askedAtStart = false;
 }
 
+/** The version running and the latest, side by side. */
+function Versions({ running, latest }: { running: string; latest: string }) {
+  return (
+    <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+      <dt className="text-muted-foreground">You are on</dt>
+      <dd className="font-medium tabular-nums">AI Office {running}</dd>
+      <dt className="text-muted-foreground">The latest is</dt>
+      <dd className="font-medium tabular-nums">AI Office {latest}</dd>
+    </dl>
+  );
+}
+
 /**
- * Asks once, as the app opens and once signed in, whether the version
- * running is the latest, and says so in a dialog only if a newer one is
- * out. Says nothing if it is the latest, or if GitHub could not be asked.
+ * Asks the first time the app opens each day, once signed in, whether the
+ * version running is the latest, and says so in a dialog only if a newer
+ * one is out: the version running, the latest, and a button to the latest
+ * release on GitHub. Says nothing if it is the latest, or if GitHub could
+ * not be asked (and asks again next time).
  */
 export function StartupVersionCheck({
   running = __APP_VERSION__,
@@ -237,8 +282,16 @@ export function StartupVersionCheck({
       return;
     }
     askedAtStart = true;
+    const day = today();
+    if (checkedOn() === day) {
+      return;
+    }
     let live = true;
     void checkLatestVersion(running).then((check) => {
+      if (check.kind === "failed") {
+        return;
+      }
+      rememberChecked(day);
       if (live && check.kind === "outOfDate") {
         setOutOfDate({ running: check.running, latest: check.latest });
       }
@@ -258,15 +311,34 @@ export function StartupVersionCheck({
       title="A newer version of AI Office is out"
       closeLabel="Close newer version notice"
       footer={
-        <Button className="ml-auto" onClick={close}>
-          Close
-        </Button>
+        <>
+          <Button variant="outline" onClick={close}>
+            Not now
+          </Button>
+          {outOfDate !== null && (
+            <Button className="ml-auto" asChild>
+              <a
+                href={releasePageOf(outOfDate.latest)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={close}
+              >
+                View the release on GitHub
+                <span className="sr-only">, opens in a new tab</span>
+              </a>
+            </Button>
+          )}
+        </>
       }
     >
       {outOfDate !== null && (
         <>
+          <Versions running={outOfDate.running} latest={outOfDate.latest} />
           <OutOfDate running={outOfDate.running} latest={outOfDate.latest} />
           <Source />
+          <p className="policy-updated">
+            AI Office checks once a day, the first time you open it.
+          </p>
         </>
       )}
     </Dialog>

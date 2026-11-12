@@ -24,7 +24,9 @@ The server also answers `GET /robots.txt`, which lets crawlers in but keeps them
 
 ## The footer and accessibility
 
-Every page ends with a footer: a "Website design" credit that links to AI Office's source, the version (the root `package.json`'s), and the Privacy Policy, Terms and Conditions, Cookie Policy and Accessibility statement. Each opens in a dialog ([`components/ui/dialog.tsx`](../../apps/web/src/components/ui/dialog.tsx)) with a title, a close button, a body that scrolls both ways on its own, and a footer that stays in place. The texts are in [`apps/web/src/legal/`](../../apps/web/src/legal/); keep the Cookie Policy's table in step with the cookies and browser storage the app uses.
+Every page ends with a footer: a "Website design" credit that links to AI Office's source, the version (the root `package.json`'s), and the Privacy Policy, Terms and Conditions, Cookie Policy and Accessibility statement. Each opens in a dialog ([`components/ui/dialog.tsx`](../../apps/web/src/components/ui/dialog.tsx)) with a title, a close button, a body that scrolls both ways on its own, and a footer that stays in place. The texts are in [`apps/web/src/legal/`](../../apps/web/src/legal/); keep the Cookie Policy's table in step with the cookies and browser storage the app uses (`legal.test.tsx` fails if any `ai-office:…` key in the web app's code is missing from it).
+
+**Is this the latest version?** The first time the app opens each day (in the browser's time zone), once signed in, it asks the server whether the version running is the latest (`GET /api/version/latest`, which reads the root `package.json` on GitHub's `main`; the browser loads nothing from other sites). Only if a newer version is out does a dialog open: the version running and the latest side by side, how to update, and **View the release on GitHub**, which opens the latest release's page in a new tab (**Not now** closes it). The day is kept in local storage (`ai-office:version-checked-on`) once an answer comes, so it asks once a day at most, and again the next time the app opens if GitHub could not be asked. General Settings' **Version** card checks on demand.
 
 General Settings' **Appearance** card sets light, dark or system (matching the device) mode, and one of six themes: Indigo (the logo's colours, and the default), Neutral, Ocean, Emerald, Rose and Amber. Every theme's surfaces are the same ink, a neutral with a trace of the logo's indigo; the themes change the accent. The interface is set in Inter, and code, ids and figures in JetBrains Mono, both served by AI Office itself from the `@fontsource-variable` packages, as the Content-Security-Policy allows no other site's fonts. The choice belongs to the browser, in local storage (`ai-office:appearance`); `index.html` applies it before the first paint, so a dark page never flashes white. The themes' colours are in `apps/web/src/styles.css`, and `theme-contrast.test.ts` holds every theme, in both modes, to WCAG 2.2 AA: 4.5:1 for text, 3:1 for field borders and the focus outline. To add a theme, add it to `themes` in `appearance.ts`, give it a light and a dark block in `styles.css`, and add its name to the check in `index.html`. Dark mode shows `brand/logo-dark.svg`, the logo with a light wordmark.
 
@@ -109,7 +111,13 @@ page scrolls.
   registered with Google.
 - **Collapsed to its icons.** **Collapse the menu** (the chevrons at its
   top) leaves only each item's icon; each is still named to screen readers
-  and by its tooltip. **Expand the menu** brings the labels back.
+  and by its tooltip. **Expand the menu** brings the labels back. Sign out's
+  icon and the server's status dot sit in the same column as the pages'
+  icons, each in an 18 px box as theirs are, expanded or collapsed.
+- **Sign out at the foot.** Sign out, Sign out everywhere and the server's
+  status are always at the bottom of the menu, however tall the Owner
+  makes the list of pages (the line above Sign out drags it shorter or
+  taller; the pages scroll within it when they do not fit).
 - **As wide as the Owner likes.** Drag its right edge to make it narrower
   or wider, from 160 to 400 pixels (224 to start with). With the edge
   focused, the left and right arrows move it by 16, Home and End take it
@@ -117,9 +125,11 @@ page scrolls.
 - **In the Owner's order.** Drag an item into another's place, or press
   Alt with the up or down arrow while it has focus; the move is announced.
   **Reset the order** puts it back.
-- **Kept in this browser.** The order and whether it is collapsed are kept
-  in `localStorage` (`ai-office:navigation-order`,
-  `ai-office:navigation-collapsed` and `ai-office:navigation-width`; `apps/web/src/navigation-prefs.ts`),
+- **Kept in this browser.** The order, whether it is collapsed, its width
+  and the pages' height are kept in `localStorage`
+  (`ai-office:navigation-order`, `ai-office:navigation-collapsed`,
+  `ai-office:navigation-width` and `ai-office:navigation-menu-height`;
+  `apps/web/src/navigation-prefs.ts`),
   so they belong to this browser alone. Without storage (a private window,
   blocked site data) the navigation is in its first order and expanded. An
   item added to AI Office later goes at the end of a saved order.

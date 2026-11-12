@@ -522,6 +522,72 @@ const cases: Case[] = [
     },
   ],
   [
+    "sends a Model to the AI Provider that hosts it, never quietly to a compatible endpoint",
+    async (setup) => {
+      await addSubscription(setup);
+      // A local model behind an OpenAI-compatible endpoint, put first.
+      await setup.accounts.add({
+        name: "Local Qwen3-Coder",
+        aiProvider: "OpenAI-compatible",
+        accountType: "endpoint",
+        endpointUrl: "http://gpu-box.lan:8080/v1",
+        priority: 1,
+      });
+
+      // Claude Code asking for a Claude Model gets Claude.
+      expect(
+        (
+          await setup.accounts.select({
+            agentTool: "Claude Code",
+            model: "claude-sonnet-5-5",
+          })
+        )?.name,
+      ).toBe("Claude Max");
+      // curl asking for one is told why Claude cannot serve it, rather
+      // than answered by the local model.
+      await expect(
+        setup.accounts.select({ agentTool: null, model: "claude-sonnet-5-5" }),
+      ).rejects.toThrow(
+        "a subscription serves only its own agent tool (Claude Code)",
+      );
+      // A Model no AI Provider claims still goes to the endpoint.
+      expect(
+        (await setup.accounts.select({ agentTool: null, model: "my-finetune" }))
+          ?.name,
+      ).toBe("Local Qwen3-Coder");
+      // So does a Model of an AI Provider the Owner has no account of.
+      expect(
+        (await setup.accounts.select({ agentTool: null, model: "glm-5" }))
+          ?.name,
+      ).toBe("Local Qwen3-Coder");
+      // Its token expired, Claude Code is told so, not sent to the endpoint.
+      setup.at(8 * hour);
+      await expect(
+        setup.accounts.select({
+          agentTool: "Claude Code",
+          model: "claude-sonnet-5-5",
+        }),
+      ).rejects.toThrow(
+        "claude-sonnet-5-5 is a Claude Model, and no Claude AI Account can serve this request now; it is not sent to another AI Provider's.",
+      );
+      // And an API key serves every tool its AI Provider's Models.
+      await setup.accounts.add({
+        name: "Work",
+        aiProvider: "Claude",
+        accountType: "api_key",
+        credential: "sk-ant-api03-workkey-0123456789abcdef",
+      });
+      expect(
+        (
+          await setup.accounts.select({
+            agentTool: null,
+            model: "claude-sonnet-5-5",
+          })
+        )?.name,
+      ).toBe("Work");
+    },
+  ],
+  [
     "reads a subscription's usage windows from its usage endpoint, before any request",
     async (setup) => {
       const { account } = await addSubscription(setup);

@@ -2208,6 +2208,29 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
               account.tokenExpiresAt > at))
         );
       };
+      // The AI Provider that hosts the Model asked for, by its name (or the
+      // Model its alias stands for). While the Owner has an unpaused
+      // account of theirs, the Model is served by that AI Provider and no
+      // other: a compatible endpoint, which is sent any Model, is not sent
+      // it, so a request for `claude-sonnet-5-5` is never quietly answered
+      // by a local model. A mapping for the endpoint's kind that sends it a
+      // Model of its own is the Owner's choice, and stands; so is an
+      // endpoint when the Owner has no account of the hosting AI Provider
+      // (a LiteLLM proxy in front of Claude, say).
+      const aliased =
+        requested === null ? null : aliasedModel(requested, mappings);
+      const host = aliased === null ? undefined : aiProviderOfModel(aliased);
+      const hosted =
+        host !== undefined &&
+        accounts.some(
+          (account) => !account.paused && account.aiProvider === host,
+        );
+      /** An endpoint left out because the Model's own AI Provider hosts it. */
+      const elsewhere = (account: AiAccountRecord): boolean =>
+        hosted &&
+        account.aiProvider !== host &&
+        servesAnyModel(account.aiProvider) &&
+        mapped(account) === aliased;
       // A Model no AI Provider claims by name goes only to the Owner's
       // compatible endpoints while one of them can serve it: only they
       // know what they serve. Without one, any account may be asked.
@@ -2215,13 +2238,15 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
         (account) =>
           !account.paused &&
           servesAnyModel(account.aiProvider) &&
-          servable(account, mapped(account)),
+          servable(account, mapped(account)) &&
+          !elsewhere(account),
       );
       const canServe = (
         account: AiAccountRecord,
         model: string | null,
       ): boolean =>
         servable(account, model) &&
+        !elsewhere(account) &&
         (!toEndpoints ||
           model == null ||
           servesAnyModel(account.aiProvider) ||
@@ -2412,12 +2437,29 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
         const onlySubscriptions = subscriptionsOnly(
           accounts.filter(
             (account) =>
-              !account.paused && servable(account, mapped(account), true),
+              !account.paused &&
+              servable(account, mapped(account), true) &&
+              !elsewhere(account),
           ),
           request.agentTool,
         );
         if (onlySubscriptions !== undefined) {
           throw new AccountsUnavailableError(503, onlySubscriptions, undefined);
+        }
+        // Said only when an endpoint would have served it but for its host.
+        if (
+          accounts.some(
+            (account) =>
+              !account.paused &&
+              elsewhere(account) &&
+              servable(account, mapped(account)),
+          )
+        ) {
+          throw new AccountsUnavailableError(
+            503,
+            `${aliased ?? ""} is a ${host ?? ""} Model, and no ${host ?? ""} AI Account can serve this request now; it is not sent to another AI Provider's.`,
+            undefined,
+          );
         }
         return undefined;
       }
