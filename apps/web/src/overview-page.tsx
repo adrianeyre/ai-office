@@ -27,6 +27,7 @@ import { PageHeader } from "@/components/ui/page-header.tsx";
 import { TableFrame } from "@/components/ui/table-frame.tsx";
 import { cn, selectClass } from "@/lib/utils.ts";
 
+import { track } from "./activity.ts";
 import { getJson, postJson, readApiError } from "./api.ts";
 import { useEventStream } from "./event-stream.ts";
 import { StageBadge } from "./scene/wall-board-panel.tsx";
@@ -716,7 +717,15 @@ export function OverviewPage({
               size="sm"
               variant="outline"
               pending={working.isFetching}
-              onClick={() => void working.refetch()}
+              onClick={() =>
+                void track(
+                  {
+                    label: "Refreshing what is working now",
+                    detail: "GET /api/working-now",
+                  },
+                  working.refetch({ throwOnError: true }),
+                ).catch(() => undefined)
+              }
             >
               <RefreshCw aria-hidden />
               Refresh

@@ -957,6 +957,7 @@ function IssueDraftsEditor({
           type="button"
           size="sm"
           disabled={off || problem !== undefined}
+          pending={busy}
           onClick={() => {
             void (async () => {
               if (
@@ -977,6 +978,7 @@ function IssueDraftsEditor({
           size="sm"
           variant="outline"
           disabled={off || !edited || problem !== undefined}
+          pending={busy}
           onClick={() => void save()}
         >
           <Save aria-hidden />

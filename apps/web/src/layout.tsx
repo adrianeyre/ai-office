@@ -36,6 +36,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
 import { cn } from "@/lib/utils.ts";
 
+import { ActivityIndicator } from "./activity-indicator.tsx";
 import { browser, postJson } from "./api.ts";
 import { CompanyLogo } from "./brand/company-logo.tsx";
 import { healthQuery } from "./health.ts";
@@ -132,7 +133,8 @@ function ServerStatus({ collapsed = false }: { collapsed?: boolean }) {
  */
 function SessionControls({ collapsed = false }: { collapsed?: boolean }) {
   const { data: session, error } = useQuery(sessionQuery);
-  const [signingOut, setSigningOut] = useState(false);
+  // Which sign-out is on its way, so its button shows it.
+  const [signingOut, setSigningOut] = useState<string>();
 
   useEffect(() => {
     if (error instanceof SignedOutError) {
@@ -144,7 +146,7 @@ function SessionControls({ collapsed = false }: { collapsed?: boolean }) {
     if (session === undefined) {
       return;
     }
-    setSigningOut(true);
+    setSigningOut(url);
     const response = await postJson(url, {}, session.csrfToken);
     if (url === "/api/logout/everywhere" && response.ok) {
       const body = signedOutEverywhereSchema.safeParse(
@@ -163,7 +165,8 @@ function SessionControls({ collapsed = false }: { collapsed?: boolean }) {
         variant="ghost"
         size="sm"
         className="justify-start"
-        disabled={session === undefined || signingOut}
+        disabled={session === undefined || signingOut !== undefined}
+        pending={signingOut === "/api/logout"}
         title={collapsed ? "Sign out" : undefined}
         onClick={() => void signOut("/api/logout")}
       >
@@ -174,7 +177,8 @@ function SessionControls({ collapsed = false }: { collapsed?: boolean }) {
         variant="ghost"
         size="sm"
         className={cn("justify-start", collapsed && "md:hidden")}
-        disabled={session === undefined || signingOut}
+        disabled={session === undefined || signingOut !== undefined}
+        pending={signingOut === "/api/logout/everywhere"}
         onClick={() => void signOut("/api/logout/everywhere")}
       >
         Sign out everywhere
@@ -648,6 +652,7 @@ function SignedInLayout({ children }: { children?: ReactNode }) {
       <SiteFooter />
       <NoticeNotifier />
       <StartupVersionCheck />
+      <ActivityIndicator />
     </div>
   );
 }

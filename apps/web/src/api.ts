@@ -1,8 +1,11 @@
 import { apiErrorSchema, csrfHeader, type ApiError } from "@ai-office/shared";
 
+import { trackRequest } from "./activity.ts";
+
 /**
  * Sends `body` as JSON, with the session's CSRF token when there is a
- * session. Resolves with the response, whatever its status.
+ * session. Resolves with the response, whatever its status. The Owner
+ * asked for it, so the Activity indicator shows it until it is answered.
  */
 export function sendJson(
   method: "POST" | "PATCH" | "PUT",
@@ -10,22 +13,33 @@ export function sendJson(
   body: unknown,
   csrfToken?: string,
 ): Promise<Response> {
-  return fetch(url, {
+  return trackRequest(
     method,
-    headers: {
-      "content-type": "application/json",
-      ...(csrfToken === undefined ? {} : { [csrfHeader]: csrfToken }),
-    },
-    body: JSON.stringify(body),
-  });
+    url,
+    fetch(url, {
+      method,
+      headers: {
+        "content-type": "application/json",
+        ...(csrfToken === undefined ? {} : { [csrfHeader]: csrfToken }),
+      },
+      body: JSON.stringify(body),
+    }),
+  );
 }
 
-/** Sends a DELETE, with the session's CSRF token when there is a session. */
+/**
+ * Sends a DELETE, with the session's CSRF token when there is a session,
+ * shown by the Activity indicator until it is answered.
+ */
 export function sendDelete(url: string, csrfToken?: string): Promise<Response> {
-  return fetch(url, {
-    method: "DELETE",
-    headers: csrfToken === undefined ? {} : { [csrfHeader]: csrfToken },
-  });
+  return trackRequest(
+    "DELETE",
+    url,
+    fetch(url, {
+      method: "DELETE",
+      headers: csrfToken === undefined ? {} : { [csrfHeader]: csrfToken },
+    }),
+  );
 }
 
 /** POSTs `body` as JSON; see `sendJson`. */

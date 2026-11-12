@@ -39,12 +39,13 @@ export function PromptCacheCard() {
   const queryClient = useQueryClient();
   const { data: settings, isError } = useQuery(promptCacheQuery);
   const { data: session } = useQuery(sessionQuery);
-  const [busy, setBusy] = useState(false);
+  // The TTL being saved, so its button shows it.
+  const [busy, setBusy] = useState<PromptCacheTtl>();
   const [problem, setProblem] = useState<string>();
   const [saved, setSaved] = useState(false);
 
   const choose = async (ttl: PromptCacheTtl) => {
-    setBusy(true);
+    setBusy(ttl);
     setProblem(undefined);
     setSaved(false);
     const response = await sendJson(
@@ -65,7 +66,7 @@ export function PromptCacheCard() {
         error.problems?.[0] ?? error.message ?? "The TTL was not saved.",
       );
     }
-    setBusy(false);
+    setBusy(undefined);
   };
 
   return (
@@ -99,7 +100,8 @@ export function PromptCacheCard() {
                   size="sm"
                   variant={settings.ttl === ttl ? "default" : "outline"}
                   aria-pressed={settings.ttl === ttl}
-                  disabled={busy || session === undefined}
+                  disabled={busy !== undefined || session === undefined}
+                  pending={busy === ttl}
                   onClick={() => void choose(ttl)}
                 >
                   {promptCacheTtlLabels[ttl]}

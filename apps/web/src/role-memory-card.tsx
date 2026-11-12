@@ -57,14 +57,15 @@ export function RoleMemoryCard({ floor }: { floor: Floor }) {
   const { data: list, error } = useQuery(query);
   const { data: agents } = useQuery(agentsQuery(floor.id));
   const [problem, setProblem] = useState<string | null>(null);
-  const [busy, setBusy] = useState<number | null>(null);
+  // The entry being changed, and how, so the button pressed shows it.
+  const [busy, setBusy] = useState<{ id: number; action: Action } | null>(null);
   const archived = floor.archivedAt !== null;
 
   const nameOf = (agentId: string): string =>
     agents?.find(({ id }) => id === agentId)?.name ?? "An Agent";
 
   const act = async (entry: RoleMemoryEntry, action: Action) => {
-    setBusy(entry.id);
+    setBusy({ id: entry.id, action });
     setProblem(null);
     const url = `/api/floors/${encodeURIComponent(floor.id)}/role-memory/${String(entry.id)}`;
     const response =
@@ -85,7 +86,8 @@ export function RoleMemoryCard({ floor }: { floor: Floor }) {
       size="sm"
       variant={action === "accept" ? "default" : "outline"}
       aria-label={`${actionLabels[action]} "${entry.text}"`}
-      disabled={archived || busy === entry.id || session === undefined}
+      disabled={archived || busy?.id === entry.id || session === undefined}
+      pending={busy?.id === entry.id && busy.action === action}
       onClick={() => void act(entry, action)}
     >
       {actionLabels[action]}

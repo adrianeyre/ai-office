@@ -11,6 +11,8 @@ import {
   CardTitle,
 } from "@/components/ui/card.tsx";
 
+import { Spinner } from "@/components/ui/spinner.tsx";
+
 import { getJson, readApiError, sendJson } from "./api.ts";
 import { sessionQuery } from "./session.ts";
 
@@ -83,9 +85,16 @@ export function RequestBodiesCard() {
               type="checkbox"
               checked={settings.store}
               disabled={busy || session === undefined}
+              aria-busy={busy}
               onChange={(event) => void change(event.target.checked)}
             />
             Keep request and response bodies (encrypted)
+            {busy && (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Spinner className="size-3" />
+                Saving…
+              </span>
+            )}
           </label>
         )}
         {problem !== undefined && (

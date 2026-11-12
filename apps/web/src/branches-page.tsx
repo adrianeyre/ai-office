@@ -25,6 +25,7 @@ import { TableFrame } from "@/components/ui/table-frame.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
 import { cn, selectClass } from "@/lib/utils.ts";
 
+import { track } from "./activity.ts";
 import { AgentLink } from "./agent-link.tsx";
 import {
   aheadBehindBadge,
@@ -645,7 +646,16 @@ export function BranchesPage({ floorId, onFloorChange }: BranchesPageProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => void branches.refetch()}
+            pending={branches.isFetching}
+            onClick={() =>
+              void track(
+                {
+                  label: `Reading ${floorName}'s branches again`,
+                  detail: `GET /api/floors/${chosen ?? ""}/branches`,
+                },
+                branches.refetch({ throwOnError: true }),
+              ).catch(() => undefined)
+            }
           >
             <RotateCcw aria-hidden />
             Try again
