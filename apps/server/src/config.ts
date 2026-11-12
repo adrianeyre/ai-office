@@ -14,6 +14,7 @@ import {
 } from "@ai-office/shared/crypto";
 import { z } from "zod";
 
+import { exchangeRatesUrl } from "./office/exchange-rates.ts";
 import { isLoopback } from "./auth/setup-token.ts";
 
 // Start-up configuration from the environment (PRD FR-67). Everything else
@@ -183,6 +184,18 @@ const environmentSchema = z.object({
   GITHUB_API_URL: z
     .url({ protocol: /^https?$/, error: "must be an http:// or https:// URL" })
     .default("https://api.github.com"),
+  // Where the day's exchange rates come from, for costs in the office's
+  // currency: ExchangeRate-API's open endpoint by default; `off` for none
+  // (the end-to-end tests, which reach nothing beyond the machine).
+  EXCHANGE_RATES_URL: z
+    .union([
+      z.literal("off"),
+      z.url({
+        protocol: /^https?$/,
+        error: "must be an http:// or https:// URL, or off",
+      }),
+    ])
+    .optional(),
   // Sandboxes (PRD FR-19): where Agents' clones are made on the host, and
   // the AI Gateway's address as a sandbox reaches it (ADR 0001: sandboxes
   // reach models only through it). Agents work issues only once it is set.
@@ -267,6 +280,12 @@ export interface Config {
    * it through are added in Floor Settings (ADR 0011).
    */
   readonly githubApiUrl: string;
+  /**
+   * Where the day's exchange rates are fetched from; null when they are
+   * not fetched (`EXCHANGE_RATES_URL=off`), so costs show in US dollars
+   * unless the Owner gives a rate of their own.
+   */
+  readonly exchangeRatesUrl: string | null;
   readonly sandboxes: {
     /** Where clones are made, one directory per run. */
     readonly workDir: string;
@@ -404,6 +423,10 @@ export function loadConfig(
     logLevel: values.LOG_LEVEL,
     webDistDir: values.WEB_DIST_DIR ?? defaultWebDistDir,
     githubApiUrl: values.GITHUB_API_URL,
+    exchangeRatesUrl:
+      values.EXCHANGE_RATES_URL === "off"
+        ? null
+        : (values.EXCHANGE_RATES_URL ?? exchangeRatesUrl),
     sandboxes: {
       workDir: values.SANDBOX_WORK_DIR ?? join(tmpdir(), "ai-office-sandboxes"),
       ...sandboxGateway(values.SANDBOX_GATEWAY_URL),

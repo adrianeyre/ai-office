@@ -157,6 +157,7 @@ import { buildApp } from "./app.ts";
 import {
   createExchangeRates,
   officeCostFormat,
+  type ExchangeRates,
 } from "./office/exchange-rates.ts";
 import { writeSetupToken } from "./auth/setup-token.ts";
 import { databaseAuthStore } from "./auth/store.ts";
@@ -296,10 +297,16 @@ export async function startOffice(
   const upstream = createUpstreamFetch({ proxy: () => outboundProxy });
   // The day's exchange rates, for costs in the office's currency, fetched
   // through the outbound proxy like every other upstream request.
-  const exchangeRates = createExchangeRates({
-    fetch: upstream.fetch,
-    logger: logger.child({ component: "exchange-rates" }),
-  });
+  // None at all when EXCHANGE_RATES_URL is off: costs then show in US
+  // dollars unless the Owner gives a rate of their own.
+  const exchangeRates: ExchangeRates =
+    config.exchangeRatesUrl === null
+      ? { current: () => Promise.resolve(undefined) }
+      : createExchangeRates({
+          fetch: upstream.fetch,
+          url: config.exchangeRatesUrl,
+          logger: logger.child({ component: "exchange-rates" }),
+        });
   // Load balancing (FR-37): the Owner's strategy, read at start and again
   // whenever it changes, and the tokens each AI Account used lately.
   let balancing = defaultLoadBalancingSettings;

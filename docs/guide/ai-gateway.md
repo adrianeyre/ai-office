@@ -162,7 +162,9 @@ circulating ISO 4217 currency).
   outbound proxy when one is set. A failed fetch is not tried again for
   ten minutes, and the last rates stand in meanwhile. The Owner may give
   their own rate (what one US dollar is worth in the currency) instead,
-  for a currency with no published rate or to fix one.
+  for a currency with no published rate or to fix one. `EXCHANGE_RATES_URL` points the server at
+  another source of the same shape, or, set to `off`, fetches none (the
+  end-to-end tests do, as they reach nothing beyond the machine).
 - **No rate.** While neither is known, costs are shown in US dollars, as
   they are kept, never in the chosen currency's symbol at the wrong value.
 - **API.** `GET /api/office/currency` answers `{"currency","manualRate",
