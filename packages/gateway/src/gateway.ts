@@ -391,6 +391,55 @@ export interface GatewayOptions {
     readonly session: string | null;
     readonly body: unknown;
   }) => Promise<object>;
+  /**
+   * The Models the Gateway lists at `GET /v1/models`, for clients that ask
+   * which there are before they call one (OpenAI's SDKs, editors and chat
+   * apps, Anthropic's). Without it, the list is empty.
+   */
+  readonly models?: () => Promise<readonly GatewayModel[]>;
+}
+
+/** A Model `GET /v1/models` lists. */
+export interface GatewayModel {
+  /** Its name, as a request asks for it. */
+  readonly id: string;
+  /** Its AI Provider's name for it, if it has one. */
+  readonly displayName: string | null;
+  /** The AI Provider it is served by (`owned_by` to OpenAI's clients). */
+  readonly aiProvider: string;
+}
+
+/**
+ * `GET /v1/models`'s answer: in Anthropic's shape for a client that sends
+ * `anthropic-version` (as Anthropic's SDKs do), otherwise in OpenAI's.
+ * Neither says when a Model was made, so `created` is the epoch.
+ */
+export function modelList(
+  models: readonly GatewayModel[],
+  format: ApiFormat,
+): object {
+  if (format === "anthropic") {
+    return {
+      data: models.map((model) => ({
+        type: "model",
+        id: model.id,
+        display_name: model.displayName ?? model.id,
+        created_at: new Date(0).toISOString(),
+      })),
+      has_more: false,
+      first_id: models[0]?.id ?? null,
+      last_id: models.at(-1)?.id ?? null,
+    };
+  }
+  return {
+    object: "list",
+    data: models.map((model) => ({
+      id: model.id,
+      object: "model",
+      created: 0,
+      owned_by: model.aiProvider,
+    })),
+  };
 }
 
 /** An Agent's call, as Token Caps see it. */
@@ -452,6 +501,14 @@ const sleepFor = (ms: number, signal: AbortSignal): Promise<void> =>
     const timer = setTimeout(done, ms);
     signal.addEventListener("abort", done, { once: true });
   });
+
+/**
+ * A path with its `/v1` given twice (`/v1/v1/messages`), as a tool sends it
+ * when its base URL already ends in `/v1` and it adds `/v1/…` itself, with
+ * the one `/v1`; any other path as it is.
+ */
+export const collapsedV1 = (url: string): string =>
+  url.replace(/^\/v1\/v1(?=[/?#]|$)/, "/v1");
 
 /** The most of each body kept for request history. */
 export const maxStoredBodyBytes = 1024 * 1024;
@@ -1058,6 +1115,10 @@ export async function buildGateway(
   };
   const app = Fastify({
     loggerInstance: options.logger,
+    // A tool given the Gateway's `/v1` address where it wants AI Office's
+    // own (Claude Code's ANTHROPIC_BASE_URL, which it adds `/v1/messages`
+    // to) asks for `/v1/v1/…`: it is served as `/v1/…`.
+    rewriteUrl: (request) => collapsedV1(request.url ?? "/"),
     bodyLimit,
     // Every request is recorded in gateway_requests instead.
     logController: new LogController({ disableRequestLogging: true }),
@@ -1161,6 +1222,39 @@ export async function buildGateway(
           : "available",
     };
   });
+
+  // The Models there are, for clients that ask before they call one. Like
+  // every Gateway route, it needs a Gateway Key; it calls no AI Account,
+  // so it is not recorded as a request.
+  const listFormat = (request: FastifyRequest): ApiFormat =>
+    request.headers["anthropic-version"] === undefined ? "openai" : "anthropic";
+  app.get(
+    "/v1/models",
+    {
+      onRequest: requireKey({
+        route: "models",
+        body: (status, message) => errorBody("openai", status, message),
+        unauthorised: (keyPresented) =>
+          keyPresented
+            ? "That Gateway Key is not in use."
+            : "A Gateway Key is required: send it as x-api-key or as a bearer token.",
+      }),
+    },
+    async (request, reply) => {
+      const format = listFormat(request);
+      try {
+        const models = (await options.models?.()) ?? [];
+        return await reply.send(modelList(models, format));
+      } catch (error) {
+        request.log.error({ err: error }, "The Models could not be listed.");
+        return reply
+          .code(503)
+          .send(
+            errorBody(format, 503, "The AI Gateway could not list its Models."),
+          );
+      }
+    },
+  );
 
   const handle =
     (endpoint: GatewayEndpoint) =>

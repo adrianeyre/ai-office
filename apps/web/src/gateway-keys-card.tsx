@@ -213,6 +213,13 @@ function NewKey({
         <code>ANTHROPIC_BASE_URL={origin}</code>, and OpenAI clients such as
         Codex the base URL <code>{origin}/v1</code>.
       </p>
+      <p className="text-muted-foreground">
+        A subscription AI Account (Claude, ChatGPT, Grok or Gemini) serves only
+        its own agent tool, as its AI Provider&apos;s terms require: Claude Code
+        for a Claude subscription, Codex for a ChatGPT one, opencode for a Grok
+        or Gemini one. Any other tool, such as curl, an editor or an SDK, needs
+        an API key AI Account.
+      </p>
       <Button type="button" size="sm" variant="ghost" onClick={onDone}>
         Done
       </Button>

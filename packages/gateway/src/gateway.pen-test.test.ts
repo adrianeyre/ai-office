@@ -811,8 +811,16 @@ describe("H19: the Gateway on the host's loopback", () => {
         ).status,
       ).toBe(401);
     }
+    // The Models list is a Gateway route too: refused without a key in use.
+    expect((await fetch(`${url}/v1/models`)).status).toBe(401);
+    expect(
+      (
+        await fetch(`${url}/v1/models`, {
+          headers: { authorization: "Bearer aio_gk_notakeyinuse0000000000000" },
+        })
+      ).status,
+    ).toBe(401);
     for (const path of [
-      "/v1/models",
       "/models",
       "/usage",
       "/metrics",

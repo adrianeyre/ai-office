@@ -322,10 +322,26 @@ describe("the AI Gateway on the app's own port", () => {
     expect(entry?.body.choices).toEqual(direct?.body.choices);
   });
 
-  it("answers /v1/models, which the Gateway does not serve, with the Gateway's 404 rather than the web app", async () => {
+  it("lists the Models at /v1/models on the app's port as on the Gateway's", async () => {
     const answers = await Promise.all(
       [ports.gateway, ports.app].map(async (base) => {
         const response = await fetch(`${base}/v1/models`, {
+          headers: { "x-api-key": ownerToolKey },
+        });
+        return { status: response.status, body: await response.text() };
+      }),
+    );
+    expect(answers[1]).toEqual(answers[0]);
+    expect(answers[1]?.status).toBe(200);
+    expect(JSON.parse(answers[1]?.body ?? "")).toMatchObject({
+      object: "list",
+    });
+  });
+
+  it("answers /v1/usage, which the Gateway does not serve, with the Gateway's 404 rather than the web app", async () => {
+    const answers = await Promise.all(
+      [ports.gateway, ports.app].map(async (base) => {
+        const response = await fetch(`${base}/v1/usage`, {
           headers: { "x-api-key": ownerToolKey, cookie: owner.cookie },
         });
         return {

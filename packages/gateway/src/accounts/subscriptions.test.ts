@@ -492,9 +492,20 @@ const cases: Case[] = [
           betas: ["oauth-2025-04-20"],
         },
       );
+      // Any other tool's request is refused, saying why: only Claude Code.
       for (const agentTool of [null, "Codex", "opencode"] as const) {
-        expect(await setup.accounts.select({ agentTool })).toBeUndefined();
+        await expect(
+          setup.accounts.select({ agentTool }),
+        ).rejects.toMatchObject({
+          status: 503,
+          message: expect.stringContaining(
+            "a subscription serves only its own agent tool (Claude Code)",
+          ) as string,
+        });
       }
+      await expect(setup.accounts.select({ agentTool: null })).rejects.toThrow(
+        "This request is not from one. Send it from Claude Code (Claude Code's ANTHROPIC_BASE_URL is AI Office's address, without /v1), or add an API key AI Account to serve other tools.",
+      );
       // An API key serves everyone; the subscription still only Claude Code.
       await setup.accounts.add({
         name: "Work",
