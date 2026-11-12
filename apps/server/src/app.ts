@@ -158,6 +158,7 @@ import { registerGatewayKeyRoutes } from "./gateway-keys/routes.ts";
 import { registerNoticeRoutes } from "./notices/routes.ts";
 import { registerConfigurationRoutes } from "./configuration/routes.ts";
 import { registerPricingRoutes } from "./pricing/routes.ts";
+import type { ExchangeRates } from "./office/exchange-rates.ts";
 import { registerOfficeRoutes } from "./office/routes.ts";
 import { registerStorageRoutes } from "./storage/routes.ts";
 import { registerTokenCapRoutes } from "./token-caps/routes.ts";
@@ -321,6 +322,11 @@ export interface AppOptions {
    * through `aiAccounts`.
    */
   readonly modelCatalogue?: ModelCatalogue;
+  /**
+   * The day's exchange rates, for showing costs in the office's currency.
+   * The server fetches them; without them (in tests) none are known.
+   */
+  readonly exchangeRates?: ExchangeRates;
   /**
    * The AI Providers' default Models. The server passes its own; without
    * them they are kept in `stores`, chosen from `modelCatalogue`.
@@ -746,7 +752,12 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       : { onSecret: (secret: string) => options.redactor?.register(secret) }),
     now,
   });
-  registerOfficeRoutes(app, { settings: officeSettings });
+  registerOfficeRoutes(app, {
+    settings: officeSettings,
+    ...(options.exchangeRates === undefined
+      ? {}
+      : { exchangeRates: options.exchangeRates }),
+  });
   // The Owner's passwords, the first's settings being the Owner's profile.
   registerOwnerPasswordRoutes(app, {
     store: options.auth.store,

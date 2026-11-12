@@ -9,6 +9,8 @@ import { atDetailLevel, officeUrl } from "./messages.ts";
 import {
   reportCounts,
   reportMarkdown,
+  usDollarCost,
+  type CostFormat,
   reportTitle,
   type BatchReport,
 } from "./report.ts";
@@ -197,6 +199,7 @@ export function reportMessage(
   summary: string,
   aiOfficeUrl: string,
   occurredAt: Date,
+  cost: CostFormat = usDollarCost,
 ): OutboundMessage {
   return {
     kind: "report",
@@ -209,7 +212,7 @@ export function reportMessage(
     aiOfficeUrl,
     githubUrl: null,
     occurredAt: occurredAt.toISOString(),
-    document: reportMarkdown(report, detailLevel, summary, aiOfficeUrl),
+    document: reportMarkdown(report, detailLevel, summary, aiOfficeUrl, cost),
   };
 }
 

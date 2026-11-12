@@ -30,6 +30,7 @@ import { TableFrame } from "@/components/ui/table-frame.tsx";
 import { AgentLink } from "./agent-link.tsx";
 import { getJson, readApiError, sendJson } from "./api.ts";
 import { floorsQuery } from "./floors.ts";
+import { formatMoney, useMoney, type Money } from "./money.ts";
 import { sessionQuery } from "./session.ts";
 
 // Token accounting and Token Caps (PRD FR-31, FR-32): tokens (input plus
@@ -57,11 +58,6 @@ export const floorTokenUsageQuery = (floorId: string) =>
   });
 
 const numbers = new Intl.NumberFormat("en-US");
-const dollars = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 2,
-});
 
 /** A count of tokens: `1,234,567`. */
 export const formatTokens = (tokens: number): string => numbers.format(tokens);
@@ -79,8 +75,8 @@ export const capUseText = (use: Pick<CapUse, "cap" | "used">): string =>
   `${formatTokens(use.used)} of ${formatTokens(use.cap)}`;
 
 /** What a period used, in a line: tokens, cache reads and the estimate. */
-const totalsText = (totals: TokenTotals): string =>
-  `${formatTokens(totals.tokens)} tokens (cache reads ${formatTokens(totals.cacheReadTokens)}) · about ${dollars.format(totals.estimatedCostUsd)}`;
+const totalsText = (totals: TokenTotals, money: Money): string =>
+  `${formatTokens(totals.tokens)} tokens (cache reads ${formatTokens(totals.cacheReadTokens)}) · about ${formatMoney(totals.estimatedCostUsd, money)}`;
 
 /** A text field holding a cap: empty for none. */
 export const capValue = (cap: number | null): string =>
@@ -98,15 +94,16 @@ function PeriodTotalsList({
   label: string;
   usage: PeriodTotals;
 }) {
+  const money = useMoney();
   return (
     <dl
       aria-label={label}
       className="grid gap-1 text-sm sm:grid-cols-[auto_1fr]"
     >
       <dt className="text-muted-foreground">Today</dt>
-      <dd>{totalsText(usage.daily)}</dd>
+      <dd>{totalsText(usage.daily, money)}</dd>
       <dt className="text-muted-foreground">This month</dt>
-      <dd>{totalsText(usage.monthly)}</dd>
+      <dd>{totalsText(usage.monthly, money)}</dd>
     </dl>
   );
 }

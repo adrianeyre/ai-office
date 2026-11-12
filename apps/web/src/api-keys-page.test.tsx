@@ -161,7 +161,7 @@ describe("API Key Management", () => {
     const usage = within(codex.getByLabelText("Usage"));
     expect(usage.getByText("1,234")).toBeDefined();
     expect(usage.getByText("50,000")).toBeDefined();
-    expect(usage.getByText("US$3.50")).toBeDefined();
+    expect(usage.getByText("$3.50")).toBeDefined();
     expect(codex.getAllByText("AI proxy only").length).toBeGreaterThan(0);
   });
 

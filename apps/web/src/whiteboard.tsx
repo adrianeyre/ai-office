@@ -34,6 +34,7 @@ import { cn, selectClass } from "@/lib/utils.ts";
 
 import { AgentLink } from "./agent-link.tsx";
 import { getJson, postJson, readApiError } from "./api.ts";
+import { formatMoney, useMoney } from "./money.ts";
 import { useEventStream } from "./event-stream.ts";
 import { floorQuery } from "./floors.ts";
 import { GrillingWhiteboard } from "./grilling.tsx";
@@ -307,9 +308,6 @@ function Kickoff({
   );
 }
 
-/** An estimated cost, in US dollars. */
-const usd = (amount: number): string => `$${amount.toFixed(2)}`;
-
 const tokens = (count: number): string => count.toLocaleString("en-GB");
 
 /** A finished Batch's Wrap-up: each issue's outcome, and the totals. */
@@ -327,6 +325,9 @@ function WrapUpView({
   Heading: "h3" | "h4";
 }) {
   const { totals } = wrapUp;
+  // An estimated cost, in the office's currency.
+  const money = useMoney();
+  const usd = (amount: number): string => formatMoney(amount, money);
   const blocked = wrapUp.issues.filter(
     ({ outcome }) => outcome === "blocked" || outcome === "not_started",
   );

@@ -21,12 +21,16 @@ import {
   retentionSettingsSchema,
   sandboxSettingsSchema,
   watchdogSettingsSchema,
+  currencySettingsSchema,
+  type CurrencyResponse,
+  type CurrencySettings,
 } from "@ai-office/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
 import { sendInvalidRequest } from "../auth/responses.ts";
 import { sendFloorError } from "../floors/routes.ts";
+import type { ExchangeRates } from "./exchange-rates.ts";
 
 // The office admin's settings (PRD FR-65). So far: the Git identity agent
 // commits are by (FR-68), which each Floor can override in its own
@@ -47,9 +51,46 @@ import { sendFloorError } from "../floors/routes.ts";
 
 export function registerOfficeRoutes(
   app: FastifyInstance,
-  options: { readonly settings: OfficeSettings },
+  options: {
+    readonly settings: OfficeSettings;
+    /** The day's exchange rates; without them, none are known. */
+    readonly exchangeRates?: ExchangeRates;
+  },
 ): void {
-  const { settings } = options;
+  const { settings, exchangeRates } = options;
+
+  // The currency costs are shown in, with the day's exchange rates.
+  const currencyAnswer = async (
+    currency: CurrencySettings,
+  ): Promise<CurrencyResponse> => {
+    const table = await exchangeRates?.current();
+    return {
+      ...currency,
+      rates: table === undefined ? null : { ...table.rates },
+      ratesUpdatedAt: table?.updatedAt.toISOString() ?? null,
+    };
+  };
+
+  app.get("/api/office/currency", { config: { access: "owner" } }, async () =>
+    currencyAnswer(await settings.currencySettings()),
+  );
+
+  app.put(
+    "/api/office/currency",
+    { config: { access: "owner" } },
+    async (request, reply) => {
+      const parsed = currencySettingsSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return sendInvalidRequest(reply, parsed.error);
+      }
+      const currency = await settings.setCurrencySettings(parsed.data);
+      request.log.info(
+        { currency: currency.currency },
+        "The office's currency was set.",
+      );
+      return currencyAnswer(currency);
+    },
+  );
 
   app.get("/api/office/git-identity", { config: { access: "owner" } }, () =>
     settings.gitIdentity(),

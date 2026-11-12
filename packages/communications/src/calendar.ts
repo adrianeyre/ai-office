@@ -9,7 +9,12 @@ import {
 import { escapeMarkdown } from "./markdown.ts";
 import { officeUrl } from "./messages.ts";
 import type { PublicationSources } from "./publications.ts";
-import { reportCounts, type BatchReport } from "./report.ts";
+import {
+  reportCounts,
+  usDollarCost,
+  type BatchReport,
+  type CostFormat,
+} from "./report.ts";
 
 // What a calendar (Google Calendar) is sent (PRD FR-92): an event per
 // Batch, made when the Batch starts (`batch.started`) and changed to its
@@ -132,6 +137,7 @@ export function calendarMessage(
   publication: CalendarPublication,
   detailLevel: DetailLevel,
   occurredAt: Date,
+  cost: CostFormat = usDollarCost,
 ): OutboundMessage {
   const titled = detailLevel === "titles_and_summaries";
   const batch = `Batch ${String(publication.batchId)}`;
@@ -158,11 +164,11 @@ export function calendarMessage(
   } else {
     const { report } = publication;
     title = `${name}: ${publication.counts}`;
-    const cost =
+    const spent =
       report === null
         ? ""
-        : `, about $${report.totals.estimatedCostUsd.toFixed(2)} (estimated)`;
-    const head = `${on} finished: ${escapeMarkdown(publication.counts)}. ${publication.tokens.toLocaleString("en-GB")} tokens${cost}.`;
+        : `, about ${cost(report.totals.estimatedCostUsd)} (estimated)`;
+    const head = `${on} finished: ${escapeMarkdown(publication.counts)}. ${publication.tokens.toLocaleString("en-GB")} tokens${spent}.`;
     const issues = report === null ? [] : issueLines(report, detailLevel);
     // Each issue while there is room, then the Plan for the rest.
     const kept: string[] = [];

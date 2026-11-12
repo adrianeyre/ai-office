@@ -11,6 +11,7 @@ import type { ReactNode } from "react";
 
 import { CommunicationsCard } from "./connections-page.tsx";
 import { AppearanceCard } from "./appearance-card.tsx";
+import { CurrencyCard } from "./currency-card.tsx";
 import { ConfigurationCard } from "./configuration-card.tsx";
 import { CreditsCard } from "./credits-card.tsx";
 import { AvailableSkillsCard } from "./available-skills.tsx";
@@ -126,6 +127,7 @@ export function AdminPage() {
       comingSoon="More office settings, such as notification channels, will be set here."
     >
       <AppearanceCard />
+      <CurrencyCard />
       <SeasonalEventsCard />
       <RoleLibraryCard />
       <FloorTemplatesCard />

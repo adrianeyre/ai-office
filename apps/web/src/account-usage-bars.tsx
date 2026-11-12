@@ -6,6 +6,8 @@ import {
   type RateLimitState,
 } from "@ai-office/shared";
 
+import { formatForeign, useMoney } from "./money.ts";
+
 // The usage bars an AI Account shows beyond a subscription's 5-hour and
 // weekly windows (PRD FR-36), the best its AI Provider honestly reports:
 // - an API key whose answers carry rate-limit headers (Anthropic, OpenAI,
@@ -29,18 +31,6 @@ const compact = new Intl.NumberFormat("en-GB", {
   notation: "compact",
   maximumFractionDigits: 1,
 });
-
-const money = (amount: number, currency: string): string => {
-  try {
-    return new Intl.NumberFormat("en-GB", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return `${amount.toFixed(2)} ${currency}`;
-  }
-};
 
 /** A percentage, never over 100 or under 0. */
 const share = (part: number, whole: number): number =>
@@ -114,6 +104,10 @@ function RateLimitBar({
 
 /** A prepaid account's credit: used of its limit, or what is left. */
 function CreditBar({ balance }: { balance: CreditBalance }) {
+  // In the office's currency when the rate from the AI Provider's is known.
+  const office = useMoney();
+  const money = (amount: number, currency: string): string =>
+    formatForeign(amount, currency, office);
   const read = `read ${new Date(balance.observedAt).toLocaleString()}`;
   if (balance.used !== null && balance.limit !== null && balance.limit > 0) {
     const text = `${money(balance.used, balance.currency)} of ${money(balance.limit, balance.currency)} used`;

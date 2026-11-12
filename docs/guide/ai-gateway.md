@@ -137,6 +137,37 @@ that Model has no price or the response counted no tokens.
   lists them. Each change is a `config.changed` event naming the Model.
   Prices are kept in `model_prices`.
 
+#### The currency costs are shown in
+
+Costs are kept, and prices given, in US dollars, as AI Providers price
+their Models; everywhere AI Office shows one, it is converted to the
+office's currency, set in General Settings' **Currency** card: British
+pounds until the Owner chooses another of the world's currencies (every
+circulating ISO 4217 currency).
+
+- **Where.** The analytics, the request history and each request's
+  detail, API keys' usage, Token Caps' totals, a Batch's Wrap-up on the
+  whiteboard, the Model prices card (whose form still takes US dollars),
+  an AI Account's prepaid balance (from the AI Provider's own currency,
+  when the rate is known), and the Batch reports and calendar events the
+  Communications Agent sends through Connections.
+- **The rate.** The day's rate, which the server fetches from
+  ExchangeRate-API's open endpoint (`open.er-api.com`, no key, some 160
+  currencies) when it is first asked for, then once a day, through the
+  outbound proxy when one is set. A failed fetch is not tried again for
+  ten minutes, and the last rates stand in meanwhile. The Owner may give
+  their own rate (what one US dollar is worth in the currency) instead,
+  for a currency with no published rate or to fix one.
+- **No rate.** While neither is known, costs are shown in US dollars, as
+  they are kept, never in the chosen currency's symbol at the wrong value.
+- **API.** `GET /api/office/currency` answers `{"currency","manualRate",
+  "rates","ratesUpdatedAt"}`; `PUT` it with `{"currency","manualRate"}`
+  (`manualRate` null for the day's rate). Each change is a
+  `config.changed` event naming what changed (`currency.currency`,
+  `currency.manualRate`). It is kept in `schema_meta` under
+  `setting:currency`, not in a column of `office_settings`, so adding it
+  did not change the schema (which has no migrations).
+
 ### Analytics
 
 **Analytics** in the web app (`/analytics`) holds the Gateway's dashboards
@@ -309,7 +340,20 @@ one client there, and one sandbox would lock every Agent out.
   ```
 
   Behind the `tls` profile, use `https://<your domain>` (and
-  `https://<your domain>/v1`) instead. **Revoke** stops it
+  `https://<your domain>/v1`) instead. A tool given the `/v1` address
+  where it wants AI Office's own (Claude Code with
+  `ANTHROPIC_BASE_URL=https://<your domain>/v1`, which then asks for
+  `/v1/v1/messages`) is served all the same: a doubled `/v1` is taken as
+  one. `GET /v1/models` lists the Models of the AI Accounts there are
+  (the model catalogue's), in OpenAI's shape, or Anthropic's for a client
+  that sends `anthropic-version`, for the tools that ask before they call
+  one; like every Gateway route it needs a Gateway Key, and it is not
+  recorded as a request. Which AI Account serves a tool follows the usual
+  rules: a subscription serves only its own agent tool (see [Claude
+  subscriptions](#claude-subscriptions)), so curl, an editor or an SDK
+  needs an API key AI Account. When the only accounts that could serve a
+  request are other tools' subscriptions, the `503` says so, naming the
+  tools, rather than only that no AI Account is available. **Revoke** stops it
   at once. Each key shows when it was last used (to the minute). Its
   calls are held to the office's Token Caps, against its own use, as the
   Terminal's are (see

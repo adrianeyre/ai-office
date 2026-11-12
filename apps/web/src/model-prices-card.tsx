@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label.tsx";
 import { TableFrame } from "@/components/ui/table-frame.tsx";
 
 import { getJson, readApiError, sendDelete, sendJson } from "./api.ts";
+import { currencyName, formatPrecise, useMoney } from "./money.ts";
 import { sessionQuery } from "./session.ts";
 
 // Model prices (PRD FR-43): what the AI Gateway estimates each request's
@@ -51,9 +52,6 @@ const priceFields = [
   ["cacheWrite", "Cache write"],
   ["cacheRead", "Cache read"],
 ] as const satisfies readonly (readonly [keyof ModelPrice, string])[];
-
-const dollars = (amount: number): string =>
-  `$${amount.toLocaleString("en-US", { maximumFractionDigits: 6 })}`;
 
 const priceUrl = (model: string): string =>
   `/api/gateway/prices/${encodeURIComponent(model)}`;
@@ -172,6 +170,9 @@ function PriceForm({
           </div>
         ))}
       </div>
+      <p className="text-xs text-muted-foreground">
+        In US dollars per million tokens, as AI Providers publish their prices.
+      </p>
       {problems.length > 0 && (
         <div role="alert">
           <ul className="space-y-1 text-sm text-destructive">
@@ -212,6 +213,7 @@ function PriceRow({
 }) {
   const [editing, setEditing] = useState(false);
   const [failed, setFailed] = useState(false);
+  const money = useMoney();
 
   const restoreDefault = async () => {
     const response = await sendDelete(priceUrl(entry.model), csrfToken);
@@ -229,7 +231,7 @@ function PriceRow({
         </th>
         {priceFields.map(([field]) => (
           <td key={field} className="py-2 pr-4 tabular-nums">
-            {dollars(entry.price[field])}
+            {formatPrecise(entry.price[field], money)}
           </td>
         ))}
         <td className="py-2 pr-4">{sourceLabel[entry.source]}</td>
@@ -298,6 +300,7 @@ export function ModelPricesCard() {
   const prices = useQuery(modelPricesQuery);
   const { data: session } = useQuery(sessionQuery);
   const refresh = () => queryClient.invalidateQueries(modelPricesQuery);
+  const money = useMoney();
 
   return (
     <Card>
@@ -306,9 +309,12 @@ export function ModelPricesCard() {
           <h2>Model prices</h2>
         </CardTitle>
         <CardDescription>
-          US dollars per million tokens, from which each request&apos;s cost is
-          estimated, for information only. Your price for a Model wins over the
-          pricing table and over prices AI Providers publish.
+          Prices per million tokens, from which each request&apos;s cost is
+          estimated, for information only, shown in{" "}
+          {currencyName(money.currency)} ({money.currency}). They are kept, and
+          given, in US dollars, as AI Providers publish them. Your price for a
+          Model wins over the pricing table and over prices AI Providers
+          publish.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

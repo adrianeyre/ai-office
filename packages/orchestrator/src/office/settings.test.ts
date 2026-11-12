@@ -291,6 +291,32 @@ const cases: Case[] = [
     },
   ],
   [
+    "shows costs in British pounds, at the day's rate, until the Owner chooses another currency",
+    async ({ settings, bus }) => {
+      expect(await settings.currencySettings()).toEqual({
+        currency: "GBP",
+        manualRate: null,
+      });
+      const chosen = { currency: "EUR", manualRate: null } as const;
+      expect(await settings.setCurrencySettings(chosen)).toEqual(chosen);
+      // The same again changes nothing.
+      await settings.setCurrencySettings(chosen);
+      expect(await settings.currencySettings()).toEqual(chosen);
+      await settings.setCurrencySettings({ currency: "EUR", manualRate: 0.9 });
+      expect(await settings.currencySettings()).toEqual({
+        currency: "EUR",
+        manualRate: 0.9,
+      });
+      // Which changed, never their values.
+      expect(
+        (await configChanges(bus)).map(({ scope, keys }) => [scope, keys]),
+      ).toEqual([
+        ["office", ["currency.currency"]],
+        ["office", ["currency.manualRate"]],
+      ]);
+    },
+  ],
+  [
     "carries 12,000 characters of each memory and 40,000 of the Skills listing until the Owner chooses otherwise",
     async ({ settings, bus }) => {
       expect(await settings.promptBudgetSettings()).toEqual({

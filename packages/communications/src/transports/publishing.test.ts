@@ -675,6 +675,7 @@ describe("detail levels and redaction in a report", () => {
           qaRounds: 1,
           tokens: 150_000,
           estimatedCostUsd: 1.5,
+          estimatedCost: "$1.50",
         },
         {
           issue: 2,
@@ -685,6 +686,7 @@ describe("detail levels and redaction in a report", () => {
           qaRounds: 0,
           tokens: 90_000,
           estimatedCostUsd: 0.9,
+          estimatedCost: "$0.90",
         },
         {
           issue: 4,
@@ -694,6 +696,7 @@ describe("detail levels and redaction in a report", () => {
           qaRounds: 0,
           tokens: 0,
           estimatedCostUsd: 0,
+          estimatedCost: "$0.00",
         },
       ],
     });
