@@ -1,3 +1,14 @@
+## [1.8.0](https://github.com/adrianeyre/ai-office/compare/v1.7.0...v1.8.0) (2026-11-12)
+
+### Features
+
+* **web:** check for a newer version the first time AI Office opens each day, and bring the Cookie Policy up to date ([e76f19e](https://github.com/adrianeyre/ai-office/commit/e76f19e736c45a133a035112379697ae7e0afa6f))
+
+### Bug Fixes
+
+* **gateway:** send a Model to the AI Provider that hosts it, never quietly to a compatible endpoint ([30c4c1c](https://github.com/adrianeyre/ai-office/commit/30c4c1c496c6f8075ada1fd61f217328b7be9b47))
+* **web:** line up the collapsed menu's status dot, and keep Sign out at the menu's foot ([99c97ce](https://github.com/adrianeyre/ai-office/commit/99c97ce5032a79ead956bf2444c950106531be09))
+
 ## [1.7.0](https://github.com/adrianeyre/ai-office/compare/v1.6.0...v1.7.0) (2026-11-12)
 
 ### Features
