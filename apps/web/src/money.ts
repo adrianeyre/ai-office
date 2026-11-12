@@ -154,6 +154,20 @@ export function formatForeign(
   return formatMoney(amount * usdPer, money);
 }
 
+/**
+ * A US-dollar amount in the office's currency, as a number to put in a
+ * field: to six significant figures, so a converted price reads cleanly.
+ */
+export const toOfficeAmount = (usd: number, money: Money): number =>
+  Number((usd * money.rate).toPrecision(6));
+
+/**
+ * An amount given in the office's currency, in US dollars to keep: to six
+ * decimal places, so a price given back unchanged is kept as it was.
+ */
+export const toUsdAmount = (amount: number, money: Money): number =>
+  Math.round((amount / money.rate) * 1_000_000) / 1_000_000;
+
 /** The office's currency's name: "British pounds", "euros"… */
 export function currencyName(currency: string): string {
   try {

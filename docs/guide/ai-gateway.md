@@ -139,18 +139,21 @@ that Model has no price or the response counted no tokens.
 
 #### The currency costs are shown in
 
-Costs are kept, and prices given, in US dollars, as AI Providers price
-their Models; everywhere AI Office shows one, it is converted to the
-office's currency, set in General Settings' **Currency** card: British
-pounds until the Owner chooses another of the world's currencies (every
+Costs and prices are kept in US dollars, as AI Providers price their
+Models; everywhere AI Office shows one, it is converted to the office's
+currency, set in General Settings' **Currency** card: British pounds
+until the Owner chooses another of the world's currencies (every
 circulating ISO 4217 currency).
 
 - **Where.** The analytics, the request history and each request's
   detail, API keys' usage, Token Caps' totals, a Batch's Wrap-up on the
-  whiteboard, the Model prices card (whose form still takes US dollars),
-  an AI Account's prepaid balance (from the AI Provider's own currency,
-  when the rate is known), and the Batch reports and calendar events the
-  Communications Agent sends through Connections.
+  whiteboard, the Model prices card (whose form takes prices in the
+  office's currency too, converted to US dollars to keep; a price left as
+  it was shown is kept exactly), an AI Account's prepaid balance (from the
+  AI Provider's own currency, when the rate is known), and the Batch
+  reports, decks, documents and calendar events the Communications Agent
+  sends through Connections. A Google Sheets work log's **Estimated cost
+  (USD)** column stays in US dollars, so its rows never mix currencies.
 - **The rate.** The day's rate, which the server fetches from
   ExchangeRate-API's open endpoint (`open.er-api.com`, no key, some 160
   currencies) when it is first asked for, then once a day, through the

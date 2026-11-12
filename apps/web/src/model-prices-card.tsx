@@ -25,13 +25,20 @@ import { Label } from "@/components/ui/label.tsx";
 import { TableFrame } from "@/components/ui/table-frame.tsx";
 
 import { getJson, readApiError, sendDelete, sendJson } from "./api.ts";
-import { currencyName, formatPrecise, useMoney } from "./money.ts";
+import {
+  currencyName,
+  formatPrecise,
+  toOfficeAmount,
+  toUsdAmount,
+  useMoney,
+} from "./money.ts";
 import { sessionQuery } from "./session.ts";
 
 // Model prices (PRD FR-43): what the AI Gateway estimates each request's
-// cost from, in US dollars per million tokens. The pricing table gives the
-// defaults, AI Providers' published prices replace them, and the Owner's
-// price for a Model wins over both.
+// cost from, per million tokens: kept in US dollars, as AI Providers price
+// their Models, and shown and given in the office's currency. The pricing
+// table gives the defaults, AI Providers' published prices replace them,
+// and the Owner's price for a Model wins over both.
 
 /** Every priced Model (`GET /api/gateway/prices`). */
 export const modelPricesQuery = queryOptions({
@@ -80,6 +87,9 @@ function PriceForm({
   onCancel?: () => void;
 }) {
   const [problems, setProblems] = useState<string[]>([]);
+  // Prices are given in the office's currency, and kept in US dollars.
+  const money = useMoney();
+  const shown = (usd: number) => String(toOfficeAmount(usd, money));
   const empty = { input: "", output: "", cacheWrite: "", cacheRead: "" };
   const {
     register,
@@ -92,10 +102,10 @@ function PriceForm({
       ...(initial === undefined
         ? empty
         : {
-            input: String(initial.input),
-            output: String(initial.output),
-            cacheWrite: String(initial.cacheWrite),
-            cacheRead: String(initial.cacheRead),
+            input: shown(initial.input),
+            output: shown(initial.output),
+            cacheWrite: shown(initial.cacheWrite),
+            cacheRead: shown(initial.cacheRead),
           }),
     },
   });
@@ -106,7 +116,12 @@ function PriceForm({
       Object.fromEntries(
         priceFields.map(([field]) => [
           field,
-          values[field].trim() === "" ? undefined : Number(values[field]),
+          values[field].trim() === ""
+            ? undefined
+            : // A price left as it was shown is kept exactly as it was.
+              initial !== undefined && values[field] === shown(initial[field])
+              ? initial[field]
+              : toUsdAmount(Number(values[field]), money),
         ]),
       ),
     );
@@ -171,7 +186,10 @@ function PriceForm({
         ))}
       </div>
       <p className="text-xs text-muted-foreground">
-        In US dollars per million tokens, as AI Providers publish their prices.
+        In {currencyName(money.currency)} ({money.currency}) per million tokens.
+        {money.currency === "USD"
+          ? ""
+          : " Kept in US dollars, as AI Providers publish their prices, at today's rate."}
       </p>
       {problems.length > 0 && (
         <div role="alert">
@@ -310,11 +328,9 @@ export function ModelPricesCard() {
         </CardTitle>
         <CardDescription>
           Prices per million tokens, from which each request&apos;s cost is
-          estimated, for information only, shown in{" "}
-          {currencyName(money.currency)} ({money.currency}). They are kept, and
-          given, in US dollars, as AI Providers publish them. Your price for a
-          Model wins over the pricing table and over prices AI Providers
-          publish.
+          estimated, for information only, in {currencyName(money.currency)} (
+          {money.currency}). Your price for a Model wins over the pricing table
+          and over prices AI Providers publish.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

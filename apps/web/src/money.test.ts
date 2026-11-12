@@ -7,6 +7,8 @@ import {
   formatPrecise,
   formatTotal,
   moneyOf,
+  toOfficeAmount,
+  toUsdAmount,
   usDollars,
 } from "./money.ts";
 
@@ -80,5 +82,25 @@ describe("costs in the office's currency", () => {
 
   it("names the currency", () => {
     expect(currencyName("GBP")).toBe("British Pound");
+  });
+});
+
+describe("prices given in the office's currency", () => {
+  const live = moneyOf({
+    currency: "GBP",
+    manualRate: null,
+    rates: { USD: 1, GBP: 0.752421 },
+    ratesUpdatedAt: null,
+  });
+
+  it("are shown converted, to six significant figures", () => {
+    expect(toOfficeAmount(3, live)).toBe(2.25726);
+    expect(toOfficeAmount(3, usDollars)).toBe(3);
+  });
+
+  it("are kept in US dollars, to six decimal places", () => {
+    expect(toUsdAmount(1.5, pounds)).toBe(2);
+    expect(toUsdAmount(2.25726, live)).toBe(2.999996);
+    expect(toUsdAmount(3, usDollars)).toBe(3);
   });
 });

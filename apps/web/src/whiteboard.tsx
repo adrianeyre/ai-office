@@ -327,7 +327,7 @@ function WrapUpView({
   const { totals } = wrapUp;
   // An estimated cost, in the office's currency.
   const money = useMoney();
-  const usd = (amount: number): string => formatMoney(amount, money);
+  const cost = (amount: number): string => formatMoney(amount, money);
   const blocked = wrapUp.issues.filter(
     ({ outcome }) => outcome === "blocked" || outcome === "not_started",
   );
@@ -339,7 +339,7 @@ function WrapUpView({
       <p className="text-xs text-muted-foreground">
         Finished {when(finishedAt)}, on version {wrapUp.planVersion} of the
         Plan. {tokens(totals.tokens)} tokens, about{" "}
-        {usd(totals.estimatedCostUsd)} (estimated).
+        {cost(totals.estimatedCostUsd)} (estimated).
         {totals.closed > 0 && <> {totals.closed} closed without merging.</>}
       </p>
       <div className="overflow-x-auto">
@@ -406,7 +406,7 @@ function WrapUpView({
                   {tokens(issue.tokens)}
                 </td>
                 <td className="py-1 text-right tabular-nums">
-                  {usd(issue.estimatedCostUsd)}
+                  {cost(issue.estimatedCostUsd)}
                 </td>
               </tr>
             ))}
