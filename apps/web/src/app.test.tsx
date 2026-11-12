@@ -217,6 +217,20 @@ describe("the app layout", () => {
     // Each item is still named, and its tooltip says what it is.
     const office = within(nav).getByRole("link", { name: "Office" });
     expect(office.getAttribute("title")).toBe("Office");
+    // The server's state and Sign out are centred in the column with the
+    // pages' icons, each icon in an 18 px box as theirs are, so all are in
+    // one line.
+    const status = (await screen.findByText("Server and database up"))
+      .parentElement;
+    const signOut = screen.getByRole("button", { name: "Sign out" });
+    for (const row of [office, status, signOut]) {
+      expect(row?.className).toContain("md:justify-center");
+      expect(row?.className).toContain("md:px-0");
+    }
+    expect(
+      document.querySelector("[data-slot=server-dot]")?.parentElement
+        ?.className,
+    ).toContain("size-[1.125rem]");
     expect(localStorage.getItem("ai-office:navigation-collapsed")).toBe("true");
     await userEvent.click(
       screen.getByRole("button", { name: "Expand the menu" }),
@@ -276,7 +290,11 @@ describe("the app layout", () => {
     // A focusable separator always has a value: all its pages, the most.
     expect(line.getAttribute("aria-valuenow")).toBe("1600");
     expect(aside?.style.getPropertyValue("--menu-height")).toBe("");
-    expect(line.className).toContain("mt-auto");
+    // At their own height the pages fill the menu, and Sign out and the
+    // server's state are at its foot.
+    const foot = document.querySelector("[data-slot=menu-foot]");
+    expect(pages?.className).toContain("md:flex-1");
+    expect(foot?.className).toContain("md:mt-auto");
 
     // From the least, the down arrow makes it taller.
     line.focus();
@@ -284,7 +302,9 @@ describe("the app layout", () => {
     expect(line.getAttribute("aria-valuenow")).toBe("112");
     expect(aside?.style.getPropertyValue("--menu-height")).toBe("112px");
     expect(pages?.className).toContain("md:h-[var(--menu-height)]");
-    expect(line.className).not.toContain("mt-auto");
+    // Shorter pages leave the foot where it was: at the bottom.
+    expect(pages?.className).not.toContain("md:flex-1");
+    expect(foot?.className).toContain("md:mt-auto");
     expect(localStorage.getItem("ai-office:navigation-menu-height")).toBe(
       "112",
     );

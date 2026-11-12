@@ -89,6 +89,20 @@ const navigation: readonly {
   { to: "/general-settings", label: "General Settings", icon: Settings },
 ];
 
+/**
+ * Where a row at the menu's foot puts its icon: where a page link puts
+ * its own (12 px in from the edge, 18 px square), or centred in the
+ * column when the menu is collapsed, so every icon is in one line.
+ */
+const footRow = (collapsed: boolean) =>
+  cn(
+    "flex w-full items-center gap-2.5 pr-2 pl-3",
+    collapsed && "md:justify-center md:px-0",
+  );
+
+/** An 18 px square, as a page link's icon is, for any icon in the foot. */
+const iconBox = "flex size-[1.125rem] shrink-0 items-center justify-center";
+
 function ServerStatus({ collapsed = false }: { collapsed?: boolean }) {
   const { data, isError } = useQuery(healthQuery);
   const [label, healthy] = isError
@@ -101,26 +115,25 @@ function ServerStatus({ collapsed = false }: { collapsed?: boolean }) {
   return (
     <p
       role="status"
-      className={cn(
-        "flex items-center gap-2 rounded-full border bg-background/60 px-2.5 py-1 text-xs",
-        collapsed && "md:justify-center md:border-0 md:bg-transparent md:px-0",
-      )}
+      className={cn(footRow(collapsed), "py-1.5 text-xs")}
       title={collapsed ? label : undefined}
     >
-      {data === undefined && !isError ? (
-        <Spinner className="size-3 text-muted-foreground" />
-      ) : (
-        /* A ring around the dot, so it reads on either surface. */
-        <span
-          aria-hidden
-          className={cn(
-            "size-2 shrink-0 rounded-full ring-3",
-            healthy
-              ? "bg-success ring-success/20"
-              : "bg-destructive ring-destructive/20",
-          )}
-        />
-      )}
+      <span aria-hidden className={iconBox}>
+        {data === undefined && !isError ? (
+          <Spinner className="size-3 text-muted-foreground" />
+        ) : (
+          /* A ring around the dot, so it reads on either surface. */
+          <span
+            data-slot="server-dot"
+            className={cn(
+              "size-2 rounded-full ring-3",
+              healthy
+                ? "bg-success ring-success/20"
+                : "bg-destructive ring-destructive/20",
+            )}
+          />
+        )}
+      </span>
       <span className={cn(collapsed && "md:sr-only")}>{label}</span>
     </p>
   );
@@ -164,19 +177,23 @@ function SessionControls({ collapsed = false }: { collapsed?: boolean }) {
       <Button
         variant="ghost"
         size="sm"
-        className="justify-start"
+        className={cn(footRow(collapsed), "justify-start has-[>svg]:pl-3")}
         disabled={session === undefined || signingOut !== undefined}
         pending={signingOut === "/api/logout"}
         title={collapsed ? "Sign out" : undefined}
         onClick={() => void signOut("/api/logout")}
       >
-        <LogOut aria-hidden />
+        <LogOut aria-hidden className="size-[1.125rem]" />
         <span className={cn(collapsed && "md:sr-only")}>Sign out</span>
       </Button>
       <Button
         variant="ghost"
         size="sm"
-        className={cn("justify-start", collapsed && "md:hidden")}
+        className={cn(
+          footRow(collapsed),
+          "justify-start",
+          collapsed && "md:hidden",
+        )}
         disabled={session === undefined || signingOut !== undefined}
         pending={signingOut === "/api/logout/everywhere"}
         onClick={() => void signOut("/api/logout/everywhere")}
@@ -454,7 +471,7 @@ function MenuDivider({ menu }: { menu: RefObject<HTMLDivElement | null> }) {
       data-dragging={dragging ? "" : undefined}
       className={cn(
         // A tall strip to grab, with the line through its middle.
-        height === undefined ? "mt-auto" : "-mt-1.5",
+        "-mt-1.5",
         "relative -mb-1.5 hidden h-3 shrink-0 cursor-row-resize touch-none rounded-full outline-none md:block",
         "before:absolute before:inset-x-0 before:top-1/2 before:h-px before:bg-border hover:before:h-0.5 hover:before:bg-ring/60 focus-visible:before:h-0.5 focus-visible:before:bg-ring data-dragging:before:h-0.5 data-dragging:before:bg-ring",
       )}
@@ -623,8 +640,11 @@ function SignedInLayout({ children }: { children?: ReactNode }) {
             ref={menu}
             className={cn(
               "md:min-h-0 md:overflow-y-auto",
-              menuHeight !== undefined &&
-                "md:h-[var(--menu-height)] md:shrink-0",
+              // Its own height fills what the foot leaves, so the line
+              // above Sign out sits just over it; the Owner's is fixed.
+              menuHeight === undefined
+                ? "md:flex-1"
+                : "md:h-[var(--menu-height)] md:shrink-0",
             )}
           >
             <MainNavigation
@@ -632,9 +652,13 @@ function SignedInLayout({ children }: { children?: ReactNode }) {
               onNavigate={closeNavigation}
             />
           </div>
-          {/* At the foot with Sign out, until the Owner moves it. */}
+          {/* Under the pages, just over the foot until the Owner moves it. */}
           <MenuDivider menu={menu} />
-          <div className="space-y-2 border-t pt-3 text-muted-foreground md:border-t-0 md:pt-0">
+          {/* Sign out and the server's state: always at the bottom. */}
+          <div
+            data-slot="menu-foot"
+            className="space-y-1 border-t pt-3 text-muted-foreground md:mt-auto md:shrink-0 md:border-t-0 md:pt-0"
+          >
             <SessionControls collapsed={collapsed} />
             <ServerStatus collapsed={collapsed} />
           </div>
