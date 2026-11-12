@@ -1298,13 +1298,18 @@ its URL required and its key optional:
 | Anthropic-compatible | as `ANTHROPIC_BASE_URL` is given (`https://llm.example.com/anthropic`) | the URL, then `/v1/messages` | as `x-api-key` and as a bearer token | Claude Code |
 | OpenAI-compatible | as `OPENAI_BASE_URL` is given, `/v1` included (`http://gpu-box.lan:8000/v1`) | the URL, then `/chat/completions` or `/responses` | as a bearer token | opencode |
 
-- **Any Model.** Only its owner knows what it serves, so it is sent any
-  Model asked of it, whoever's it is by name, and may be forced any Model
-  or given any in a Combo's slot. A Model no AI Provider claims by name
-  goes to it before any other account; a Model of a known AI Provider goes
-  to that AI Provider's accounts and the endpoints in priority order, so
-  give an endpoint a worse priority than accounts that should serve
-  first.
+- **Any Model, but not another AI Provider's.** Only its owner knows
+  what it serves, so it may be forced any Model, given any in a Combo's
+  slot, or sent one by a mapping for its kind. A Model no AI Provider
+  claims by name goes to it before any other account. A Model a known AI
+  Provider hosts (`claude-*` is Claude's, `gpt-*` ChatGPT's, and so on)
+  goes to that AI Provider's accounts and never to an endpoint while the
+  Owner has an unpaused account of that AI Provider: a request for
+  `claude-sonnet-5-5` is never quietly answered by a local model. If none
+  of them can serve it (a subscription, for a tool that is not its own),
+  the request is refused, saying why. Only when the Owner has no account
+  of the hosting AI Provider at all (a LiteLLM proxy in front of Claude,
+  say) does an endpoint get its Models, in priority order.
 - **Formats.** Requests in its own format pass through; the other format's
   are translated (opencode's Chat Completions to an Anthropic-compatible
   endpoint's Messages, Claude Code's Messages to an OpenAI-compatible
