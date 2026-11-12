@@ -1,3 +1,17 @@
+## [1.7.0](https://github.com/adrianeyre/ai-office/compare/v1.6.0...v1.7.0) (2026-11-12)
+
+### Features
+
+* **connections:** write the Google Sheets work log's cost in the office's currency ([7f0fab9](https://github.com/adrianeyre/ai-office/commit/7f0fab9d27f23e294d9fff1866e19e6221de2131))
+* **settings:** show every cost in the office's currency, British pounds by default ([06e88aa](https://github.com/adrianeyre/ai-office/commit/06e88aa496d60163026558e00c8501d3e0554422))
+* **settings:** take Model prices in the office's currency too, and drop the last dollar-only text ([8639ce2](https://github.com/adrianeyre/ai-office/commit/8639ce2a2627986343b84d9af2db9f5f9cb3fca8))
+* **web:** show a spinner, a progress bar and what is happening whenever the Owner waits on the server ([5b564b1](https://github.com/adrianeyre/ai-office/commit/5b564b137e39d6296e547747d05c9a829b7984cf))
+
+### Bug Fixes
+
+* **e2e:** keep the end-to-end tests off the internet, and cover the currency in a browser ([837e9ca](https://github.com/adrianeyre/ai-office/commit/837e9ca4999754b53c57fee127d78b80137fa87d))
+* **gateway:** serve Owner tools given a /v1 base URL, list Models, and say why a subscription refuses ([bbbccb4](https://github.com/adrianeyre/ai-office/commit/bbbccb46e1d924f89c170f6ccce598a181a796da))
+
 ## [1.6.0](https://github.com/adrianeyre/ai-office/compare/v1.5.0...v1.6.0) (2026-11-06)
 
 ### Features
