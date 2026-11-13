@@ -17,12 +17,12 @@
     "@ai-office/github": "workspace:*",
     "@ai-office/server": "workspace:*",
     "@ai-office/shared": "workspace:*",
-    "@axe-core/playwright": "^4.13.0",
-    "@playwright/test": "^1.64.0",
-    "@testcontainers/postgresql": "^12.2.0",
-    "@types/node": "^26.6.5",
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.65.0",
+    "@testcontainers/postgresql": "^12.2.1",
+    "@types/node": "^26.6.6",
     "@types/pg": "^8.23.1",
     "pg": "^8.23.1",
-    "testcontainers": "^12.2.0"
+    "testcontainers": "^12.2.1"
   }
 }
