@@ -26,6 +26,10 @@ export default defineConfig(
       parserOptions: {
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
+        // typescript-eslint 8.72's single-run Programs duplicate the project
+        // service's, which takes `eslint .` past Node's default heap
+        // (typescript-eslint/typescript-eslint#13109).
+        disallowAutomaticSingleRunInference: true,
       },
     },
   },

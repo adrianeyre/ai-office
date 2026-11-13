@@ -21,18 +21,18 @@
     "@ai-office/github": "workspace:*",
     "@ai-office/orchestrator": "workspace:*",
     "@ai-office/shared": "workspace:*",
-    "@fastify/proxy-addr": "^5.1.1",
-    "@fastify/static": "^10.1.6",
+    "@fastify/proxy-addr": "^5.1.2",
+    "@fastify/static": "^10.1.10",
     "@node-rs/argon2": "^2.2.2",
     "drizzle-orm": "~0.45.4",
-    "fastify": "^5.12.5",
-    "otplib": "^13.5.0",
+    "fastify": "^5.12.8",
+    "otplib": "^13.6.0",
     "pino": "^10.4.0",
     "qrcode": "^1.5.4",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/qrcode": "^1.5.6",
-    "vitest": "^5.0.3"
+    "vitest": "^5.1.0"
   }
 }

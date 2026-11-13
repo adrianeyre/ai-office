@@ -13,3 +13,10 @@ allowBuilds:
   cpu-features: false
   protobufjs: false
   ssh2: false
+
+# The latest conventionalcommits preset renders release notes only with
+# conventional-changelog-writer 9, and the latest release-notes-generator and
+# commit-analyzer, which semantic-release brings, still ask for 8. Drop this
+# once they take 9.
+overrides:
+  conventional-changelog-writer: ^9.3.0
