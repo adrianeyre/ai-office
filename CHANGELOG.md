@@ -1,3 +1,9 @@
+## [1.8.1](https://github.com/adrianeyre/ai-office/compare/v1.8.0...v1.8.1) (2026-11-13)
+
+### Bug Fixes
+
+* **web:** keep three at 0.186 until n8ao's fix for r187 can be installed ([0ca9179](https://github.com/adrianeyre/ai-office/commit/0ca9179eb3f185bf01ea84c29a921081aee49415))
+
 ## [1.8.0](https://github.com/adrianeyre/ai-office/compare/v1.7.0...v1.8.0) (2026-11-12)
 
 ### Features
