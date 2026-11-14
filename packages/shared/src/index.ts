@@ -734,6 +734,7 @@ export {
   skillFilesSchema,
   skillListSchema,
   skillNamePattern,
+  reservedSkillNames,
   skillOriginSchema,
   skillPathProblem,
   skillProblems,

@@ -129,6 +129,13 @@ describe("SKILL.md frontmatter", () => {
     ]);
   });
 
+  it("refuses the name of a built-in chat command (ADR 0012)", () => {
+    expect(problemsOf(skillMd("name: goal\ndescription: d"))).toEqual([
+      "`goal` is a built-in command: give the Skill another name.",
+    ]);
+    expect(problemsOf(skillMd("name: goals\ndescription: d"))).toEqual([]);
+  });
+
   it("needs a description of 1 to 1024 characters", () => {
     expect(problemsOf(skillMd("name: a"))).toEqual([
       "The frontmatter needs a description.",
