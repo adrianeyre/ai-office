@@ -1,4 +1,4 @@
-import type { FloorSkill } from "@ai-office/shared";
+import { goalCommand, goalDescription } from "@ai-office/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
 
@@ -11,22 +11,43 @@ import { floorSkillsQuery } from "./floor-skills-card.tsx";
 // Skills that match are listed under it. The arrow keys move through them,
 // Enter or Tab puts `/name ` in the box, and Escape closes the list; so
 // does a click on one. The box stays a text box, which names the list
-// (`aria-controls`) and the option chosen (`aria-activedescendant`).
+// (`aria-controls`) and the option chosen (`aria-activedescendant`). The
+// chat's built-in `/goal` (ADR 0012) is listed first when it matches, and
+// no Skill of its name is.
 
 /** The most Skills listed at once. */
 const maxShown = 8;
 
-/** The Skills matching `/query`: those it starts first, then those holding it. */
+/** What the list offers: a Skill, or one of the chat's built-in commands. */
+export interface SlashOption {
+  readonly name: string;
+  readonly description: string;
+}
+
+/** The chat's built-in commands the list offers, before any Skill. */
+export const builtInCommands: readonly SlashOption[] = [
+  { name: goalCommand.slice(1), description: goalDescription },
+];
+
+/**
+ * The built-in commands and Skills matching `/query`: those it starts
+ * first, then those holding it.
+ */
 export function matchingSkills(
-  skills: readonly FloorSkill[],
+  skills: readonly SlashOption[],
   text: string,
-): FloorSkill[] {
+): SlashOption[] {
   const query = /^\/([a-z0-9-]*)$/.exec(text.trimStart())?.[1];
   if (query === undefined) {
     return [];
   }
-  const starting = skills.filter(({ name }) => name.startsWith(query));
-  const holding = skills.filter(
+  const builtIn = new Set(builtInCommands.map(({ name }) => name));
+  const all = [
+    ...builtInCommands,
+    ...skills.filter(({ name }) => !builtIn.has(name)),
+  ];
+  const starting = all.filter(({ name }) => name.startsWith(query));
+  const holding = all.filter(
     ({ name }) => !name.startsWith(query) && name.includes(query),
   );
   return [...starting, ...holding].slice(0, maxShown);
@@ -69,7 +90,7 @@ export function useSkillAutocomplete({
   const open = matches.length > 0 && closedAt !== text;
   const current = Math.min(active, matches.length - 1);
   const optionId = (index: number) => `${listId}-${String(index)}`;
-  const choose = (skill: FloorSkill | undefined) => {
+  const choose = (skill: SlashOption | undefined) => {
     if (skill !== undefined) {
       onChoose(`/${skill.name} `);
     }

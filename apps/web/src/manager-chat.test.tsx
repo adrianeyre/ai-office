@@ -398,6 +398,14 @@ describe("the Manager chat", () => {
       },
     ]);
     expect((box as HTMLTextAreaElement).value).toBe("");
+    // The commands beside the box include /goal and "stop" (ADR 0012).
+    const hint = document.getElementById(
+      box.getAttribute("aria-describedby")?.split(" ")[0] ?? "",
+    );
+    expect(hint?.textContent).toContain(
+      "/goal get issues 1 to 5 done in one PR",
+    );
+    expect(hint?.textContent).toContain("say stop to call it off");
   });
 
   it("streams the Manager's reply in, a piece at a time", async () => {
@@ -557,20 +565,26 @@ describe("the Manager chat", () => {
         ]);
 
     await user.type(box, "/");
+    // The built-in /goal first (ADR 0012), then the Floor's Skills.
     expect(options()).toEqual([
-      ["/brand-voice Writes in the shop's voice.", "true"],
+      [
+        "/goal Say what you want done in your own words; the Manager assigns it and starts at once.",
+        "true",
+      ],
+      ["/brand-voice Writes in the shop's voice.", "false"],
       ["/pdf Extract text from PDFs.", "false"],
     ]);
     expect(box.getAttribute("aria-controls")).toBe(
       screen.getByRole("listbox").id,
     );
-    await user.keyboard("{ArrowDown}");
+    await user.keyboard("{ArrowDown}{ArrowDown}");
     expect(options().map(([, selected]) => selected)).toEqual([
+      "false",
       "false",
       "true",
     ]);
     expect(box.getAttribute("aria-activedescendant")).toBe(
-      screen.getAllByRole("option")[1]?.id,
+      screen.getAllByRole("option")[2]?.id,
     );
     // Enter puts the one chosen in the box, and sends nothing.
     await user.keyboard("{Enter}");
@@ -587,6 +601,18 @@ describe("the Manager chat", () => {
     await user.keyboard("{Tab}");
     expect(box.value).toBe("/brand-voice ");
     expect(document.activeElement).toBe(box);
+
+    // /goal is taken as a Skill is.
+    await user.clear(box);
+    await user.type(box, "/go");
+    expect(options()).toEqual([
+      [
+        "/goal Say what you want done in your own words; the Manager assigns it and starts at once.",
+        "true",
+      ],
+    ]);
+    await user.keyboard("{Enter}");
+    expect(box.value).toBe("/goal ");
 
     // A click takes one.
     await user.clear(box);

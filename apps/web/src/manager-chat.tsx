@@ -877,15 +877,18 @@ export function ManagerChatPanel({
               <code>{example}</code>
             </span>
           ))}
-          . <code>/skill-name</code> runs one of the Floor&apos;s Skills; type{" "}
-          <code>/</code> to choose one. <code>/grilling</code> starts a Grilling
-          Session. <code>/clear</code> clears the conversation and{" "}
-          <code>/compact</code> replaces it with a summary; decisions, Plans and
-          Batches are kept. Anything else goes to {name}&apos;s Model, which may
-          choose a Skill itself. Type <code>@</code> to mention one of the
-          repository&apos;s files; attach images or text files with the clip, or
-          paste or drop them. Enter sends; Shift+Enter starts a new line.
-          Sending while {name} is writing interrupts {name}.
+          . <code>/goal</code>, or a request in your own words, has {name}{" "}
+          assign the work to the Agents and start it at once; say{" "}
+          <code>stop</code> to call it off. <code>/skill-name</code> runs one of
+          the Floor&apos;s Skills; type <code>/</code> to choose one.{" "}
+          <code>/grilling</code> starts a Grilling Session. <code>/clear</code>{" "}
+          clears the conversation and <code>/compact</code> replaces it with a
+          summary; decisions, Plans and Batches are kept. Anything else goes to{" "}
+          {name}&apos;s Model, which may choose a Skill itself. Type{" "}
+          <code>@</code> to mention one of the repository&apos;s files; attach
+          images or text files with the clip, or paste or drop them. Enter
+          sends; Shift+Enter starts a new line. Sending while {name} is writing
+          interrupts {name}.
         </HintText>
         {attached.problems.length > 0 && (
           <ul role="alert" className="space-y-0.5 text-sm text-destructive">
