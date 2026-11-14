@@ -879,7 +879,13 @@ function BatchPlans({
         <p className="text-xs text-muted-foreground">
           {issueList(batch.issues)}, handed to the Manager{" "}
           {when(batch.createdAt)}
-          {batch.startedAt !== null && <>; approved {when(batch.startedAt)}</>}
+          {batch.startedAt !== null && (
+            <>
+              ; approved {when(batch.startedAt)}
+              {batch.chatMessageId !== null &&
+                " by your request in Manager chat"}
+            </>
+          )}
           {batch.finishedAt !== null && (
             <>; finished {when(batch.finishedAt)}</>
           )}

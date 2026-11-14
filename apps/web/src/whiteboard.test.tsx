@@ -143,6 +143,7 @@ function initialBatches(): BatchDetail[] {
         issues: [8, 9],
         status: "finished",
         onePullRequest: false,
+        chatMessageId: null,
         agentId: "grace",
         createdAt: at(0),
         startedAt: at(0),
@@ -200,6 +201,7 @@ function initialBatches(): BatchDetail[] {
         issues: [1, 2, 3],
         status: "awaiting_approval",
         onePullRequest: false,
+        chatMessageId: null,
         agentId: "grace",
         createdAt: at(1),
         startedAt: null,
@@ -235,6 +237,7 @@ function initialBatches(): BatchDetail[] {
         issues: [7],
         status: "in_progress",
         onePullRequest: true,
+        chatMessageId: 41,
         agentId: "grace",
         createdAt: at(0),
         startedAt: at(0),
@@ -287,6 +290,7 @@ function storeBatches(): BatchDetail[] {
         issues: [4, 5],
         status: "awaiting_approval",
         onePullRequest: false,
+        chatMessageId: null,
         agentId: "grace",
         createdAt: at(1),
         startedAt: null,
@@ -720,6 +724,10 @@ describe("the whiteboard", () => {
       await screen.findByRole("heading", { name: "Batch 1: In progress" }),
     ).toBeTruthy();
     expect(screen.getByText("An older Batch.")).toBeTruthy();
+    // Asked for in the Manager chat, whose request stands as its approval.
+    expect(
+      screen.getByText(/by your request in Manager chat/).textContent,
+    ).toContain("; approved ");
     // Handed over "in one PR": it says so, and names its branch.
     expect(
       screen.getByText("One pull request").parentElement?.textContent,

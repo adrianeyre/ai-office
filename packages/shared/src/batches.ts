@@ -332,6 +332,12 @@ export const batchSchema = z.object({
    * pull request, as "complete issues 1 to 5 in one PR" asks (ADR 0010).
    */
   onePullRequest: z.boolean(),
+  /**
+   * The Owner's Manager chat message whose request (or `/goal`) made it,
+   * which stands as its Plan's approval (ADR 0004, ADR 0012); null for a
+   * Batch handed over by command.
+   */
+  chatMessageId: z.number().int().positive().nullable(),
   plan: planSchema,
   /** The Kickoff's acknowledgements, one per assigned Agent, as they came. */
   acknowledgements: z.array(acknowledgementSchema),

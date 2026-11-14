@@ -297,7 +297,8 @@ const batchPlanned = event("batch.planned", {
   /** The version the Owner edited on the whiteboard, which this replans. */
   editedFrom: z.number().int().positive().optional(),
 });
-// The Owner approves a Batch's Plan on the whiteboard (FR-25.3); its work
+// The Owner approves a Batch's Plan on the whiteboard (FR-25.3), or by
+// asking for its work in the Manager chat (ADR 0004, ADR 0012); its work
 // then starts (`batch.started`).
 const batchApproved = event("batch.approved", {
   floorId,
@@ -306,6 +307,11 @@ const batchApproved = event("batch.approved", {
   planVersion: z.number().int().positive(),
   /** The Floor's Manager, whose Plan it is. */
   agentId,
+  /**
+   * The Owner's chat message whose request (or `/goal`) stands as the
+   * approval; absent when the Owner approved it on the whiteboard.
+   */
+  messageId: z.number().int().positive().optional(),
 });
 const batchStarted = event("batch.started", {
   floorId,
