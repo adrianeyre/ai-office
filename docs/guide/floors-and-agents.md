@@ -77,6 +77,12 @@ labels AI Office creates, and what intake picks up.
   token's repositories, each once, with the Floor each one is (if any).
   Without an App or a token it answers `503 github_not_configured`. When
   GitHub cannot be reached it answers `502 github_unavailable`.
+- `GET /api/github/repositories/:owner/:name` asks GitHub for one
+  repository by name, without listing them all, with its Floor if any. One
+  the App is not installed on is `422 repository_not_installed`. **Add a
+  Floor** shows its search box at once: while the list is still coming, or
+  when it has no repository of that name, a name typed in full
+  (`owner/name`) is looked up this way once the typing pauses.
 - The GitHub Apps and access tokens are the Owner's to add in Floor
   Settings' **GitHub** card, and are kept in the `github_connections`
   table, the private key and tokens sealed with `ENCRYPTION_KEY` (ADR

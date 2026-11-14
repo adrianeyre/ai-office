@@ -15,10 +15,12 @@ import {
   type WorkQueueStore,
 } from "@ai-office/orchestrator";
 import {
+  floorErrorCodes,
   floorListSchema,
   floorSchema,
   floorStopSchema,
   installedRepositoryListSchema,
+  installedRepositorySchema,
 } from "@ai-office/shared";
 import type { FastifyInstance } from "fastify";
 import { describe, expect, it, vi } from "vitest";
@@ -104,6 +106,44 @@ const cases: Case[] = [
           floorId: null,
         },
       ]);
+    },
+  ],
+  [
+    "finds one repository the App is installed on by its name",
+    async (setup) => {
+      await addWebShop(setup);
+      const found = await request(
+        setup,
+        "GET",
+        "/api/github/repositories/adrianeyre/web-shop",
+      );
+      expect(found.statusCode).toBe(200);
+      expect(installedRepositorySchema.parse(found.json())).toEqual({
+        fullName: "adrianeyre/web-shop",
+        defaultBranch: "main",
+        private: true,
+        htmlUrl: "https://github.com/adrianeyre/web-shop",
+        floorId: "web-shop",
+      });
+
+      const missing = await request(
+        setup,
+        "GET",
+        "/api/github/repositories/adrianeyre/secret",
+      );
+      expect(missing.statusCode).toBe(422);
+      expect(missing.json()).toMatchObject({
+        error: floorErrorCodes.notInstalled,
+        message:
+          "The GitHub App is not installed on adrianeyre/secret. Install it there first.",
+      });
+
+      const malformed = await request(
+        setup,
+        "GET",
+        "/api/github/repositories/adrianeyre/web%20shop",
+      );
+      expect(malformed.statusCode).toBe(400);
     },
   ],
   [

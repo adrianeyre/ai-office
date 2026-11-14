@@ -3,16 +3,11 @@ import {
   maxMentionSuggestions,
 } from "@ai-office/shared";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import {
-  useEffect,
-  useId,
-  useState,
-  type KeyboardEvent,
-  type ReactNode,
-} from "react";
+import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils.ts";
 
+import { useDebounced } from "./use-debounced.ts";
 import { getJson } from "./api.ts";
 
 // `@` file mentions in the Manager chat (PRD FR-24, ADR 0004), as Claude
@@ -55,19 +50,6 @@ export function withMention(
     text: text.slice(0, mention.start) + inserted + after,
     caret: mention.start + inserted.length,
   };
-}
-
-function useDebounced<Value>(value: Value, ms: number): Value {
-  const [settled, setSettled] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSettled(value);
-    }, ms);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [value, ms]);
-  return settled;
 }
 
 const filesQuery = (floorId: string, query: string) => ({

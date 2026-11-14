@@ -3,6 +3,8 @@
 // a page at a time. An access token can reach hundreds, so all of them in
 // one list is too many to find one in.
 
+import { repositoryNameSchema } from "@ai-office/shared";
+
 /** How many repositories a page shows, the first being the default. */
 export const pageSizes = [25, 50, 100] as const;
 export type PageSize = (typeof pageSizes)[number];
@@ -104,4 +106,13 @@ export function pageNumbers(
     previous = each;
   }
   return numbers;
+}
+
+/**
+ * What was typed, when it names one repository in full (`owner/name`):
+ * one that can be asked of GitHub on its own, before or beyond the list.
+ */
+export function typedFullName(query: string): string | undefined {
+  const parsed = repositoryNameSchema.safeParse(query.trim());
+  return parsed.success ? parsed.data : undefined;
 }

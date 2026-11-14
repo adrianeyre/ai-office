@@ -232,7 +232,10 @@ interface Call {
 function stubServer(
   options: {
     floors?: Floor[];
-    repositories?: InstalledRepository[] | Response;
+    /** The App's repositories as listed; `"still listing"` never answers. */
+    repositories?: InstalledRepository[] | Response | "still listing";
+    /** What GitHub has when asked for one by name; the listed ones if absent. */
+    installed?: InstalledRepository[];
     agents?: Agent[];
     gatewayKeys?: GatewayKey[];
     /** Each Agent's caps in force and use; the office's, unused, if absent. */
@@ -329,9 +332,35 @@ function stubServer(
         return Response.json(added, { status: 201 });
       }
       if (url === "/api/github/repositories") {
+        if (state.repositories === "still listing") {
+          throw new Error("A list still coming is never answered.");
+        }
         return Array.isArray(state.repositories)
           ? Response.json({ repositories: state.repositories })
           : state.repositories.clone();
+      }
+      const named = /^\/api\/github\/repositories\/([^/]+)\/([^/]+)$/.exec(url);
+      if (named !== null) {
+        const fullName = `${decodeURIComponent(named[1] ?? "")}/${decodeURIComponent(named[2] ?? "")}`;
+        const known =
+          options.installed ??
+          (Array.isArray(state.repositories) ? state.repositories : []);
+        const found = known.find(
+          (each) => each.fullName.toLowerCase() === fullName.toLowerCase(),
+        );
+        if (found === undefined) {
+          return Response.json(
+            {
+              error: "repository_not_installed",
+              message: `The GitHub App is not installed on ${fullName}. Install it there first.`,
+            },
+            { status: 422 },
+          );
+        }
+        const floorOf = state.floors.find(
+          ({ repository: each }) => each === found.fullName,
+        );
+        return Response.json({ ...found, floorId: floorOf?.id ?? null });
       }
       if (url === "/api/gateway-keys") {
         return Response.json({ keys: state.gatewayKeys });
@@ -556,6 +585,12 @@ function stubServer(
         { status: 404 },
       );
     };
+    if (
+      url === "/api/github/repositories" &&
+      state.repositories === "still listing"
+    ) {
+      return new Promise<Response>(() => undefined);
+    }
     return Promise.resolve(reply());
   });
   vi.stubGlobal("fetch", fetch);
@@ -751,6 +786,113 @@ describe("the Floors in Floor Settings", () => {
     );
     expect(status()).toBe("Showing 1–60 of 60 repositories.");
     expect((search as HTMLInputElement).value).toBe("");
+  });
+
+  it("finds a repository typed in full while GitHub is still listing them, and adds it", async () => {
+    const { calls } = stubServer({
+      repositories: "still listing",
+      installed: [repository("acme/web-shop"), repository("acme/blog")],
+    });
+    renderAt("/floor-settings");
+    const floors = await card("Floors");
+    // The search is there at once, beside the list still coming.
+    const search = await floors.findByLabelText("Find a repository");
+    expect(
+      floors.getByText(/Asking GitHub for the App's repositories/),
+    ).toBeDefined();
+
+    await userEvent.type(search, "acme/web-shop");
+    const found = await floors.findByRole("list", {
+      name: "Repositories the App is installed on",
+    });
+    expect(
+      within(found)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual(["acme/web-shopAdd Floor"]);
+    // Asked once, as the typing paused: not at every key.
+    expect(
+      calls
+        .map(({ url }) => url)
+        .filter((url) => url.startsWith("/api/github/repositories/")),
+    ).toEqual(["/api/github/repositories/acme/web-shop"]);
+
+    const add = within(found).getByRole("button", {
+      name: "Add acme/web-shop as a Floor",
+    });
+    await vi.waitFor(() => {
+      expect((add as HTMLButtonElement).disabled).toBe(false);
+    });
+    await userEvent.click(add);
+    expect(await floors.findByRole("link", { name: "web-shop" })).toBeDefined();
+    await vi.waitFor(() => {
+      expect(
+        within(
+          floors.getByRole("list", {
+            name: "Repositories the App is installed on",
+          }),
+        )
+          .getAllByRole("listitem")
+          .map((item) => item.textContent),
+      ).toEqual(["acme/web-shopAlready a Floor"]);
+    });
+    expect(changes(calls)).toEqual([
+      {
+        url: "/api/floors",
+        method: "POST",
+        body: { repository: "acme/web-shop", template: "development" },
+        csrf: "csrf-token-1",
+      },
+    ]);
+
+    // Clearing it goes back to waiting for the list.
+    await userEvent.clear(search);
+    expect(
+      await floors.findByText(/Asking GitHub for the App's repositories/),
+    ).toBeDefined();
+  });
+
+  it("says when a repository typed in full is not one the App is installed on", async () => {
+    stubServer({
+      repositories: "still listing",
+      installed: [repository("acme/web-shop")],
+    });
+    renderAt("/floor-settings");
+    const floors = await card("Floors");
+    await userEvent.type(
+      await floors.findByLabelText("Find a repository"),
+      "acme/secret",
+    );
+    expect((await floors.findByRole("alert")).textContent).toBe(
+      "The GitHub App is not installed on acme/secret. Install it there first.",
+    );
+  });
+
+  it("asks GitHub for a repository typed in full that the list does not have", async () => {
+    stubServer({
+      repositories: [repository("adrianeyre/blog")],
+      installed: [repository("adrianeyre/blog"), repository("acme/new-repo")],
+    });
+    renderAt("/floor-settings");
+    const floors = await card("Floors");
+    await floors.findByRole("list", {
+      name: "Repositories the App is installed on",
+    });
+    await userEvent.type(
+      floors.getByLabelText("Find a repository"),
+      "acme/new-repo",
+    );
+    await vi.waitFor(() => {
+      expect(
+        within(
+          floors.getByRole("list", {
+            name: "Repositories the App is installed on",
+          }),
+        )
+          .getAllByRole("listitem")
+          .map((item) => item.textContent),
+      ).toEqual(["acme/new-repoAdd Floor"]);
+    });
   });
 
   it("picks the Floor Template a new Floor starts from, showing each one's starting team (PRD FR-97)", async () => {

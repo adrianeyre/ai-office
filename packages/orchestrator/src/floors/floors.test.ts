@@ -151,6 +151,29 @@ const cases: Case[] = [
     },
   ],
   [
+    "finds one installed repository by its name, with its Floor, without listing them all",
+    async ({ floors }) => {
+      await floors.add("adrianeyre/Blog_2026");
+      expect(await floors.installedRepository("adrianeyre/Blog_2026")).toEqual({
+        fullName: "adrianeyre/Blog_2026",
+        defaultBranch: "trunk",
+        private: true,
+        htmlUrl: "https://github.com/adrianeyre/Blog_2026",
+        floorId: "blog-2026",
+      });
+      expect(
+        (await floors.installedRepository("acme/web-shop")).floorId,
+      ).toBeNull();
+      const error = await refusal(
+        floors.installedRepository("adrianeyre/secret"),
+      );
+      expect(error.code).toBe(floorErrorCodes.notInstalled);
+      expect(error.message).toBe(
+        "The GitHub App is not installed on adrianeyre/secret. Install it there first.",
+      );
+    },
+  ],
+  [
     "refuses a repository that is already a Floor",
     async ({ floors, events }) => {
       await floors.add("adrianeyre/web-shop");
@@ -493,6 +516,7 @@ describe("Floors without a working GitHub", () => {
       for (const attempt of [
         () => floors.add("adrianeyre/web-shop"),
         () => floors.installedRepositories(),
+        () => floors.installedRepository("adrianeyre/web-shop"),
       ]) {
         const error = await refusal(attempt());
         expect(error.code).toBe(floorErrorCodes.githubNotConfigured);
@@ -524,6 +548,7 @@ describe("Floors without a working GitHub", () => {
     for (const attempt of [
       () => floors.add("adrianeyre/web-shop"),
       () => floors.installedRepositories(),
+      () => floors.installedRepository("adrianeyre/web-shop"),
     ]) {
       expect((await refusal(attempt())).code).toBe(
         floorErrorCodes.githubUnavailable,
