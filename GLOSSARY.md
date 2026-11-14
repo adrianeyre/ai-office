@@ -87,11 +87,15 @@ _Avoid_: Classifier, judge
 ## Work
 
 **Batch**:
-The set of issues a Manager works as one: those the Owner hands it in one command, such as "complete issues 1 to 5", or those it files from one request the Owner makes in its chat.
+The set of issues a Manager works as one: those the Owner hands it in one command, such as "complete issues 1 to 5", or those one Goal names or has the Manager file.
 _Avoid_: Sprint, job, run, task list
 
+**Goal**:
+A chat request or `/goal`: what the Owner asks for in their own words, which stands as the Plan's approval.
+_Avoid_: Objective, mission
+
 **One-pull-request Batch**:
-A Batch the Owner hands over "in one PR": its issues are worked one at a time, in the Plan's order, on one shared branch, and merge together in one pull request that closes them all.
+A Batch the Owner hands over "in one PR", by command or in a Goal's words: its issues are worked one at a time, in the Plan's order, on one shared branch, and merge together in one pull request that closes them all.
 _Avoid_: Combined PR, mega-PR, stacked PRs
 
 **Plan**:

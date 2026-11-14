@@ -1,0 +1,24 @@
+# A chat request or /goal can work existing issues, and stands as the Plan's approval
+
+The Owner wants an easy way to tell the Manager what they want and have it assigned to the Agents. Until now, "complete issues 1 to 10 in one PR" worked only in the typed command's exact words, and then waited for the Plan's approval on the whiteboard (FR-25.3); a plain request ("please get issues 1 to 10 done in one PR") reached the Manager's Model, but a chat request could only file new issues (ADR 0004), so the Model told the Owner what to type. So **a request in the Manager chat may now work the Floor's existing issues as well as file new ones, and starts at once**: the request stands as the Plan's approval, as it already did for issues the Manager filed. **`/goal <words>` asks for exactly the same** as sending the words as a request, but says the Owner means it to be acted on: it is read before any Skill, goes straight to the Model's decision (a Batch, or one clarifying question; a plain reply is asked for again once), and no Skill may be named `goal`. **The typed "complete issues …" is unchanged**: it keeps the Floor's Plan approval, for when the Owner wants the whiteboard first.
+
+## Considered Options
+
+- **Keep requests to new issues, and teach the Owner the command**: no change, but not what the Owner asked for; the Model kept answering "type complete issues …".
+- **Read "complete issues" more loosely in plain code**: a looser grammar still misses descriptions ("the login issues"), and still waits for approval.
+- **Let the Model pick existing issues freely**: easy, but a number the Owner typed could be dropped, or an issue someone else opened picked up.
+- **The Model names the existing issues, and plain code holds it to the Owner's words** (chosen).
+
+## Consequences
+
+- The `batch` decision takes `existingIssues` (numbers, in order), `readings` (how each of the Owner's descriptions was read, such as "the login issues" → #12 and #15) and `onePullRequest`. The Model is given the Floor's open issues, at most 50, newest first, by number and title, as data.
+- **Every issue number the Owner typed is worked**: `#12`, or numbers after "issue"/"issues", with the ranges and lists commands take ("issues 1 to 10", "1-10", "1 through 10", "1, 3 and 4"). Plain code adds any the Model left out, never drops one, and the reply says so; issues the Model read from a description are reported as its reading. A bare number ("30 seconds") or one after "PR" is not an issue number.
+- **Existing and new issues go in one Batch, at most 10 in all.** A request for more is refused ("one request works at most 10 at a time; ask for the rest after"), never cut short.
+- **An existing issue is checked as a command's are**: one someone else opened is left out unless the Owner labelled it `ai-office`, whatever number was typed, and the reply says to label it; one closed, held by another Batch or already in the pipeline is left out, saying why. The binding check (P2-3) is told the existing issues and their titles too.
+- **The fence (ADR 0009) applies to the new issues the Model writes**; existing issues are the Owner's own and are not fenced again. Every chat Batch's pull requests still go to the Owner to merge.
+- **A chat request goes in one pull request when the Owner's own words ask for it** ("in one PR", "as one pull request", "in a single PR"; or the Model's flag, when the Owner's words say "one PR" too); its issues then run one after another (ADR 0010). Otherwise each issue has its own pull request, in parallel. This amends ADR 0010, under which a chat request's Batch never went in one pull request.
+- The approval is recorded: `batch.approved` names the chat message that stands for it, and the whiteboard and Activity Feed say "Approved by your request in Manager chat".
+- The Manager's answer lists every issue: which were picked and how descriptions were read, which started, which follow one at a time in the same pull request, which were left out and why, and which wait and why; it ends "Say **stop** to call this off, or **skip 4** to drop one."
+- Where no work can run (no sandbox runner set up), a request files and starts nothing, saying so up front, rather than making a Batch that never runs.
+- **"stop"**, a typed command, calls off the Floor's newest Batch under way that a chat request or `/goal` started: its issues not started are dropped from its Plan, the work queued or running on the rest is cancelled and handed to the Owner at `needs-human`, and issues closed or ready to merge are left as they are, as are pull requests already opened. A Batch handed over by "complete issues" is not one "stop" calls off; "skip" and "move" work on either.
+- The Manager's prompt no longer tells it to send the Owner to a typed command for work it can carry out; the typed commands stay documented as the route that keeps the Plan's approval. This amends ADR 0004, whose chat requests filed new issues only.

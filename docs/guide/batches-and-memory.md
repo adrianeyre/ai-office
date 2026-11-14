@@ -78,10 +78,19 @@ orders and show it on the orders page", is a Batch too (PRD FR-24, FR-25;
 [ADR 0004](../architectural-decision-record/0004-the-manager-files-issues-for-its-chats-requests.md)).
 The Manager files its issues and hands them over with the Plan it settled
 in the chat ([how](events-and-chat.md#requests-batches-and-contractors)).
+A request, or `/goal`, may also name the Floor's existing issues, such as
+"please get issues 1 to 10 done in one PR"
+([ADR 0012](../architectural-decision-record/0012-a-chat-request-or-goal-can-work-existing-issues.md);
+[how](events-and-chat.md#goals-plain-requests-and-goal)): they go in the
+same Batch, before the new ones, at most 10 issues in all.
 
 - **Its issues are the Owner's.** The GitHub App opened them, so intake
   leaves them alone, but the Batch takes them as the Owner's, as it does a
-  Grilling Session's: they enter work only through their Batch.
+  Grilling Session's: they enter work only through their Batch. Only the
+  issues the Manager filed are taken so (`filed` on `ChatBatchRequest`):
+  an existing issue is checked as a command's are, so one someone else
+  opened is left out unless the Owner labelled it `ai-office`, and an
+  issue left out leaves the settled Plan.
 - **Its Plan** is the chat's, by issue number: order, dependencies, likely
   files, work Roles and, for an issue in a one-off Role, its Contractor.
   Plain code checks and completes it as any draft (`planFromDraft`); if it
@@ -96,13 +105,20 @@ in the chat ([how](events-and-chat.md#requests-batches-and-contractors)).
   that, nothing is filed; nor when it names a file only the Owner may ask
   for and the Owner did not (ADR 0009). Its pull requests always go to
   the Owner to merge, whatever the Floor's Merge Policy, unless the Owner
-  adds `ai-office:auto-merge` to an issue themselves. The Plan is still on the whiteboard, and
+  adds `ai-office:auto-merge` to an issue themselves. The approval is
+  recorded as the Owner's: `batch.approved` names the chat message, and
+  the whiteboard and the Activity Feed say "approved by your request in
+  Manager chat". The Plan is still on the whiteboard, and
   the Kickoff and Wrap-up are held as for any Batch; its Contractors
   acknowledge the Plan with the rest.
 - **Several at once.** Each request is its own Batch (`chat_message_id` on
   `batches` names the Owner's message), running alongside the Floor's
   other Batches, with its own Plan and Wrap-up. "pause", "skip 4" and
-  "move 5 up" work on it as on any other.
+  "move 5 up" work on it as on any other, and "stop" calls off the newest
+  under way ([how](events-and-chat.md#goals-plain-requests-and-goal)).
+- **One pull request** when the Owner's words ask for it ("in one PR"),
+  as "complete issues … in one PR" does
+  ([below](#one-pull-request-for-a-batch)); otherwise one per issue.
 - **When it finishes**, the Manager posts its Wrap-up's summary in the
   chat, and its Contractors leave once idle
   ([Contractors](floors-and-agents.md#contractors)).
@@ -165,8 +181,10 @@ turns.
 PR", "in a single PR") hands the Manager a Batch whose issues all go in
 **one pull request** (PRD FR-25a;
 [ADR 0010](../architectural-decision-record/0010-a-batch-may-ship-as-one-pull-request.md);
-`batches/one-pull-request.ts` in `@ai-office/orchestrator`). Without it,
-each issue has its own pull request, as before.
+`batches/one-pull-request.ts` in `@ai-office/orchestrator`). So does a
+chat request or `/goal` whose own words ask for one
+([ADR 0012](../architectural-decision-record/0012-a-chat-request-or-goal-can-work-existing-issues.md)).
+Without it, each issue has its own pull request, as before.
 
 - **Kept on the Batch.** `one_pull_request` on `batches` (false by
   default) says so; the API's Batch has `onePullRequest`, the whiteboard

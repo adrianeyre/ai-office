@@ -11,7 +11,7 @@ The Owner's daily habit is "complete issues 1 to 10 in one PR", but a Batch open
 
 ## Consequences
 
-- A one-pull-request Batch runs its issues one after another: it is slower than a Batch whose independent issues run in parallel. The Owner chooses it per Batch, by command; nothing else changes for other Batches. A chat request's Batch never goes in one pull request.
+- A one-pull-request Batch runs its issues one after another: it is slower than a Batch whose independent issues run in parallel. The Owner chooses it per Batch, by command; nothing else changes for other Batches. ~~A chat request's Batch never goes in one pull request.~~ Amended by ADR 0012: a chat request's Batch goes in one pull request when the Owner's own words ask for it ("in one PR").
 - The branch is named from the Batch alone, `ai-office/batch-<id>`, so every Stage finds it without reading an issue. The Branches page shows it as one lane, with the issue at work on it and where each of the Batch's issues stands.
 - The shared branch is not rebased onto the default branch before review, unlike an issue's own (FR-25.5): a rebase would rewrite the commits earlier issues' reviewers approved. The pull request merges with a merge commit as ever; one that has come to conflict with the default branch is refused by GitHub and goes to the Owner, saying so.
 - Each issue's reviewers see only its own diff, from its base, so they judge that issue; the docs Agent and designer read the same range, and QA tests the whole branch as it stands. An approval of an earlier issue counts for the head its work ended at (where the next issue began) or for the pull request's head; commits pushed on an issue after its reviewers approved send it back to them, as P1-1 asks of any pull request.
