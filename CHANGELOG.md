@@ -1,3 +1,18 @@
+## [1.9.0](https://github.com/adrianeyre/ai-office/compare/v1.8.1...v1.9.0) (2026-11-14)
+
+### Features
+
+* **events:** mark a Plan approved by the Owner's request in Manager chat ([0212b08](https://github.com/adrianeyre/ai-office/commit/0212b08b916f0da0d023173268b716760bce24ba))
+* **manager:** let a chat request or /goal work existing issues and start at once ([ddf1d48](https://github.com/adrianeyre/ai-office/commit/ddf1d48b9b84a53ae8acf5180d0da0caf3d6b954))
+* **skills:** refuse a Skill named goal, the chat's built-in command ([9e596f1](https://github.com/adrianeyre/ai-office/commit/9e596f10f61f2f59e88bb9bd44ccd4b2cace3426))
+* **web:** offer /goal in the Manager chat's autocomplete and hint ([9968e0f](https://github.com/adrianeyre/ai-office/commit/9968e0f80c3b9d873223331f39cc99293453d817))
+* **web:** search for a repository by name while GitHub is still listing them ([065f763](https://github.com/adrianeyre/ai-office/commit/065f763be4c6377239e6f110f6505c345bce3342))
+
+### Bug Fixes
+
+* **manager:** don't read "don't put them in one PR" as asking for one ([1acf0eb](https://github.com/adrianeyre/ai-office/commit/1acf0eb752268d9b3171214cf535fe23288cc42e))
+* **sandcastle:** fetch the issue body, not only its comments ([e49b955](https://github.com/adrianeyre/ai-office/commit/e49b9557be17e6c714d473e1289664c48972ff2a))
+
 ## [1.8.1](https://github.com/adrianeyre/ai-office/compare/v1.8.0...v1.8.1) (2026-11-13)
 
 ### Bug Fixes
