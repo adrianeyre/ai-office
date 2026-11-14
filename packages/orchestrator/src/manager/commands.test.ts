@@ -421,6 +421,10 @@ describe("a request's own words (ADR 0012)", () => {
       "one PR per issue",
       "in two PRs",
       "what is a PR?",
+      "get issues 1 to 10 done, but don't put them in one PR",
+      "do not do them in a single PR",
+      "issues 3 and 4, not as one pull request",
+      "each in its own branch rather than in one PR",
     ]) {
       expect(asksForOnePullRequest(text), text).toBe(false);
     }

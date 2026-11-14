@@ -434,8 +434,22 @@ export function readManagerCommand(text: string): CommandReading {
  * PR" does: "in one PR", "as one pull request", "in a single PR" (ADR
  * 0010, ADR 0012).
  */
-export const asksForOnePullRequest = (text: string): boolean =>
-  onePullRequestWords.test(normalise(text));
+export const asksForOnePullRequest = (text: string): boolean => {
+  const normalised = normalise(text);
+  const asked = onePullRequestWords.exec(normalised);
+  return (
+    asked !== null && !refusedJustBefore.test(normalised.slice(0, asked.index))
+  );
+};
+
+/**
+ * "don't put them", "not", "rather than": words that, a few words before
+ * "in one PR", turn it into a refusal of one pull request. With no Plan to
+ * approve, reading "don't put them in one PR" as asking for one would
+ * quietly put every issue on one branch, one after another.
+ */
+const refusedJustBefore =
+  /\b(?:not|don['’]?t|dont|never|no|without|rather\s+than|instead\s+of)\b(?:\s+\S+){0,4}\s*$/;
 
 /** Words that make the numbers after them issue numbers. */
 const issueWords = new Set(["issue", "issues"]);
