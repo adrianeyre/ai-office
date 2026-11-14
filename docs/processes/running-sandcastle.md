@@ -236,7 +236,10 @@ Three pieces of syntax do the work:
 1. **The reading, before the task:** `README.md`, `GLOSSARY.md`, the PRD and
    each ADR, named individually.
 2. **The brief, fetched live** with <code>!&#96;gh issue view {{ISSUE}}&#96;</code>
-   rather than pasted, so it can't drift from the issue.
+   rather than pasted, so it can't drift from the issue. The comments
+   are fetched by a second <code>!&#96;gh issue view {{ISSUE}} --comments&#96;</code>.
+   Don't merge the two: when its output isn't a terminal, `--comments` prints
+   only the comments, so an issue with none would reach the agent empty.
 3. **What already exists and must survive.** In particular, the root
    `package.json` contains the harness that is running the agent. An agent given
    a scaffolding task will otherwise rewrite it from scratch.
