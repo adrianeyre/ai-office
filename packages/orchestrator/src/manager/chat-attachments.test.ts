@@ -404,6 +404,7 @@ const cases: Case[] = [
       const requests: ChatRequests = {
         canResearch: false,
         workRoles: () => Promise.resolve([]),
+        openIssues: () => Promise.resolve([]),
         researchRuns: () => [],
         research: () => Promise.resolve([]),
         async batch({ say }) {

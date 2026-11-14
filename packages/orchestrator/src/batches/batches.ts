@@ -13,6 +13,7 @@ import {
   type Redactor,
   type TokenUsageRow,
   type WrapUp,
+  type WrapUpOutcome,
 } from "@ai-office/shared";
 
 import { modelOf } from "../agents/agents.ts";
@@ -144,7 +145,17 @@ import {
 // "skip" and "move" work on it as on any other. Each chat request is its
 // own Batch, running alongside the Floor's others, and only its Plan gives
 // work to the Contractors in one-off Roles the Manager added for it: a
-// Batch handed over by command plans without them.
+// Batch handed over by command plans without them. A chat request (or a
+// `/goal`) may name the Floor's existing issues too (ADR 0012): only those
+// the Manager filed count as the Owner's for that; the rest are checked
+// as a command's are, and an issue left out leaves the settled Plan. Its
+// approval is recorded as the Owner's, `batch.approved` naming the chat
+// message that stands for it, and it goes in one pull request when the
+// Owner's words asked. "stop" calls off the Floor's newest chat request
+// Batch under way: its issues not started leave its Plan, the
+// work running on the rest is cancelled and handed to the Owner at
+// `needs-human`, and pull requests already opened are left as they are
+// (`callOff`).
 //
 // "complete issues 1 to 10 in one PR" hands over a Batch whose issues go
 // in one pull request (ADR 0010, `one-pull-request.ts`): its Plan runs one
@@ -154,10 +165,17 @@ import {
 // An issue handed to the Owner holds the rest, which never start, and the
 // Batch finishes as its pull request merges or the Owner decides.
 
-/** A Batch the Manager files from one of the Owner's chat requests. */
+/** A Batch the Manager makes from one of the Owner's chat requests. */
 export interface ChatBatchRequest {
   /** The Owner's chat message it is for. */
   readonly messageId: number;
+  /**
+   * The issues the Manager filed for it, which are the Owner's. The rest
+   * are the Floor's existing issues the request names (ADR 0012), checked
+   * as any Batch's are: one someone else opened is left out unless the
+   * Owner labelled it ai-office.
+   */
+  readonly filed: readonly number[];
   /**
    * The Plan settled in the chat, by issue number: its order, dependencies,
    * likely files, Agents and work Roles, checked as any draft is.
@@ -233,6 +251,16 @@ export interface Batches {
   ): Promise<PlanChange & { readonly started: readonly number[] }>;
   /** `change`, answering what was done in words, for the Manager chat. */
   changeCommand(floorId: string, change: BatchChange): Promise<string>;
+  /**
+   * Calls off the Floor's newest Batch under way that a chat request (or
+   * `/goal`) started, as the Owner's "stop" asks (ADR 0012): its issues not
+   * started leave its Plan, the work queued or running on the rest is
+   * cancelled and handed to the Owner at `needs-human`, and issues closed
+   * or with a pull request ready for the Owner are left as they are.
+   */
+  callOff(floorId: string): Promise<StopOutcome>;
+  /** `callOff`, answering what was done in words, for the Manager chat. */
+  callOffCommand(floorId: string): Promise<string>;
   /** The issues the Floor's open Batches hold back, not started yet. */
   held(floorId: string): Promise<ReadonlySet<number>>;
   /**
@@ -252,6 +280,19 @@ export interface Batches {
   trigger(): Promise<void>;
   /** Stops checking, waiting for a check in progress. */
   stop(): Promise<void>;
+}
+
+/** What "stop" did to a Batch (ADR 0012). */
+export interface StopOutcome {
+  readonly batch: BatchRecord;
+  /** Its issues that had not started, which left its Plan. */
+  readonly dropped: readonly number[];
+  /** Its issues whose work was stopped and handed to the Owner. */
+  readonly stopped: readonly number[];
+  /** Its issues left as they were: closed, ready to merge or the Owner's already. */
+  readonly leftAlone: readonly number[];
+  /** Whether the Batch finished with it. */
+  readonly finished: boolean;
 }
 
 /** A Batch, and the version of its Plan an edit or an approval left it with. */
@@ -295,12 +336,20 @@ export interface BatchesOptions {
   /** Each AI Provider's default Model, for a Manager without its own. */
   readonly defaultModels?: () => Promise<DefaultModels>;
   readonly store: BatchStore;
-  /** The work queued or running, which the Plan's assignments balance. */
+  /**
+   * The work queued or running, which the Plan's assignments balance, and
+   * which "stop" cancels.
+   */
   readonly work: Pick<WorkQueueStore, "active">;
   /** Moves started issues to `needs-work`. */
   readonly pipeline: Pipeline;
   /** Where started issues' work is queued. */
   readonly queue: IntakeQueue;
+  /**
+   * Cancels one piece of work queued or running, as "stop" asks (ADR
+   * 0012); without it, "stop" hands the issues to the Owner all the same.
+   */
+  readonly cancelWork?: (workId: number) => Promise<boolean>;
   readonly events: EventBus;
   readonly notices: Notices;
   /**
@@ -507,7 +556,7 @@ export function createBatches(options: BatchesOptions): Batches {
         !(await fromOwner(github, floor, issue, ownerLogin))
       ) {
         leave(
-          "someone else opened it, and you have not labelled it ai-office yourself",
+          "someone else opened it: label it ai-office yourself to include it",
         );
       } else if (otherBatch !== undefined) {
         leave(`it waits in Batch ${String(otherBatch)}`);
@@ -1080,6 +1129,22 @@ export function createBatches(options: BatchesOptions): Batches {
     if (outcomes === undefined) {
       return undefined;
     }
+    return conclude(floor, batch, plan, outcomes, records);
+  };
+
+  /**
+   * Finishes the Batch with these outcomes: its Wrap-up's results are
+   * kept, `batch.finished` gathers its Agents, and an info Notice tells the
+   * Owner. Undefined if it had finished meanwhile.
+   */
+  const conclude = async (
+    floor: FloorRecord,
+    batch: BatchRecord,
+    plan: PlanRecord,
+    outcomes: ReadonlyMap<number, WrapUpOutcome>,
+    records: ReadonlyMap<number, IssueRecord>,
+  ): Promise<WrapUp | undefined> => {
+    const numbers = plan.items.map(({ issue }) => issue);
     const at = now();
     const wrapUp = wrapUpOf({
       floorId: floor.id,
@@ -1528,6 +1593,154 @@ export function createBatches(options: BatchesOptions): Batches {
     });
   };
 
+  const callOff = async (floorId: string): Promise<StopOutcome> => {
+    const floor = await floorOf(floorId);
+    // The newest under way that a chat request or `/goal` started.
+    const target = (await store.open(floor.id))
+      .filter(
+        ({ status, chatMessageId }) =>
+          status === "in_progress" && chatMessageId !== null,
+      )
+      .reduce<BatchRecord | undefined>(
+        (newest, batch) =>
+          newest === undefined || batch.id > newest.id ? batch : newest,
+        undefined,
+      );
+    if (target === undefined) {
+      throw new BatchError(
+        batchErrorCodes.batchNotFound,
+        `No Batch a request of yours started is under way on ${floor.name}, so there is nothing to stop.`,
+      );
+    }
+    return onBatch(target.id, () =>
+      exclusive(async () => {
+        const batch = await store.get(target.id);
+        const plan = await store.latestPlan(target.id);
+        if (batch?.status !== "in_progress" || plan === undefined) {
+          throw new BatchError(
+            batchErrorCodes.batchNotFound,
+            `Batch ${String(target.id)} has finished, so there is nothing to stop.`,
+          );
+        }
+        const started = new Set(
+          (await store.started(batch.id)).map(({ issue }) => issue),
+        );
+        const order = plan.items.map(({ issue }) => issue);
+        const dropped = order.filter((issue) => !started.has(issue));
+        const carryingOn = order.filter((issue) => started.has(issue));
+        const { manager, ...members } = await teamOf(floor, true);
+        if (dropped.length > 0 && carryingOn.length > 0) {
+          // The issues not started leave the Plan, as "skip" would drop them.
+          const content = replanMidBatch(
+            plan,
+            carryingOn,
+            started,
+            await planTeam(members),
+            [
+              ...plan.leftOut,
+              ...dropped.map((issue) => ({
+                issue,
+                reason: "you stopped the Batch before it started",
+              })),
+            ],
+            `AI Office's rules replanned the Batch, as you stopped it while its work was under way: the issues not started (${issueList(dropped)}) were dropped, and the work on the rest stopped.`,
+          );
+          const edited = { ...content, editedFrom: plan.version };
+          const replanned = await store.addPlan(
+            batch.id,
+            batch.onePullRequest ? oneAtATime(edited) : edited,
+            manager.id,
+            now(),
+          );
+          await events.publish({
+            type: "batch.planned",
+            version: 1,
+            floorId: floor.id,
+            batchId: batch.id,
+            planVersion: replanned.version,
+            agentId: manager.id,
+            draftedBy: replanned.draftedBy,
+            issues: replanned.items.map(({ issue }) => issue),
+            editedFrom: plan.version,
+          });
+        }
+        // The work on the rest stops, and goes to the Owner; what is
+        // closed, ready to merge or theirs already is left as it is.
+        const repository = github.repository(floor.repository);
+        const active = (await options.work.active()).filter(
+          (item) => item.floorId === floor.id,
+        );
+        const stopped: number[] = [];
+        const leftAlone: number[] = [];
+        for (const issue of carryingOn) {
+          const now = await repository.getIssue(issue);
+          const stage =
+            now.state === "closed" ? null : positionOf(issue, now.labels).stage;
+          if (
+            stage === null ||
+            stage === "ready-to-merge" ||
+            stage === "needs-human"
+          ) {
+            leftAlone.push(issue);
+            continue;
+          }
+          for (const item of active.filter((work) => work.issue === issue)) {
+            await options.cancelWork?.(item.id);
+          }
+          await options.pipeline.move(floor, issue, "needs-human");
+          stopped.push(issue);
+        }
+        // With nothing started, it is over at once, none of it started.
+        const wrapUp =
+          carryingOn.length === 0
+            ? await conclude(
+                floor,
+                batch,
+                plan,
+                new Map(order.map((issue) => [issue, "not_started" as const])),
+                await recordsOf(floor, batch, order),
+              )
+            : await finishBatch(floor, batch);
+        return {
+          batch,
+          dropped,
+          stopped,
+          leftAlone,
+          finished: wrapUp !== undefined,
+        };
+      }),
+    );
+  };
+
+  /** What "stop" did, in the Manager chat's words. */
+  const describeStop = (outcome: StopOutcome): string => {
+    const { batch, dropped, stopped, leftAlone, finished } = outcome;
+    const are = (issues: readonly number[]) =>
+      issues.length === 1 ? "is" : "are";
+    return [
+      `Stopped Batch ${String(batch.id)}.`,
+      ...(dropped.length === 0
+        ? []
+        : [
+            `${issueList(dropped)} ${are(dropped)} dropped from it: ${dropped.length === 1 ? "it" : "they"} had not started.`,
+          ]),
+      ...(stopped.length === 0
+        ? []
+        : [
+            `The work on ${issueList(stopped)} stopped, and ${stopped.length === 1 ? "it is" : "they are"} handed to you (needs-human).`,
+          ]),
+      ...(leftAlone.length === 0
+        ? []
+        : [
+            `${issueList(leftAlone)} ${are(leftAlone)} left as ${leftAlone.length === 1 ? "it is" : "they are"}: done, or with a pull request for you to merge or close.`,
+          ]),
+      "Pull requests already opened are left as they are.",
+      finished
+        ? "The Batch has finished."
+        : `The Batch finishes once you merge or close ${issueList(leftAlone)}.`,
+    ].join(" ");
+  };
+
   const approve = (
     floorId: string,
     batchId: number,
@@ -1585,19 +1798,29 @@ export function createBatches(options: BatchesOptions): Batches {
     const { issues, leftOut } = await readIssues(
       floor,
       numbers,
-      new Set(request === undefined ? [] : numbers),
+      new Set(request?.filed ?? []),
     );
     if (issues.length === 0) {
       return { batch: undefined, leftOut };
     }
     const team = await planTeam(members);
     // A chat request's Plan was settled in the chat; plain code checks it,
-    // and the Manager drafts one only if it does not hold.
+    // and the Manager drafts one only if it does not hold. The issues left
+    // out leave its Plan, and the issues it waits on.
+    const kept = new Set(issues.map(({ number }) => number));
     const settled =
       request === undefined
         ? undefined
         : planFromDraft(
-            request.plan,
+            {
+              ...request.plan,
+              issues: request.plan.issues
+                .filter(({ issue }) => kept.has(issue))
+                .map((item) => ({
+                  ...item,
+                  dependsOn: item.dependsOn.filter((issue) => kept.has(issue)),
+                })),
+            },
             issues.map(({ number, title }) => ({ number, title })),
             team,
             leftOut,
@@ -1631,6 +1854,19 @@ export function createBatches(options: BatchesOptions): Batches {
       draftedBy: plan.draftedBy,
       issues: plan.items.map(({ issue }) => issue),
     });
+    // The chat request is the Plan's approval, recorded as the Owner's
+    // (ADR 0012), as the whiteboard's is.
+    if (request !== undefined) {
+      await events.publish({
+        type: "batch.approved",
+        version: 1,
+        floorId: floor.id,
+        batchId: batch.id,
+        planVersion: plan.version,
+        agentId: manager.id,
+        messageId: request.messageId,
+      });
+    }
     await kickoff(floor, manager, members.agents, batch, plan);
     let started: number[] = [];
     const urls = new Map(
@@ -1891,6 +2127,10 @@ export function createBatches(options: BatchesOptions): Batches {
         requested,
         await change(floorId, requested),
       );
+    },
+    callOff,
+    async callOffCommand(floorId) {
+      return describeStop(await callOff(floorId));
     },
     async held(floorId) {
       return new Set((await holding(floorId)).keys());

@@ -806,6 +806,9 @@ export {
   managerChatCompactionSchema,
   managerChatCompactionTriggers,
   readChatControl,
+  goalCommand,
+  goalDescription,
+  readGoalCommand,
   type ManagerChatCompaction,
   managerChatErrorCodes,
   managerChatFrameSchema,
@@ -1059,10 +1062,12 @@ export {
   oneOffRoleSchema,
   requestBindingSchema,
   requestIssueSchema,
+  requestReadingSchema,
   type ChatRequest,
   type OneOffRole,
   type RequestBinding,
   type RequestIssue,
+  type RequestReading,
 } from "./chat-requests.ts";
 export {
   maxMemoryEntries,

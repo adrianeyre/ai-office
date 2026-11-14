@@ -18,6 +18,7 @@ import {
   mentionedFiles,
   readGrillingAnswers,
   readChatControl,
+  readGoalCommand,
   readGrillingControl,
   readSkillCommand,
   skillAnnouncement,
@@ -196,6 +197,12 @@ import type {
 // one JSON object in a fenced block, held back from listeners while it is
 // written, and asked for once more if it cannot be acted on. As the Batch
 // goes on, the Manager reports back in the chat (`postProgress`).
+// A request may work the Floor's existing issues too, whose open ones the
+// Model is given by number and title (ADR 0012). "/goal <words>" is such
+// a request, read before any Skill: it goes straight to the Model's
+// decision, which must be a Batch or a clarifying question, and is asked
+// for once more if the reply is plain. "stop" calls off the Batch the
+// latest request started (`carryOut`).
 
 /** Why the chat refused a message; `code` is one of `managerChatErrorCodes`. */
 export class ManagerChatError extends Error {
@@ -707,6 +714,7 @@ const notYet: Record<ManagerCommandKind, string> = {
   complete: "Batches are not available here, so nothing was started.",
   skip: "Batches are not available here, so nothing changed.",
   move: "Batches are not available here, so nothing changed.",
+  stop: "Batches are not available here, so nothing was stopped.",
   pause: "Pausing a Floor is not available yet, so nothing changed.",
   resume: "Pausing a Floor is not available yet, so nothing changed.",
   report: "Status reports are not available here, so none was written.",
@@ -716,6 +724,10 @@ const reasonOf = (error: unknown): string =>
   (error instanceof Error ? error.message : String(error))
     .replaceAll(/\s+/g, " ")
     .trim();
+
+/** What the Model is told when it answered a `/goal` plainly (ADR 0012). */
+const goalRetryMessage =
+  "The Owner's message was a /goal: a request to act. Answer with a decision block, a batch or a clarifying question, not a plain reply.";
 
 export function createManagerChat(options: ManagerChatOptions): ManagerChat {
   const { store, models } = options;
@@ -1157,6 +1169,9 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
         publish(floor.id, { type: "delta", replyTo: asked.id, text });
       }
     };
+    // "/goal": a request to act on, never a Skill or a plain answer (ADR
+    // 0012).
+    const goal = readGoalCommand(asked.text) !== undefined;
     // A chat request is the Model's to decide, outside a Grilling Session
     // and a Skill the Owner ran, while the Floor lets it spin work off.
     const requests =
@@ -1232,7 +1247,7 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
         // is the Owner's to run (`/grilling`, `/wayfinder`); one that
         // loads instructions (`/pr`) may be chosen like any other.
         const offered =
-          asked.skill === null && session === undefined
+          asked.skill === null && session === undefined && !goal
             ? (await skillsOf(floor.id).catch(() => noSkills)).skills.filter(
                 ({ name, source }) =>
                   !(source === "built-in" && isGrillingSkillName(name)) &&
@@ -1241,6 +1256,14 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
             : [];
         const workRoles =
           requests === undefined ? [] : await requests.workRoles(floor.id);
+        // The Floor's open issues, which a request may work (ADR 0012).
+        const openIssues =
+          requests === undefined
+            ? undefined
+            : (await requests.openIssues(floor))?.map(({ number, title }) => ({
+                number,
+                title: redactor.redactText(title),
+              }));
         // The Manager answers in its conversation's read-only agent session
         // when its AI Provider has an agent tool (ADR 0004); else in one
         // call through the Gateway, unable to read the repository.
@@ -1302,6 +1325,8 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
               : {
                   requests: requestsSection({
                     roles: workRoles,
+                    goal,
+                    ...(openIssues === undefined ? {} : { openIssues }),
                     research:
                       requests.canResearch && prompt.findings === undefined,
                     ...(prompt.findings === undefined
@@ -1494,12 +1519,34 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
             ? { kind: "decision", value: second.value }
             : { kind: "unreadable", problem: second.problem };
         };
+        /** Whether a `/goal` answered plainly was asked once more for a decision. */
+        let askedForDecision = false;
         /** Carries out what the reply holds: a decision, or a plain reply. */
         const carryOutReply = async (
           written: string,
           findings?: readonly string[],
         ): Promise<Omit<NewChatMessage, "createdAt"> | undefined> => {
           const block = decisionOf(written);
+          if (
+            requests !== undefined &&
+            block === undefined &&
+            goal &&
+            !askedForDecision
+          ) {
+            // A `/goal` is answered with a decision (ADR 0012).
+            askedForDecision = true;
+            startReply();
+            const again = await call(
+              { ...prompt, ...(findings === undefined ? {} : { findings }) },
+              stream,
+              controller.signal,
+              [
+                { role: "assistant", content: written },
+                { role: "user", content: goalRetryMessage },
+              ],
+            );
+            return carryOutReply(again.text, findings);
+          }
           if (requests === undefined || block === undefined) {
             return plain(written);
           }
@@ -1510,7 +1557,7 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
           if (decided.kind === "unreadable") {
             return answered(
               "error",
-              `${manager.name} meant to act on that, but its decision could not be read: ${decided.problem} Say it again, or file the issues yourself and say "complete issues …".`,
+              `${manager.name} meant to act on that, but its decision could not be read: ${decided.problem} Say it again, or name the issues to work, such as "/goal work issues 12 and 15".`,
             );
           }
           const { value } = decided;
@@ -2295,6 +2342,71 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
    * writes the summary): the Owner's message is kept, in the running
    * Grilling Session if there is one, which goes on either way.
    */
+  /**
+   * "/goal <words>" (ADR 0012): kept as the Owner's message, then answered
+   * as a request, straight to the Model's decision; or refused with a hint
+   * when there is nothing to ask for, or no request can be carried out.
+   */
+  const sendGoal = async (
+    floor: FloorRecord,
+    manager: AgentRecord,
+    team: readonly AgentRecord[],
+    text: string,
+    words: string,
+    attached: readonly ChatAttachment[],
+  ): Promise<{
+    readonly message: ChatMessageRecord;
+    readonly reply: ChatMessageRecord | undefined;
+  }> => {
+    let message: ChatMessageRecord;
+    let hint: string | undefined;
+    try {
+      const running = await options.grilling?.active(floor.id);
+      hint =
+        words === ""
+          ? 'Say what you want after /goal, such as "/goal get issues 1 to 5 done in one PR".'
+          : options.requests === undefined
+            ? `${manager.name} cannot carry out requests here, so nothing was started: say "complete issues …" to hand it a Batch.`
+            : !floor.spinOffFromChat
+              ? `"Manager spins off work from chat" is off for this Floor, so nothing was started: turn it on in Floor Settings, or say "complete issues …" to hand ${manager.name} a Batch.`
+              : running === undefined
+                ? undefined
+                : `A Grilling Session is running, so nothing was started: say "pause the session" first, then set your goal.`;
+      message = await keepOwner({
+        floorId: floor.id,
+        kind: "owner",
+        text: text.trim(),
+        command: null,
+        replyTo: null,
+        agentId: null,
+        model: null,
+        attachments: attached,
+      });
+    } catch (error) {
+      busy.delete(floor.id);
+      throw error;
+    }
+    if (hint !== undefined) {
+      try {
+        const reply = await keep({
+          floorId: floor.id,
+          kind: "hint",
+          text: hint,
+          command: null,
+          replyTo: message.id,
+          agentId: manager.id,
+          model: null,
+        });
+        return { message, reply };
+      } finally {
+        busy.delete(floor.id);
+      }
+    }
+    return inTheBackground(message, (controller) =>
+      answer(floor, manager, team, message, controller),
+    );
+  };
+
   const chatControl = async (
     floor: FloorRecord,
     manager: AgentRecord,
@@ -2817,6 +2929,11 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
       const control = readChatControl(text);
       if (control !== undefined) {
         return chatControl(floor, manager, text, control, attached);
+      }
+      // "/goal <words>" (ADR 0012), before any Skill of its name.
+      const goal = readGoalCommand(text);
+      if (goal !== undefined) {
+        return sendGoal(floor, manager, team, text, goal.words, attached);
       }
       // "/name [arguments]": one of the Floor's Skills, to load (FR-74).
       const skillCommand = readSkillCommand(text);

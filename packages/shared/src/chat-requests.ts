@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { maxPlanFileLength, maxPlanFiles } from "./batches.ts";
+import { maxCommandIssues, maxIssueNumber } from "./manager-chat.ts";
 import { maxRoleInstructions } from "./roles.ts";
 
 // A request the Owner makes in the Manager chat (PRD FR-24, ADR 0004). The
@@ -14,11 +15,19 @@ import { maxRoleInstructions } from "./roles.ts";
 // opened by `chatRequestFence`, which this schema checks; anything else
 // is its reply. The orchestrator, the server and the event schema share
 // these.
+//
+// A Batch may work the Floor's existing issues as well as file new ones
+// (ADR 0012): the Owner names them by number ("issues 1 to 10") or
+// describes them ("the login issues"), and the Model gives their numbers,
+// with how it read each description. Plain code then adds every number
+// the Owner typed, so none is dropped (`typedIssues`), and refuses a
+// request for more than `maxRequestIssues` issues in all. A request asking
+// for "one PR" goes in one pull request (ADR 0010).
 
 /** The line a decision's fenced block opens with. */
 export const chatRequestFence = "```request";
 
-/** The most issues the Manager files for one request. */
+/** The most issues one request works, existing and new together. */
 export const maxRequestIssues = 10;
 /** The most one-off Roles it writes for one request. */
 export const maxRequestRoles = 5;
@@ -84,6 +93,21 @@ export const requestIssueSchema = z.strictObject({
 });
 export type RequestIssue = z.infer<typeof requestIssueSchema>;
 
+const existingIssueSchema = z
+  .number({ error: "existingIssues lists issue numbers." })
+  .int({ error: "existingIssues lists issue numbers." })
+  .positive({ error: "existingIssues lists issue numbers." })
+  .max(maxIssueNumber, { error: "existingIssues lists issue numbers." });
+
+/** How the Model read one of the Owner's descriptions of existing issues. */
+export const requestReadingSchema = z.strictObject({
+  /** The Owner's words, such as "the login issues". */
+  words: text("the Owner's words", 200),
+  /** The existing issues it read them as. */
+  issues: z.array(existingIssueSchema).max(maxCommandIssues),
+});
+export type RequestReading = z.infer<typeof requestReadingSchema>;
+
 /** What the Manager's Model decided about a chat message it did not just answer. */
 export const chatRequestSchema = z.discriminatedUnion(
   "decision",
@@ -106,7 +130,10 @@ export const chatRequestSchema = z.discriminatedUnion(
           error: `Ask at most ${String(maxResearchQuestions)} questions.`,
         }),
     }),
-    /** Repository work: the issues to file, as one Batch. */
+    /**
+     * Repository work, as one Batch: the Floor's existing issues to work,
+     * and the new issues to file. At least one of either.
+     */
     z.strictObject({
       decision: z.literal("batch"),
       /** The Plan in two or three sentences, for the Owner. */
@@ -114,12 +141,29 @@ export const chatRequestSchema = z.discriminatedUnion(
       roles: z.array(oneOffRoleSchema).max(maxRequestRoles, {
         error: `Write at most ${String(maxRequestRoles)} one-off Roles.`,
       }),
-      issues: z
-        .array(requestIssueSchema)
-        .min(1, { error: "File at least one issue." })
-        .max(maxRequestIssues, {
-          error: `File at most ${String(maxRequestIssues)} issues for one request.`,
-        }),
+      /**
+       * The existing issues to work, by number, in order (ADR 0012): those
+       * the Owner named, and those their descriptions name. Room for more
+       * than a request may work, so a request for too many is refused in
+       * the Owner's words rather than misread.
+       */
+      existingIssues: z
+        .array(existingIssueSchema)
+        .max(maxCommandIssues, {
+          error: `Name at most ${String(maxCommandIssues)} existing issues.`,
+        })
+        .optional(),
+      /** How each of the Owner's descriptions was read, such as "the login issues". */
+      readings: z.array(requestReadingSchema).max(maxRequestIssues).optional(),
+      /** The new issues to file, after the existing ones. */
+      issues: z.array(requestIssueSchema).max(maxRequestIssues, {
+        error: `File at most ${String(maxRequestIssues)} issues for one request.`,
+      }),
+      /**
+       * Whether the Owner asked for it all in one pull request (ADR 0010);
+       * it goes in one only when their own words say so too.
+       */
+      onePullRequest: z.boolean().optional(),
     }),
   ],
   { error: 'decision is "batch", "research" or "clarify".' },

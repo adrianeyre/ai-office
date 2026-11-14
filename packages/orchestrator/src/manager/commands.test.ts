@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  asksForOnePullRequest,
   describeCommand,
   editDistance,
   issueList,
   readManagerCommand,
+  typedIssues,
 } from "./commands.ts";
 
 // The Manager chat's commands (PRD FR-24), read in plain code: ranges and
@@ -349,5 +351,78 @@ describe("editDistance", () => {
     expect(editDistance("compleet", "complete")).toBe(1);
     expect(editDistance("cmplte", "complete")).toBe(2);
     expect(editDistance("", "pause")).toBe(5);
+  });
+});
+
+describe("stop", () => {
+  it("reads stop on its own", () => {
+    expect(command("stop")).toEqual({ kind: "stop" });
+    expect(command("Stop.")).toEqual({ kind: "stop" });
+    expect(command("please stop")).toEqual({ kind: "stop" });
+    expect(describeCommand({ kind: "stop" })).toBe(
+      "Understood: stop the Batch your latest request started.",
+    );
+  });
+
+  it("refuses it with anything after it, and leaves sentences alone", () => {
+    expect(hint("stop 4")).toBe(
+      '"stop" calls off the Batch your latest request started, so it takes nothing after it: type "stop" on its own, or "skip 4" to drop one issue.',
+    );
+    expect(hint("stpo")).toBe(
+      'I did not understand that. Did you mean "stop"?',
+    );
+    for (const text of ["Stop everything", "stop the flaky test in issue 4"]) {
+      expect(readManagerCommand(text), text).toEqual({ kind: "message" });
+    }
+  });
+});
+
+describe("a request's own words (ADR 0012)", () => {
+  it.each([
+    [
+      "please get issues 1 to 10 done in one PR",
+      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    ],
+    ["do issues 3-5", [3, 4, 5]],
+    ["work issues 1 through 3 next", [1, 2, 3]],
+    ["fix issues 1, 3 and 4 today", [1, 3, 4]],
+    ["look at #12, then #7 & #9", [12, 7, 9]],
+    ["#1-#3 and issue 8", [1, 2, 3, 8]],
+    ["complete 1 to 3", [1, 2, 3]],
+    ["/goal issue 4 and issue 4 again", [4]],
+  ])("reads the issues typed in %j", (text, issues) => {
+    expect(typedIssues(text)).toEqual(issues);
+  });
+
+  it("leaves numbers that are not issue numbers alone", () => {
+    for (const text of [
+      "make the timeout 30 seconds",
+      "the login issues",
+      "review PR #5",
+      "merge pull request #6",
+      "issues 5 to 1",
+      "",
+    ]) {
+      expect(typedIssues(text), text).toEqual([]);
+    }
+  });
+
+  it("knows when the Owner's words ask for one pull request", () => {
+    for (const text of [
+      "please get issues 1 to 10 done in one PR",
+      "the login issues, as one pull request",
+      "Do them in a single PR.",
+      "/goal complete issues 1 to 5 in one PR",
+    ]) {
+      expect(asksForOnePullRequest(text), text).toBe(true);
+    }
+    for (const text of [
+      "get issues 1 to 10 done",
+      "one PR per issue",
+      "in two PRs",
+      "what is a PR?",
+    ]) {
+      expect(asksForOnePullRequest(text), text).toBe(false);
+    }
   });
 });

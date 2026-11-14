@@ -205,3 +205,17 @@ export function managerChatIssues(app: GitHubApp): ManagerChatIssues {
     },
   };
 }
+
+/**
+ * The open issues of a repository, by number and title, read with the
+ * Manager's own client, which only reads (ADR 0012): what a chat request
+ * may work.
+ */
+export const managerOpenIssues =
+  (app: GitHubApp) =>
+  async (
+    repository: string,
+  ): Promise<{ readonly number: number; readonly title: string }[]> =>
+    (await managerGitHub(app).repository(repository).listIssues()).map(
+      ({ number, title }) => ({ number, title }),
+    );

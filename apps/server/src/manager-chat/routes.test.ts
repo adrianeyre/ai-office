@@ -297,6 +297,52 @@ describe("sending", () => {
     });
   });
 
+  it("reads /goal before any Skill, refuses a Skill named goal, and answers stop at once (ADR 0012)", async () => {
+    const setup = await setUp();
+    const refused = await setup.server.inject({
+      method: "POST",
+      url: "/api/skills",
+      headers: setup.owner.headers,
+      payload: {
+        source: "editor",
+        files: [
+          {
+            path: "SKILL.md",
+            content:
+              "---\nname: goal\ndescription: Sets goals.\n---\n\nSet one.\n",
+          },
+        ],
+      },
+    });
+    expect(refused.statusCode).toBe(400);
+    expect(refused.json()).toMatchObject({
+      problems: ["`goal` is a built-in command: give the Skill another name."],
+    });
+
+    // Nothing here carries out requests, so /goal says so at once: it is
+    // never looked up as a Skill.
+    const goal = managerChatSendResponseSchema.parse(
+      (await send(setup, "/goal get issues 1 to 5 done in one PR")).json(),
+    );
+    expect(goal.message).toMatchObject({
+      kind: "owner",
+      text: "/goal get issues 1 to 5 done in one PR",
+      skill: null,
+    });
+    expect(goal.reply?.kind).toBe("hint");
+    expect(goal.reply?.text).toContain("cannot carry out requests here");
+
+    const stop = managerChatSendResponseSchema.parse(
+      (await send(setup, "stop")).json(),
+    );
+    expect(stop.reply).toMatchObject({
+      kind: "command",
+      command: { kind: "stop" },
+      text: "Understood: stop the Batch your latest request started. Batches are not available here, so nothing was stopped.",
+    });
+    expect(setup.model.requests).toEqual([]);
+  });
+
   it("refuses an empty, overlong or malformed message", async () => {
     const setup = await setUp();
     for (const text of ["", "   ", "x".repeat(8001), 4]) {

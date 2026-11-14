@@ -74,9 +74,25 @@ describe("managerSystemPrompt", () => {
       "such as Adrian (Coder), so the Owner knows who is who",
     );
     expect(prompt).toContain(
-      '"complete issues 1 to 5", "complete issues 1 to 5 in one PR", "skip 4", "move 5 up", "pause", "resume" and "status"',
+      '"complete issues 1 to 5", "complete issues 1 to 5 in one PR", "skip 4", "move 5 up", "stop", "pause", "resume" and "status"',
     );
+    // `/goal` reaches the Model, so it is not one of the commands that never do.
+    expect(prompt).not.toContain('"/goal');
+    expect(prompt).toContain("tell them the exact words to type");
     expect(prompt).not.toContain("The Owner's instructions for you");
+  });
+
+  it("tells a Manager that carries out requests never to send the Owner to a command for one (ADR 0012)", () => {
+    const prompt = managerSystemPrompt({
+      ...input,
+      requests: ["## Requests: you are the orchestrator"],
+    });
+    expect(prompt).toContain(
+      'A request for work in the Owner\'s own words, such as "get issues 1 to 10 done in one PR", or one starting /goal, is yours to carry out (see Requests below), and starts at once: never tell them to type a command for it.',
+    );
+    expect(prompt).toContain(
+      '"complete issues …" is for when they want to approve the Plan on the whiteboard first',
+    );
   });
 
   it("ends with the Owner's extra instructions for the Manager", () => {

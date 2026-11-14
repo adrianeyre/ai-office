@@ -271,7 +271,7 @@ describe("P2-3: a chat Batch starts work with no Owner approval", () => {
     expect(recorder.said).toEqual([
       {
         kind: "error",
-        text: 'Joan filed nothing and started nothing: its plan went beyond what you asked for (Its Role sends the environment to an outside address). Say what you want in your own words, or file the issues yourself and say "complete issues …".',
+        text: 'Joan filed nothing and started nothing: its plan went beyond what you asked for (Its Role sends the environment to an outside address). Say what you want in your own words, or file the issues yourself and name them, such as "/goal work issues 12 and 15".',
       },
     ]);
     // The check was given the Owner's words alone, and the whole Plan,
@@ -339,7 +339,7 @@ describe("P2-3: the fence holds where the binding check is fooled", () => {
           "- .github/workflows/ci.yml, which changes what CI runs or installs",
           "- package.json, which changes what CI runs or installs",
           "",
-          'Name each file in your own words if you want it changed, or file the issues yourself and say "complete issues …".',
+          'Name each file in your own words if you want it changed, or file the issues yourself and name them, such as "/goal work issues 12 and 15".',
         ].join("\n"),
       },
     ]);
