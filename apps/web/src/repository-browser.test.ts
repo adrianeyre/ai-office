@@ -5,6 +5,7 @@ import {
   ownerOf,
   ownersOf,
   pageNumbers,
+  typedFullName,
   type Browsing,
 } from "./repository-browser.ts";
 
@@ -131,5 +132,26 @@ describe("the page numbers offered", () => {
     expect(pageNumbers(12, 12)).toEqual([1, "gap", 11, 12]);
     // A gap of one page shows the page instead.
     expect(pageNumbers(4, 12)).toEqual([1, 2, 3, 4, 5, "gap", 12]);
+  });
+});
+
+describe("a repository typed in full", () => {
+  it("is what names one repository as owner/name, trimmed", () => {
+    expect(typedFullName("adrianeyre/web-shop")).toBe("adrianeyre/web-shop");
+    expect(typedFullName("  Acme/Blog_2026.v2 ")).toBe("Acme/Blog_2026.v2");
+  });
+
+  it("is nothing for part of a name, or for anything else", () => {
+    for (const query of [
+      "",
+      "web-shop",
+      "adrianeyre/",
+      "/web-shop",
+      "adrianeyre/web shop",
+      "a/b/c",
+      "https://github.com/adrianeyre/web-shop",
+    ]) {
+      expect(typedFullName(query)).toBeUndefined();
+    }
   });
 });

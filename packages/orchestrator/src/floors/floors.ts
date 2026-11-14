@@ -53,6 +53,11 @@ export interface Floors {
   /** Every repository the App is installed on, with its Floor if any. */
   installedRepositories(): Promise<InstalledRepository[]>;
   /**
+   * The repository `owner/name` with its Floor if any, asked of GitHub on
+   * its own, so one whose name is known is found without listing them all.
+   */
+  installedRepository(fullName: string): Promise<InstalledRepository>;
+  /**
    * Makes a Floor of `owner/name` from the Floor Template `template`
    * (Development when absent): its team, settings and labels.
    * Development's are a Manager, a coder, a reviewer (its required
@@ -310,6 +315,25 @@ export function createFloors(options: FloorsOptions): Floors {
     }
   };
 
+  const notInstalled = (fullName: string) =>
+    new FloorError(
+      floorErrorCodes.notInstalled,
+      `The GitHub App is not installed on ${fullName}. Install it there first.`,
+    );
+
+  const installed = (
+    repository: Repository,
+    all: readonly FloorRecord[],
+  ): InstalledRepository => ({
+    fullName: repository.fullName,
+    defaultBranch: repository.defaultBranch,
+    private: repository.private,
+    htmlUrl: repository.htmlUrl,
+    floorId:
+      all.find(({ githubRepositoryId }) => githubRepositoryId === repository.id)
+        ?.id ?? null,
+  });
+
   const floorExists = (repository: Repository, floorId?: string) =>
     new FloorError(
       floorErrorCodes.floorExists,
@@ -326,17 +350,17 @@ export function createFloors(options: FloorsOptions): Floors {
         store.list({ includeArchived: true }),
       ]);
       return repositories
-        .map((repository) => ({
-          fullName: repository.fullName,
-          defaultBranch: repository.defaultBranch,
-          private: repository.private,
-          htmlUrl: repository.htmlUrl,
-          floorId:
-            all.find(
-              ({ githubRepositoryId }) => githubRepositoryId === repository.id,
-            )?.id ?? null,
-        }))
+        .map((repository) => installed(repository, all))
         .sort((a, b) => a.fullName.localeCompare(b.fullName));
+    },
+
+    async installedRepository(fullName) {
+      const app = github();
+      const [repository, all] = await Promise.all([
+        onGitHub(() => app.repository(fullName).get(), notInstalled(fullName)),
+        store.list({ includeArchived: true }),
+      ]);
+      return installed(repository, all);
     },
 
     async add(fullName, templateId) {
@@ -355,10 +379,7 @@ export function createFloors(options: FloorsOptions): Floors {
       }
       const repository = await onGitHub(
         () => app.repository(fullName).get(),
-        new FloorError(
-          floorErrorCodes.notInstalled,
-          `The GitHub App is not installed on ${fullName}. Install it there first.`,
-        ),
+        notInstalled(fullName),
       );
       const existing = (await store.list({ includeArchived: true })).find(
         ({ githubRepositoryId }) => githubRepositoryId === repository.id,

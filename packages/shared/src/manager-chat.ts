@@ -14,7 +14,7 @@ import {
 
 // The Manager chat (PRD FR-24): the Owner talks with each Floor's Manager.
 // Commands such as "complete issues 1 to 5" (or "complete issues 1 to 5 in
-// one PR", ADR 0010), "skip 4", "move 5 up", "pause", "resume" and
+// one PR", ADR 0010), "skip 4", "move 5 up", "stop", "pause", "resume" and
 // "status" are read by plain code, which says what
 // it understood; anything else goes to the Manager's Model through the AI
 // Gateway, and its reply streams back over server-sent events (§8). The
@@ -54,6 +54,12 @@ export const managerCommandSchema = z.discriminatedUnion("kind", [
     issue: issueNumberSchema,
     direction: z.enum(["up", "down"]),
   }),
+  /**
+   * "stop": call off the Batch the Owner's latest chat request or `/goal`
+   * started (ADR 0012): its issues not started are dropped, and the work
+   * running on the rest is stopped.
+   */
+  z.object({ kind: z.literal("stop") }),
   /** "pause": stop starting the Floor's work. */
   z.object({ kind: z.literal("pause") }),
   /** "resume": start it again. */
@@ -66,14 +72,41 @@ export type ManagerCommandKind = ManagerCommand["kind"];
 
 /** The commands, as the Owner types them: shown beside the chat. */
 export const managerCommandExamples: readonly string[] = [
+  "/goal get issues 1 to 5 done in one PR",
   "complete issues 1 to 5",
   "complete issues 1 to 5 in one PR",
   "skip 4",
   "move 5 up",
+  "stop",
   "pause",
   "resume",
   "status",
 ];
+
+// Goals in the chat (ADR 0012): the Owner says what they want in their own
+// words, and the Manager works the issues they name or describe, files
+// any new ones, and starts them at once: the request stands as the Plan's
+// approval. `/goal <words>` asks for exactly that, as a plain request
+// does, but goes straight to the Manager's decision: never to a Skill,
+// never a plain answer. It is built in, so it is read before any Skill,
+// and no Skill may be named `goal`.
+
+export const goalCommand = "/goal";
+
+/** What `/goal` does, in one line, as the chat's autocomplete shows it. */
+export const goalDescription =
+  "Say what you want done in your own words; the Manager assigns it and starts at once.";
+
+/** `/goal` with what the Owner wants; undefined for any other message. */
+export function readGoalCommand(
+  text: string,
+): { readonly words: string } | undefined {
+  const match = /^\/goal(?:\s+([\s\S]*))?$/i.exec(text.trim());
+  if (match === null) {
+    return undefined;
+  }
+  return { words: match[1]?.trim() ?? "" };
+}
 
 // Skills in the chat (PRD FR-74): `/skill-name [arguments]` loads that
 // Skill's instructions into the Manager's session for the conversation,

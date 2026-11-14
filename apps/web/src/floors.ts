@@ -4,6 +4,7 @@ import {
   floorSchema,
   floorTemplateListSchema,
   installedRepositoryListSchema,
+  installedRepositorySchema,
 } from "@ai-office/shared";
 import {
   subjectOf,
@@ -83,6 +84,23 @@ export const installedRepositoriesQuery = queryOptions({
   // A GitHub that is not configured or not reachable is said at once.
   retry: false,
 });
+
+/**
+ * The repository `owner/name`, asked of GitHub on its own
+ * (`GET /api/github/repositories/:owner/:name`): found by a name typed in
+ * full without waiting for every repository to be listed.
+ */
+export const installedRepositoryQuery = (fullName: string) =>
+  queryOptions({
+    queryKey: [...installedRepositoriesQuery.queryKey, fullName],
+    queryFn: () =>
+      getJson(
+        `/api/github/repositories/${fullName.split("/").map(encodeURIComponent).join("/")}`,
+        installedRepositorySchema,
+      ),
+    // Not installed, or GitHub not reachable, is said at once.
+    retry: false,
+  });
 
 /** The Floor Templates a Floor is added from (`GET /api/floor-templates`). */
 export const floorTemplatesQuery = queryOptions({

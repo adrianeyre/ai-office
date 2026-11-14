@@ -294,7 +294,7 @@ is implied by the Floor. The conversation is kept per Floor, in
 `manager_chat_messages`, and read when the chat opens.
 
 - **Commands, in plain code.** "complete issues 1 to 5", "skip 4", "move 5
-  up", "pause", "resume" and "status" are read by AI Office itself
+  up", "stop", "pause", "resume" and "status" are read by AI Office itself
   (`readManagerCommand` in `@ai-office/orchestrator`), and no model sees
   them. Issue lists take ranges (`1 to 5`, `1-5`, `1 through 5`) and lists
   (`1, 3 and 4`, `#1 & #3`), at most 50 issues. The answer says what was
@@ -309,7 +309,9 @@ is implied by the Floor. The conversation is kept per Floor, in
   saying it goes with "complete". "status" is answered with the
   Manager's [status report](issue-pipeline.md#status-reports). "skip" and "move" change
   the open Batch holding the issue ([below](batches-and-memory.md#changing-a-batch-mid-way-skip-and-move)),
-  and the answer goes on with its new version. Pausing a Floor is not
+  and the answer goes on with its new version. "stop" calls off the Batch
+  the Owner's latest request or `/goal` started
+  ([below](#goals-plain-requests-and-goal)). Pausing a Floor is not
   available yet, so for that it adds that nothing changed. If carrying a
   command out fails, or it does not fit the Batch, the answer is an error
   saying why.
@@ -537,6 +539,70 @@ still going, and shows nothing until there are some.
   frame and the page fetches `GET
   /api/floors/:floorId/manager-chat/tasks` again.
 
+### Goals: plain requests and `/goal`
+
+The Owner can say what they want in their own words, and the Manager
+assigns the work to the Agents and starts it at once
+([ADR 0012](../architectural-decision-record/0012-a-chat-request-or-goal-can-work-existing-issues.md)):
+"please get issues 1 to 10 done in one PR", "fix the login issues", "add
+an orders page". The request stands as the Plan's approval, so nothing
+waits for the whiteboard. "complete issues …" is still there for when the
+Owner wants to approve the Plan on the whiteboard first: it keeps the
+Floor's plan approval.
+
+- **`/goal <words>`** asks for exactly what sending the words as a request
+  does, but says the Owner means it to be acted on: AI Office reads it
+  before any Skill (`readGoalCommand` in `@ai-office/shared`), the Model
+  must answer with a `batch` or a `clarify` decision (a plain reply is
+  asked for again once), and no Skill is offered. It is built in: adding a
+  Skill named `goal` is refused ("`goal` is a built-in command"), and the
+  chat's `/` autocomplete lists `/goal` first. `/goal` with nothing after
+  it, with "Manager spins off work from chat" off, or while a Grilling
+  Session runs, is answered with a hint and starts nothing.
+- **Existing issues.** The Model is given the Floor's open issues (at
+  most 50, newest first, by number and title, as data) and names, in
+  `existingIssues`, those the Owner typed or described, saying in
+  `readings` how it read each description. The Plan says, for example,
+  "You named #3 and #4" and `"the login issues" → #12 and #15: my
+  reading.`
+- **Every typed number is worked** (`typedIssues` in `manager/commands.ts`):
+  `#12`, and numbers after "issue" or "issues", with the ranges and lists
+  commands take ("issues 1 to 10", "1-10", "1 through 10", "1, 3 and
+  4"). AI Office adds any the Model left out, saying so, and never drops
+  one. A bare number ("30 seconds") or one after "PR" is not an issue
+  number.
+- **One Batch, at most 10 issues**, existing and new together. A request
+  for more is refused, saying to ask for the rest after; nothing is cut
+  short.
+- **Left out, saying why.** An existing issue goes through the Batch's own
+  checks: one someone else opened is left out unless the Owner labelled
+  it `ai-office` ("someone else opened it: label it ai-office yourself to
+  include it"), whatever number was typed; one closed, waiting in another
+  Batch or already in the pipeline is left out with its reason. Only the
+  new issues the Model writes are fenced ([below](#requests-batches-and-contractors));
+  existing ones are the Owner's own.
+- **One pull request when asked.** When the Owner's words say "in one PR"
+  ("as one pull request", "in a single PR"), the Batch goes in
+  [one pull request](batches-and-memory.md#one-pull-request-for-a-batch),
+  one issue after another (`asksForOnePullRequest`); the Model's own
+  `onePullRequest` counts only when the Owner's words say so too.
+  Otherwise each issue has its own pull request, in parallel.
+- **The answer** lists the issues picked, those started, those that
+  follow one at a time in the same pull request, those left out and those
+  that wait (on their triage, or on the issues they depend on), and ends
+  "Say **stop** to call this off, or **skip 4** to drop one.", naming one
+  of the Batch's issues still to start.
+- **No sandbox runner.** Where `SANDBOX_GATEWAY_URL` is unset, no work can
+  run, so a request files and starts nothing, saying why up front.
+- **"stop"** calls off the Floor's newest Batch under way that a chat
+  request or `/goal` started (`callOff` in `batches.ts`): its issues not
+  started are dropped from its Plan, as a replan; the work queued or
+  running on the rest is cancelled, as the Meeting Room's stops cancel
+  work, and those issues go to the Owner at `needs-human`; issues closed
+  or ready to merge, and pull requests already opened, are left as they
+  are. A Batch handed over by "complete issues …" is never one "stop"
+  calls off; "skip" and "move" work on either.
+
 ### Requests, Batches and Contractors
 
 The Manager is the chat's orchestrator, as a coding assistant spins work
@@ -568,8 +634,9 @@ Grilling Session runs, is never a request.
   words name that file too (its path, its name or a folder it is in):
   plain rules, the Merge Policy's own (`merge/owner-only.ts`), checked
   before any model is. The chat lists each such file and why, and asks
-  the Owner to name them, or to file the issues and say "complete issues
-  …".
+  the Owner to name them, or to file the issues themselves and name them,
+  such as "/goal work issues 12 and 15". Existing issues the request works
+  are not fenced again.
 - **Bound to the Owner's own words** (P2-3,
   `manager/request-binding.ts`). The decision is written by the Manager's
   session, which has read the repository, web pages and attachments, any
@@ -596,7 +663,8 @@ Grilling Session runs, is never a request.
   them (once: it cannot send more research). With no room for a
   Contractor, the Manager researches itself. Without sandboxes set up,
   research is not offered.
-- **`batch`: plan, then go.** The Model lists the issues to file, each
+- **`batch`: plan, then go.** The Model names the existing issues to work
+  ([above](#goals-plain-requests-and-goal)) and lists the new issues to file, each
   with what to build, acceptance criteria, the earlier issues it depends
   on, its likely files, and its work Role: a library work Role's name, or
   a one-off Role it writes in `roles` (a name such as "Migration writer",
@@ -625,11 +693,13 @@ Grilling Session runs, is never a request.
      filed for those it depends on, and a comment noting it was filed for
      the request. A `manager.issue_filed` event records each.
   4. **Adds the Contractors** and says each one's arrival.
-  5. **Starts the Batch** with the Plan settled here (checked as any draft
-     is), skipping the Floor's plan approval: the request is the approval
+  5. **Starts the Batch** of the existing issues and the new ones, with
+     the Plan settled here (checked as any draft is), skipping the Floor's
+     plan approval: the request is the approval, recorded as
+     `batch.approved` naming the Owner's message
      ([Batches](batches-and-memory.md#batches-from-the-manager-chat)).
   If filing stops part-way, the chat says which issues were filed, and
-  `complete issues …` starts them. The chat is held while this runs.
+  `/goal work issues …` starts them. The chat is held while this runs.
 - **Reporting back.** As the Batch goes on, the Manager posts `progress`
   messages in answer to the request (`createChatReports`): each issue done
   (its pull request merged) or blocked (handed to the Owner, which raises

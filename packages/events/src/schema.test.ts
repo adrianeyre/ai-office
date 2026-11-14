@@ -107,6 +107,19 @@ describe("Floor Templates in events", () => {
   });
 });
 
+describe("a Plan's approval in events", () => {
+  it("reads one on the whiteboard, without a message, and one by a chat request, with it (ADR 0012)", () => {
+    const approved = exampleEvents["batch.approved"];
+    expect(officeEventSchema.safeParse(approved).success).toBe(true);
+    expect(
+      officeEventSchema.safeParse({ ...approved, messageId: 41 }).success,
+    ).toBe(true);
+    expect(
+      officeEventSchema.safeParse({ ...approved, messageId: 0 }).success,
+    ).toBe(false);
+  });
+});
+
 describe("subjectOf", () => {
   it("finds the Floor, every Agent and the issue", () => {
     expect(subjectOf(exampleEvents.handoff)).toEqual({

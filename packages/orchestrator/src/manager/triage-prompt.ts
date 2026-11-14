@@ -102,7 +102,7 @@ export function triagePrompt(input: TriagePromptInput): TriagePrompt {
     "An issue is clear enough to work when both of these hold:",
     "",
     "- **Acceptance criteria are present.** It says, as a list or unmistakably in its text, how to tell that the work is done.",
-    "- **Its scope is bounded.** It asks for one change that one Agent can finish on one branch, in one pull request: not an open-ended goal, or a project of many parts.",
+    "- **Its scope is bounded.** It asks for one change that one Agent can finish on one branch, in one pull request: not an open-ended aim, or a project of many parts.",
     "",
     "When it is not, ask the Owner what they must answer before work starts. Ask only for decisions: never about what an Agent can find out from the repository itself. Do not invent requirements.",
     "",

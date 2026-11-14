@@ -42,6 +42,7 @@ import {
   createContractorDepartures,
   makeWorkDir,
   managerChatIssues,
+  managerOpenIssues,
   modelRequestBindingCheck,
   publishingGrillingStore,
   createMemoryCuration,
@@ -1031,10 +1032,19 @@ export async function startOffice(
     roles: stores.roles,
     issues: managerChatIssues(github),
     batches: {
-      create: (floorId, issues, request) =>
-        batches.create(floorId, issues, request),
+      create: (floorId, issues, request, batchOptions) =>
+        batches.create(floorId, issues, request, batchOptions),
       describe: (floorId, outcome) => batches.describe(floorId, outcome),
     },
+    // A request may work the Floor's open issues, read with the Manager's
+    // own client (ADR 0012).
+    openIssues: managerOpenIssues(github),
+    // With no sandbox runner (below), no work would ever run: a request
+    // files and starts nothing, saying so up front (ADR 0012).
+    cannotRun: () =>
+      runner === undefined
+        ? "no work can run here, as no sandbox runner is set up. Set SANDBOX_GATEWAY_URL so Agents can work in sandboxes, then ask again."
+        : undefined,
     work: workQueueStore,
     sandboxLimit: async () =>
       (await officeSettings.sandboxSettings()).concurrencyLimit,
@@ -1116,6 +1126,10 @@ export async function startOffice(
     requests: chatRequests,
     report: (floorId, replyTo) => statusReports.write(floorId, { replyTo }),
     carryOut: (floorId, command) => {
+      // "stop" calls off the Batch the latest chat request started (ADR 0012).
+      if (command.kind === "stop") {
+        return batches.callOffCommand(floorId);
+      }
       if (
         command.kind !== "complete" &&
         command.kind !== "skip" &&
@@ -1710,6 +1724,8 @@ export async function startOffice(
     work: workQueueStore,
     pipeline,
     queue: workQueue,
+    // "stop" cancels the work on a chat request's Batch (ADR 0012).
+    cancelWork: (workId) => floorStops.cancel(workId),
     events,
     notices,
     triage,

@@ -27,6 +27,12 @@ const maxPathLength = 300;
 /** Lowercase letters, digits and single hyphens, neither first nor last. */
 export const skillNamePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const maxSkillNameLength = 64;
+
+/**
+ * Names no Skill may take: the Manager chat's built-in commands, which it
+ * reads before any Skill (`/goal`, ADR 0012).
+ */
+export const reservedSkillNames: readonly string[] = ["goal"];
 export const maxSkillDescriptionLength = 1024;
 const maxCompatibilityLength = 500;
 
@@ -121,6 +127,10 @@ const frontmatterSchema = z.looseObject({
     .regex(skillNamePattern, {
       error:
         "A Skill's name uses only lowercase letters, digits and single hyphens, and does not start or end with a hyphen.",
+    })
+    .refine((name) => !reservedSkillNames.includes(name), {
+      error: (issue) =>
+        `\`${String(issue.input)}\` is a built-in command: give the Skill another name.`,
     }),
   description: z
     .string({ error: "The frontmatter needs a description." })

@@ -8,6 +8,7 @@ import {
   addFloorRequestSchema,
   floorErrorCodes,
   floorSettingsUpdateSchema,
+  repositoryNameSchema,
   type ApiError,
   type Floor,
   type FloorErrorCode,
@@ -62,6 +63,11 @@ interface FloorParams {
   readonly floorId: string;
 }
 
+interface RepositoryParams {
+  readonly owner: string;
+  readonly name: string;
+}
+
 export function registerFloorRoutes(
   app: FastifyInstance,
   options: {
@@ -81,6 +87,24 @@ export function registerFloorRoutes(
     async (_request, reply) => {
       try {
         return { repositories: await floors.installedRepositories() };
+      } catch (error) {
+        return sendFloorError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Params: RepositoryParams }>(
+    "/api/github/repositories/:owner/:name",
+    { config: { access: "owner" } },
+    async (request, reply) => {
+      const parsed = repositoryNameSchema.safeParse(
+        `${request.params.owner}/${request.params.name}`,
+      );
+      if (!parsed.success) {
+        return sendInvalidRequest(reply, parsed.error);
+      }
+      try {
+        return await floors.installedRepository(parsed.data);
       } catch (error) {
         return sendFloorError(reply, error);
       }

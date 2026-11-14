@@ -864,6 +864,7 @@ export {
   ManagerAuthorityError,
   managerChatActions,
   managerChatIssues,
+  managerOpenIssues,
   managerGitHub,
   managerMoves,
   type ChatIssue,

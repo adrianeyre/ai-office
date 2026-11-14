@@ -195,6 +195,7 @@ const cases: [string, (stores: OfficeStores) => Promise<void>][] = [
         startedAt: at.toISOString(),
         started: [1],
         onePullRequest: false,
+        chatMessageId: null,
         plan: {
           batchId: first.id,
           version: 2,

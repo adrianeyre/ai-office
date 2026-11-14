@@ -567,7 +567,7 @@ const cases: [string, (setup: Setup) => Promise<void>][] = [
             {
               issue: 7,
               reason:
-                "someone else opened it, and you have not labelled it ai-office yourself",
+                "someone else opened it: label it ai-office yourself to include it",
             },
           ],
           editedFrom: null,
@@ -668,7 +668,7 @@ const cases: [string, (setup: Setup) => Promise<void>][] = [
           "",
           "Left out:",
           "#6: it is closed.",
-          "#7: someone else opened it, and you have not labelled it ai-office yourself.",
+          "#7: someone else opened it: label it ai-office yourself to include it.",
           "",
           "Plan approval is off for this Floor, so work has started on #1, #3 and #5. #2 starts once #1 is closed. #4 starts once #2 is closed.",
         ].join("\n"),
@@ -927,7 +927,7 @@ const cases: [string, (setup: Setup) => Promise<void>][] = [
           "",
           "#5: it is already in the pipeline, at needs-review.",
           "#6: it is closed.",
-          "#7: someone else opened it, and you have not labelled it ai-office yourself.",
+          "#7: someone else opened it: label it ai-office yourself to include it.",
           "#99: it was not found on GitHub.",
         ].join("\n"),
       );
@@ -967,7 +967,7 @@ const cases: [string, (setup: Setup) => Promise<void>][] = [
         `complete issues ${String(filed.number)} to ${String(other.number)}`,
       );
       expect(reply?.text).toContain(
-        `Left out:\n#${String(other.number)}: someone else opened it, and you have not labelled it ai-office yourself.`,
+        `Left out:\n#${String(other.number)}: someone else opened it: label it ai-office yourself to include it.`,
       );
       expect(reply?.text).not.toContain(`#${String(filed.number)}: `);
       expect(await setup.batches.held("web-shop")).toEqual(

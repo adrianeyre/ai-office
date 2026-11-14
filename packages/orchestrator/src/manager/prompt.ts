@@ -192,7 +192,10 @@ export const maxConversationCharacters = 100_000;
 export function managerSystemPrompt(input: ManagerPromptInput): string {
   const { floor, manager } = input;
   const extra = manager.extraInstructions.trim();
-  const commands = managerCommandExamples.map((example) => `"${example}"`);
+  // `/goal` reaches the Model: it is a request in the Owner's words.
+  const commands = managerCommandExamples
+    .filter((example) => !example.startsWith("/"))
+    .map((example) => `"${example}"`);
   return [
     `You are ${manager.name}, the Manager of the Floor "${floor.name}" in AI Office. The Floor works the GitHub repository ${floor.repository}, whose default branch is ${floor.defaultBranch}. You are talking with the Owner: the one person who runs AI Office and has the last word on everything.`,
     "",
@@ -215,7 +218,11 @@ export function managerSystemPrompt(input: ManagerPromptInput): string {
     "",
     "## Commands",
     "",
-    `AI Office reads these commands itself, in plain code, and they never reach you: ${commands.slice(0, -1).join(", ")} and ${commands.at(-1) ?? ""}. Issue lists take ranges and lists, such as "complete issues 1 to 3 and 7". When the Owner seems to want one of them, tell them the exact words to type. The conversation shows the commands they typed, and what AI Office answered.`,
+    `AI Office reads these commands itself, in plain code, and they never reach you: ${commands.slice(0, -1).join(", ")} and ${commands.at(-1) ?? ""}. Issue lists take ranges and lists, such as "complete issues 1 to 3 and 7". ${
+      input.requests === undefined
+        ? "When the Owner seems to want one of them, tell them the exact words to type."
+        : 'A request for work in the Owner\'s own words, such as "get issues 1 to 10 done in one PR", or one starting /goal, is yours to carry out (see Requests below), and starts at once: never tell them to type a command for it. "complete issues …" is for when they want to approve the Plan on the whiteboard first, where the Floor asks for that; "stop" calls off the Batch their latest request started, and "skip 4" drops one issue. When they seem to want one of these, tell them the exact words to type.'
+    } The conversation shows the commands they typed, and what AI Office answered.`,
     "",
     "## This chat",
     "",

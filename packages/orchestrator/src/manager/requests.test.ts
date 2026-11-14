@@ -122,6 +122,30 @@ describe("reading the Manager's decision", () => {
     ]);
   });
 
+  it("reads existing issues, how descriptions were read, and one pull request (ADR 0012)", () => {
+    const value = {
+      decision: "batch",
+      message: "The login issues, in one PR.",
+      roles: [],
+      existingIssues: [12, 15],
+      readings: [{ words: "the login issues", issues: [12, 15] }],
+      issues: [],
+      onePullRequest: true,
+    };
+    expect(parseChatRequest(block(value), [coder])).toEqual({
+      ok: true,
+      value: { ...value, resolved: [] },
+    });
+    // Existing and new together, each new one with its Role.
+    const both = parseChatRequest(
+      block({ ...value, issues: [issue("coder")] }),
+      [coder],
+    );
+    expect(
+      both.ok && both.value.decision === "batch" && both.value.resolved,
+    ).toEqual([{ kind: "library", role: coder }]);
+  });
+
   it("says what is wrong, in a sentence the Model can act on", () => {
     const problem = (value: unknown, library = [coder]) => {
       const parsed = parseChatRequest(block(value), library);
@@ -158,7 +182,18 @@ describe("reading the Manager's decision", () => {
     ).toBe("Name each one-off Role once.");
     expect(
       problem({ decision: "batch", message: "x", roles: [], issues: [] }),
-    ).toContain("File at least one issue.");
+    ).toBe(
+      "Name at least one issue: an existing one in existingIssues, or a new one in issues.",
+    );
+    expect(
+      problem({
+        decision: "batch",
+        message: "x",
+        roles: [],
+        existingIssues: [0],
+        issues: [],
+      }),
+    ).toContain("existingIssues lists issue numbers.");
     expect(problem("no block at all")).toBeDefined();
   });
 });

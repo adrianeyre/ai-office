@@ -52,15 +52,21 @@ import {
   floorsQuery,
   floorTemplatesQuery,
   installedRepositoriesQuery,
+  installedRepositoryQuery,
 } from "./floors.ts";
 import {
   browse,
   ownersOf,
   pageNumbers,
   pageSizes,
+  typedFullName,
   type PageSize,
 } from "./repository-browser.ts";
 import { sessionQuery } from "./session.ts";
+import { useDebounced } from "./use-debounced.ts";
+
+/** How long typing must pause before a name typed in full is asked of GitHub. */
+export const repositoryLookupDelayMs = 400;
 
 /** How each Floor Template's icon is drawn. */
 export const floorTemplateIcons: Record<FloorTemplateIcon, LucideIcon> = {
@@ -403,9 +409,58 @@ function Pagination({
 }
 
 /**
+ * One repository named in full, asked of GitHub on its own: shown with
+ * its Add Floor while every repository is still being listed, or when the
+ * list has none of that name (installed since it was listed, perhaps).
+ */
+function RepositoryLookup({
+  fullName,
+  template,
+  ready,
+  csrfToken,
+  onAdded,
+}: {
+  fullName: string;
+  template: string | undefined;
+  ready: boolean;
+  csrfToken: string | undefined;
+  onAdded: () => Promise<void>;
+}) {
+  const found = useQuery(installedRepositoryQuery(fullName));
+  if (found.isPending) {
+    return (
+      <LoadingMessage className="text-sm">
+        Asking GitHub for {fullName}…
+      </LoadingMessage>
+    );
+  }
+  if (found.isError) {
+    return (
+      <p role="alert" className="text-sm text-destructive">
+        {found.error.message}
+      </p>
+    );
+  }
+  return (
+    <ul aria-label="Repositories the App is installed on" className="divide-y">
+      <RepositoryRow
+        repository={found.data}
+        template={template}
+        ready={ready}
+        csrfToken={csrfToken}
+        onAdded={onAdded}
+      />
+    </ul>
+  );
+}
+
+/**
  * The repositories that can become Floors, a page at a time: found by
  * typing any part of a name, and narrowed to one GitHub organisation or
- * user when they belong to several. An access token can reach hundreds.
+ * user when they belong to several. An access token can reach hundreds,
+ * and listing them all takes GitHub a while, so the search is offered at
+ * once: a name typed in full (`owner/name`) is asked of GitHub on its own
+ * while the list is still coming (`repositories` undefined).
  */
 function RepositoryBrowser({
   repositories,
@@ -414,7 +469,7 @@ function RepositoryBrowser({
   csrfToken,
   onAdded,
 }: {
-  repositories: InstalledRepository[];
+  repositories: InstalledRepository[] | undefined;
   template: string | undefined;
   ready: boolean;
   csrfToken: string | undefined;
@@ -428,18 +483,27 @@ function RepositoryBrowser({
   const ownerId = useId();
   const top = useRef<HTMLDivElement>(null);
 
-  const owners = ownersOf(repositories);
+  const listed = repositories ?? [];
+  const owners = ownersOf(listed);
   // An owner no longer among them, its last one gone, is every owner.
   const chosenOwner = owners.some((each) => each.owner === owner)
     ? owner
     : undefined;
-  const shown = browse(repositories, {
+  const shown = browse(listed, {
     query,
     owner: chosenOwner,
     page,
     pageSize,
   });
   const filtered = query.trim() !== "" || chosenOwner !== undefined;
+  // Asked of GitHub only once the typing pauses, and only while it still
+  // says the same: a stale name is never shown.
+  const typed = typedFullName(query);
+  const settled = useDebounced(typed, repositoryLookupDelayMs);
+  const lookUp =
+    typed !== undefined &&
+    settled === typed &&
+    (repositories === undefined || shown.total === 0);
 
   const clear = () => {
     setQuery("");
@@ -451,6 +515,15 @@ function RepositoryBrowser({
     // The new page starts where the old one did, the controls in view.
     top.current?.scrollIntoView({ block: "nearest" });
   };
+  const lookup = lookUp ? (
+    <RepositoryLookup
+      fullName={typed}
+      template={template}
+      ready={ready}
+      csrfToken={csrfToken}
+      onAdded={onAdded}
+    />
+  ) : undefined;
 
   return (
     <div ref={top} className="space-y-3">
@@ -467,7 +540,11 @@ function RepositoryBrowser({
               type="search"
               autoComplete="off"
               spellCheck={false}
-              placeholder="Start typing its name"
+              placeholder={
+                repositories === undefined
+                  ? "Type owner/name to find it now"
+                  : "Start typing its name"
+              }
               className="pl-9"
               value={query}
               onChange={(event) => {
@@ -498,9 +575,7 @@ function RepositoryBrowser({
                 setPage(1);
               }}
             >
-              <option value="">
-                Every organisation ({repositories.length})
-              </option>
+              <option value="">Every organisation ({listed.length})</option>
               {owners.map(({ owner: each, count }) => (
                 <option key={each} value={each}>
                   {each} ({count})
@@ -511,56 +586,69 @@ function RepositoryBrowser({
         )}
       </div>
 
-      <p role="status" className="text-sm text-muted-foreground">
-        {shown.total === 0
-          ? "No repository matches."
-          : `Showing ${String(shown.from)}–${String(shown.to)} of ${String(shown.total)} ${shown.total === 1 ? "repository" : "repositories"}${filtered ? ` (of ${String(repositories.length)})` : ""}.`}
-      </p>
+      {repositories === undefined
+        ? (lookup ?? (
+            <LoadingMessage className="text-sm">
+              Asking GitHub for the App's repositories… Type a repository's
+              owner/name to find it without waiting.
+            </LoadingMessage>
+          ))
+        : (lookup ?? (
+            <>
+              <p role="status" className="text-sm text-muted-foreground">
+                {shown.total === 0
+                  ? "No repository matches."
+                  : `Showing ${String(shown.from)}–${String(shown.to)} of ${String(shown.total)} ${shown.total === 1 ? "repository" : "repositories"}${filtered ? ` (of ${String(listed.length)})` : ""}.`}
+              </p>
 
-      {shown.total === 0 ? (
-        <div className="space-y-2 rounded-md border border-dashed p-4 text-sm">
-          <p>
-            {/* Only a search finds none: every owner offered has some. */}
-            No repository
-            {chosenOwner === undefined ? "" : ` of ${chosenOwner}`} has “
-            {query.trim()}” in its name. Check the spelling
-            {chosenOwner === undefined
-              ? "."
-              : ", or look through every organisation’s."}
-          </p>
-          <Button size="sm" variant="outline" onClick={clear}>
-            Clear the search
-          </Button>
-        </div>
-      ) : (
-        <ul
-          aria-label="Repositories the App is installed on"
-          className="divide-y"
-        >
-          {shown.items.map((repository) => (
-            <RepositoryRow
-              key={repository.fullName}
-              repository={repository}
-              template={template}
-              ready={ready}
-              csrfToken={csrfToken}
-              onAdded={onAdded}
-            />
+              {shown.total === 0 ? (
+                <div className="space-y-2 rounded-md border border-dashed p-4 text-sm">
+                  <p>
+                    {/* Only a search finds none: every owner offered has some. */}
+                    No repository
+                    {chosenOwner === undefined ? "" : ` of ${chosenOwner}`} has
+                    “{query.trim()}” in its name. Check the spelling
+                    {chosenOwner === undefined
+                      ? "."
+                      : ", or look through every organisation’s."}
+                  </p>
+                  <Button size="sm" variant="outline" onClick={clear}>
+                    Clear the search
+                  </Button>
+                </div>
+              ) : (
+                <ul
+                  aria-label="Repositories the App is installed on"
+                  className="divide-y"
+                >
+                  {shown.items.map((repository) => (
+                    <RepositoryRow
+                      key={repository.fullName}
+                      repository={repository}
+                      template={template}
+                      ready={ready}
+                      csrfToken={csrfToken}
+                      onAdded={onAdded}
+                    />
+                  ))}
+                </ul>
+              )}
+            </>
           ))}
-        </ul>
-      )}
 
-      <Pagination
-        page={shown.page}
-        pageCount={shown.pageCount}
-        pageSize={pageSize}
-        showPageSize={shown.total > pageSizes[0]}
-        onPage={toPage}
-        onPageSize={(size) => {
-          setPageSize(size);
-          setPage(1);
-        }}
-      />
+      {repositories !== undefined && (
+        <Pagination
+          page={shown.page}
+          pageCount={shown.pageCount}
+          pageSize={pageSize}
+          showPageSize={shown.total > pageSizes[0]}
+          onPage={toPage}
+          onPageSize={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -862,11 +950,6 @@ export function FloorsCard() {
             Add a Floor
           </h3>
           <TemplatePicker chosen={chosen} onChoose={setChosen} />
-          {repositories.isPending && (
-            <LoadingMessage className="text-sm">
-              Asking GitHub for the App's repositories…
-            </LoadingMessage>
-          )}
           {repositories.isError && (
             <p role="alert" className="text-sm text-destructive">
               {repositories.error.message}
@@ -878,7 +961,9 @@ export function FloorsCard() {
               on the repositories you want as Floors.
             </p>
           )}
-          {repositories.data !== undefined && repositories.data.length > 0 && (
+          {(repositories.isPending ||
+            (repositories.data !== undefined &&
+              repositories.data.length > 0)) && (
             <RepositoryBrowser
               repositories={repositories.data}
               template={chosen ?? templates.data?.defaultTemplate}

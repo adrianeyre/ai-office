@@ -6,8 +6,8 @@ import {
 
 // The Manager chat's commands (PRD FR-24), read in plain code before
 // anything reaches a model: "complete issues 1 to 5", "skip 4", "move 5
-// up", "pause", "resume" and "status" (or "report", "status report": the
-// Manager's status report, FR-23). Issue lists take ranges ("1 to 5", "1-5",
+// up", "stop" (ADR 0012), "pause", "resume" and "status" (or "report",
+// "status report": the Manager's status report, FR-23). Issue lists take ranges ("1 to 5", "1-5",
 // "1 through 5") and lists ("1, 3 and 4", "1 3 4", "#1 & #3"). "complete"
 // may end "in one PR" ("in one pull request", "as one PR", "in a single
 // PR"): the Batch's issues then go in one pull request (ADR 0010). A message
@@ -16,6 +16,11 @@ import {
 // it cannot read ("complete issues 5 to 1"), it is refused with a hint,
 // and no model sees it. Anything else is a message for the Manager's
 // Model.
+//
+// A request in the Owner's own words is read here too, for what plain code
+// holds it to (ADR 0012): the issue numbers it names (`typedIssues`), which
+// the Manager may never drop, and whether it asks for one pull request
+// (`asksForOnePullRequest`).
 
 /** How the chat reads one of the Owner's messages. */
 export type CommandReading =
@@ -34,6 +39,7 @@ const verbs = [
   "complete",
   "skip",
   "move",
+  "stop",
   "pause",
   "resume",
   "status",
@@ -66,6 +72,7 @@ const usage: Record<Verb, string> = {
     'Say which issues, such as "complete issues 1 to 5" or "complete issues 1, 3 and 4"; end it "in one PR" to have them all in one pull request.',
   skip: 'Say which issues to skip, such as "skip 4" or "skip 4 and 6".',
   move: 'Say which issue and which way, such as "move 5 up" or "move 5 down".',
+  stop: '"stop" calls off the Batch your latest request started, so it takes nothing after it: type "stop" on its own, or "skip 4" to drop one issue.',
   pause:
     '"pause" pauses the whole Floor, so it takes nothing after it: type "pause" on its own.',
   resume:
@@ -90,6 +97,13 @@ const wordToken = /^[a-z]+$/;
 /** "in one PR" and its kin, ending a "complete" command (ADR 0010). */
 const onePullRequestEnding =
   /\s+(?:in|as)\s+(?:one|a\s+single)\s+(?:pr|pull\s+request)$/;
+
+/**
+ * "in one PR", "as one pull request", "in a single PR" anywhere in the
+ * Owner's words: a request that asks for one pull request (ADR 0010).
+ */
+const onePullRequestWords =
+  /\b(?:in|as|into)\s+(?:one|a\s+single|a\s+single\s+one|just\s+one)\s+(?:pr|pull\s+request)\b/;
 
 /** Where "in one PR" goes, for a command it does not end. */
 const onePullRequestHint =
@@ -231,6 +245,7 @@ function parse(tokens: readonly string[]): CommandReading {
   switch (verb) {
     case "pause":
     case "resume":
+    case "stop":
       return rest.length === 0 ? command({ kind: verb }) : refused(usage[verb]);
     // "status", "report" and "status report" are one command.
     case "status":
@@ -334,6 +349,8 @@ export function describeCommand(command: ManagerCommand): string {
       return `Understood: ${issues("skip", command.issues)}.`;
     case "move":
       return `Understood: move issue #${String(command.issue)} ${command.direction} one place.`;
+    case "stop":
+      return "Understood: stop the Batch your latest request started.";
     case "pause":
       return "Understood: pause this Floor's work.";
     case "resume":
@@ -410,4 +427,87 @@ export function readManagerCommand(text: string): CommandReading {
         hint: `I did not understand that. Did you mean "${corrected}"? ${guess.hint}`,
       };
   }
+}
+
+/**
+ * Whether the Owner's words ask for one pull request, as "complete … in one
+ * PR" does: "in one PR", "as one pull request", "in a single PR" (ADR
+ * 0010, ADR 0012).
+ */
+export const asksForOnePullRequest = (text: string): boolean => {
+  const normalised = normalise(text);
+  const asked = onePullRequestWords.exec(normalised);
+  return (
+    asked !== null && !refusedJustBefore.test(normalised.slice(0, asked.index))
+  );
+};
+
+/**
+ * "don't put them", "not", "rather than": words that, a few words before
+ * "in one PR", turn it into a refusal of one pull request. With no Plan to
+ * approve, reading "don't put them in one PR" as asking for one would
+ * quietly put every issue on one branch, one after another.
+ */
+const refusedJustBefore =
+  /\b(?:not|don['’]?t|dont|never|no|without|rather\s+than|instead\s+of)\b(?:\s+\S+){0,4}\s*$/;
+
+/** Words that make the numbers after them issue numbers. */
+const issueWords = new Set(["issue", "issues"]);
+/** Words that make the number after them a pull request's. */
+const pullRequestWords = new Set(["pr", "request"]);
+
+/**
+ * The issue numbers the Owner typed in their own words, in the order
+ * typed, each once (ADR 0012): `#12`, and numbers after "issue" or
+ * "issues", with the ranges and lists commands take ("issues 1 to 10",
+ * "issues 1-10", "issues 1 through 10", "issues 1, 3 and 4", "#1 & #3"), or the issues of
+ * a "complete" command.
+ * A bare number with neither, such as "30 seconds", is not one; nor is a
+ * number after "PR" or "pull request". A range or list that cannot be read is left out, for
+ * the Manager's reading to stand.
+ */
+export function typedIssues(text: string): number[] {
+  // "complete 1 to 5", word for word as the command reads it.
+  const reading = readManagerCommand(text);
+  if (reading.kind === "command" && reading.command.kind === "complete") {
+    return [...reading.command.issues];
+  }
+  const tokens = tokenise(normalise(text)).map(({ text: token }) => token);
+  const found: number[] = [];
+  let index = 0;
+  while (index < tokens.length) {
+    const token = tokens[index] ?? "";
+    const before = tokens[index - 1] ?? "";
+    const named =
+      token.startsWith("#") ||
+      (issueWords.has(before) && issueToken.test(token));
+    if (!issueToken.test(token) || !named || pullRequestWords.has(before)) {
+      index += 1;
+      continue;
+    }
+    // The longest run of numbers, ranges and separators from here.
+    let end = index;
+    while (
+      end < tokens.length &&
+      (issueToken.test(tokens[end] ?? "") ||
+        rangeWords.has(tokens[end] ?? "") ||
+        listSeparators.has(tokens[end] ?? ""))
+    ) {
+      end += 1;
+    }
+    let run = tokens.slice(index, end);
+    while (run.length > 0 && !issueToken.test(run.at(-1) ?? "")) {
+      run = run.slice(0, -1);
+    }
+    const parsed = parseIssues(run, "complete");
+    if (parsed.kind === "issues") {
+      for (const issue of parsed.issues) {
+        if (!found.includes(issue)) {
+          found.push(issue);
+        }
+      }
+    }
+    index = Math.max(end, index + 1);
+  }
+  return found;
 }

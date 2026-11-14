@@ -396,6 +396,24 @@ describe("event text", () => {
     expect([...grouped].sort()).toEqual([...eventTypes].sort());
   });
 
+  it("says a Plan was approved by the Owner's request in Manager chat (ADR 0012)", () => {
+    const approved: Extract<OfficeEvent, { type: "batch.approved" }> = {
+      type: "batch.approved",
+      version: 1,
+      floorId: "web-shop",
+      batchId: 3,
+      planVersion: 1,
+      agentId: "grace",
+    };
+    const names = { agent: () => "Grace" };
+    expect(describeEvent(approved, names)).toBe(
+      "The Owner approved version 1 of Batch 3's Plan, by Grace.",
+    );
+    expect(describeEvent({ ...approved, messageId: 41 }, names)).toBe(
+      "Approved by your request in Manager chat: version 1 of Batch 3's Plan, by Grace.",
+    );
+  });
+
   it("names Agents, and never needs more than the event", () => {
     expect(
       describeEvent(

@@ -11,6 +11,10 @@ Before touching anything, read these in full. They are the canon your work is ju
 
 # The brief
 
+!`gh issue view {{ISSUE}}`
+
+## Comments on the issue
+
 !`gh issue view {{ISSUE}} --comments`
 
 Every issue listed under "Blocked by" must already be closed. If one is open, stop, comment on this issue saying which, and output <promise>COMPLETE</promise>.
