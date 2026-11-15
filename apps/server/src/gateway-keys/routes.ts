@@ -12,6 +12,7 @@ import {
   gatewayKeyErrorCodes,
   gatewayKeyUpdateRequestSchema,
   keyProfileSchema,
+  noTokenCaps,
   type ApiError,
   type CreatedGatewayKey,
   type GatewayKey,
@@ -50,6 +51,7 @@ export const gatewayKeyBody = (key: GatewayKeyInfo): GatewayKey => ({
   profile: key.profile ?? defaultKeyProfile,
   access: key.access ?? "proxy",
   enabled: key.enabled ?? true,
+  tokenCaps: key.tokenCaps ?? noTokenCaps,
 });
 
 /** Answers a `GatewayKeyError` with its status; anything else is rethrown. */
@@ -189,7 +191,7 @@ export function registerGatewayKeyRoutes(
         const key = await keys.update(request.params.keyId, changes);
         request.log.info(
           { gatewayKeyId: key.id, changes: Object.keys(changes) },
-          "A Gateway Key's access was changed.",
+          "A Gateway Key was changed.",
         );
         return gatewayKeyBody(key);
       } catch (error) {

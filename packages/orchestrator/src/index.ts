@@ -545,6 +545,7 @@ export {
   ownerToolCapRefusal,
   createTokenCaps,
   type CapSubject,
+  type OwnerToolCapUse,
   type TokenCapService,
   type TokenCapsOptions,
 } from "./caps/token-caps.ts";

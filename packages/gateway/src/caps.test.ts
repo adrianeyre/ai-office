@@ -216,6 +216,39 @@ describe("Token Caps at the Gateway", () => {
     expect(upstream.received).toHaveLength(2);
   });
 
+  it("asks for an Owner tool's calls with its key's own Token Caps, if it has any", async () => {
+    const ownCapsKey = "aio_gk_akeywithtokencapsofitsown00000000000000";
+    const tokenCaps = { daily: 50_000, monthly: "unlimited" } as const;
+    const asked: unknown[] = [];
+    upstream = await startFakeUpstream((_request, response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(message);
+    });
+    gateway = await startGateway({
+      upstream,
+      keys: staticKeys({
+        [gatewayKey]: testCaller,
+        [ownCapsKey]: {
+          kind: "owner_tool",
+          keyId: "own-caps-key",
+          name: "Script",
+          tokenCaps,
+        },
+      }),
+      ownerToolCapCheck: (ownerTool, keyCaps) => {
+        asked.push([ownerTool, keyCaps]);
+        return Promise.resolve(undefined);
+      },
+    });
+    const model = { model: "claude-haiku-5-5" };
+    expect((await call("/v1/messages", gatewayKey, model)).status).toBe(200);
+    expect((await call("/v1/messages", ownCapsKey, model)).status).toBe(200);
+    expect(asked).toEqual([
+      ["test-tool", undefined],
+      ["Script", tokenCaps],
+    ]);
+  });
+
   it("G1-3: refuses an Owner tool's call with a 503 when Token Caps cannot be read", async () => {
     upstream = await startFakeUpstream((_request, response) => {
       response.writeHead(200, { "content-type": "application/json" });
@@ -394,6 +427,34 @@ describe("G1-2: a capped caller's calls, one at a time", () => {
       expect((await second).status).toBe(200);
     },
   );
+
+  it("lets an Owner tool whose key is unlimited in both periods make calls at once", async () => {
+    const unlimitedKey = "aio_gk_akeywithnotokencapsatall000000000000000";
+    const provider = await holding();
+    gateway = await startGateway({
+      upstream: provider.upstream,
+      keys: staticKeys({
+        [unlimitedKey]: {
+          kind: "owner_tool",
+          keyId: "unlimited-key",
+          name: "Batch job",
+          tokenCaps: { daily: "unlimited", monthly: "unlimited" },
+        },
+      }),
+      ownerToolCapCheck: () => Promise.resolve(undefined),
+    });
+    const model = { model: "claude-haiku-5-5" };
+    const first = call("/v1/messages", unlimitedKey, model);
+    const second = call("/v1/messages", unlimitedKey, model);
+    // Both reach the AI Provider without waiting for each other.
+    await vi.waitFor(() => {
+      expect(provider.held).toHaveLength(2);
+    });
+    provider.answer();
+    provider.answer();
+    expect((await first).status).toBe(200);
+    expect((await second).status).toBe(200);
+  });
 
   it("ends a refused call's turn, so the next is asked", async () => {
     upstream = await startFakeUpstream((_request, response) => {

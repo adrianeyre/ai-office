@@ -228,6 +228,12 @@ export const gatewayKeys = pgTable(
     access: text("access").notNull().default("proxy"),
     /** False while the Owner has it disabled: refused, but kept. */
     enabled: boolean("enabled").notNull().default(true),
+    /**
+     * An Owner tool's key's own daily and monthly Token Caps, as
+     * `keyTokenCapsSchema` (packages/shared) checks them: tokens,
+     * `"unlimited"`, or null for the office's. Null until set.
+     */
+    tokenCaps: jsonb("token_caps"),
   },
   (table) => [
     check(

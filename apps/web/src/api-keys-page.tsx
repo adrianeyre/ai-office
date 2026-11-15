@@ -1,4 +1,5 @@
 import {
+  capPeriods,
   defaultTimeZone,
   gatewayKeyAccessLevels,
   gatewayKeyAccessNames,
@@ -6,9 +7,12 @@ import {
   gatewayKeyUpdateRequestSchema,
   gatewayKeyUsageListSchema,
   keyProfileSchema,
+  unlimitedTokenCap,
+  type CapPeriod,
   type GatewayKey,
   type GatewayKeyAccess,
   type GatewayKeyUsage,
+  type KeyTokenCap,
 } from "@ai-office/shared";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Power, PowerOff, Trash2 } from "lucide-react";
@@ -42,6 +46,7 @@ import {
 import { OwnerPasswords } from "./owner-passwords.tsx";
 import { OwnerProofFields, useOwnerProof } from "./owner-proof.tsx";
 import { timeZoneLabel, timeZones } from "./time-zones.ts";
+import { formatTokens, officeTokenUsageQuery } from "./token-caps.tsx";
 import { sessionQuery } from "./session.ts";
 
 // API Key Management: the keys that reach AI Office's AI Gateway (Gateway
@@ -98,17 +103,57 @@ function KeyStats({ keys }: { keys: readonly GatewayKey[] }) {
   );
 }
 
+/** How a key's Token Cap is set in a period: the office's, its own, none. */
+const capModeOrder = ["office", "own", "unlimited"] as const;
+type CapMode = (typeof capModeOrder)[number];
+
+const capModeNames: Record<CapMode, string> = {
+  office: "Office default",
+  own: "Own limit",
+  unlimited: "Unlimited",
+};
+
+const periodNames: Record<CapPeriod, string> = {
+  daily: "Daily",
+  monthly: "Monthly",
+};
+
 interface KeyFormValues {
   name: string;
   nickname: string;
   timeZone: string;
   access: GatewayKeyAccess;
+  dailyMode: CapMode;
+  dailyCap: string;
+  monthlyMode: CapMode;
+  monthlyCap: string;
 }
+
+const capModeOf = (cap: KeyTokenCap): CapMode =>
+  cap === null ? "office" : cap === unlimitedTokenCap ? "unlimited" : "own";
+
+/** A period's cap as the form shows it: the tokens of its own limit. */
+const capFieldOf = (cap: KeyTokenCap): string =>
+  typeof cap === "number" ? String(cap) : "";
+
+/** A period's cap from the form; a number of tokens unless it is not one. */
+const capFrom = (mode: CapMode, tokens: string): KeyTokenCap => {
+  if (mode === "office") {
+    return null;
+  }
+  if (mode === "unlimited") {
+    return unlimitedTokenCap;
+  }
+  const trimmed = tokens.trim().replaceAll(",", "");
+  return trimmed === "" ? Number.NaN : Number(trimmed);
+};
 
 /**
  * One key's name, who uses it (nickname and time zone) and, for one of the
- * Owner's tools, its access. An Agent's key keeps its Agent's name and
- * only calls models. Giving an enabled key UI access asks for a proof.
+ * Owner's tools, its access and its daily and monthly Token Caps: the
+ * office's, its own, or unlimited. An Agent's key keeps its Agent's name,
+ * only calls models, and is held to its Agent's caps. Giving an enabled
+ * key UI access asks for a proof.
  */
 function KeyForm({ gatewayKey }: { gatewayKey: GatewayKey }) {
   const queryClient = useQueryClient();
@@ -122,6 +167,10 @@ function KeyForm({ gatewayKey }: { gatewayKey: GatewayKey }) {
     nickname: key.profile.nickname,
     timeZone: key.profile.timeZone,
     access: key.access,
+    dailyMode: capModeOf(key.tokenCaps.daily),
+    dailyCap: capFieldOf(key.tokenCaps.daily),
+    monthlyMode: capModeOf(key.tokenCaps.monthly),
+    monthlyCap: capFieldOf(key.tokenCaps.monthly),
   });
   const {
     register,
@@ -132,6 +181,18 @@ function KeyForm({ gatewayKey }: { gatewayKey: GatewayKey }) {
   } = useForm<KeyFormValues>({ defaultValues: valuesOf(gatewayKey) });
   const id = (field: string) => `api-key-${gatewayKey.id}-${field}`;
   const access = useWatch({ control, name: "access" });
+  const capModes: Record<CapPeriod, CapMode> = {
+    daily: useWatch({ control, name: "dailyMode" }),
+    monthly: useWatch({ control, name: "monthlyMode" }),
+  };
+  // The office's caps and what this tool used, to set its own against.
+  const { data: officeUsage } = useQuery({
+    ...officeTokenUsageQuery,
+    enabled: ownerTool,
+  });
+  const toolUsage = officeUsage?.ownerTools.find(
+    ({ ownerTool: name }) => name === gatewayKey.name,
+  )?.usage;
   // After the change the key signs in, where before it did not.
   const givesUi =
     ownerTool &&
@@ -149,14 +210,27 @@ function KeyForm({ gatewayKey }: { gatewayKey: GatewayKey }) {
       nickname: values.nickname,
       timeZone: values.timeZone,
     });
+    const capsChanged =
+      dirtyFields.dailyMode === true ||
+      dirtyFields.dailyCap === true ||
+      dirtyFields.monthlyMode === true ||
+      dirtyFields.monthlyCap === true;
     const changes = gatewayKeyUpdateRequestSchema.safeParse({
       ...(dirtyFields.name === true ? { name: values.name } : {}),
       ...(dirtyFields.access === true ? { access: values.access } : {}),
+      ...(capsChanged
+        ? {
+            tokenCaps: {
+              daily: capFrom(values.dailyMode, values.dailyCap),
+              monthly: capFrom(values.monthlyMode, values.monthlyCap),
+            },
+          }
+        : {}),
     });
     const issues = [
       ...(profile.error?.issues ?? []),
       ...(ownerTool &&
-      (dirtyFields.name === true || dirtyFields.access === true)
+      (dirtyFields.name === true || dirtyFields.access === true || capsChanged)
         ? (changes.error?.issues ?? [])
         : []),
     ];
@@ -170,7 +244,11 @@ function KeyForm({ gatewayKey }: { gatewayKey: GatewayKey }) {
     }
     const keyUrl = `/api/gateway-keys/${encodeURIComponent(gatewayKey.id)}`;
     let updated = gatewayKey;
-    if (ownerTool && changes.success) {
+    if (
+      ownerTool &&
+      changes.success &&
+      (dirtyFields.name === true || dirtyFields.access === true || capsChanged)
+    ) {
       const response = await sendJson(
         "PATCH",
         keyUrl,
@@ -275,6 +353,51 @@ function KeyForm({ gatewayKey }: { gatewayKey: GatewayKey }) {
           </p>
         </div>
       </div>
+      {ownerTool && (
+        <fieldset className="grid gap-3 sm:grid-cols-2">
+          <legend className="mb-2 text-sm font-medium">Token limits</legend>
+          {capPeriods.map((period) => (
+            <div key={period} className="space-y-2">
+              <Label htmlFor={id(`${period}-mode`)}>
+                {periodNames[period]} limit
+              </Label>
+              <div className="flex gap-2">
+                <select
+                  id={id(`${period}-mode`)}
+                  className={selectClass}
+                  aria-describedby={id(`${period}-hint`)}
+                  {...register(`${period}Mode`)}
+                >
+                  {capModeOrder.map((mode) => (
+                    <option key={mode} value={mode}>
+                      {capModeNames[mode]}
+                    </option>
+                  ))}
+                </select>
+                {capModes[period] === "own" && (
+                  <Input
+                    id={id(`${period}-cap`)}
+                    aria-label={`${periodNames[period]} limit in tokens`}
+                    inputMode="numeric"
+                    autoComplete="off"
+                    placeholder="Tokens"
+                    {...register(`${period}Cap`)}
+                  />
+                )}
+              </div>
+              <p
+                id={id(`${period}-hint`)}
+                className="text-xs text-muted-foreground"
+              >
+                {capHint(capModes[period], period, officeUsage?.caps[period])}
+                {toolUsage === undefined
+                  ? ""
+                  : ` Used ${period === "daily" ? "today" : "this month"}: ${formatTokens(toolUsage[period].tokens)} tokens.`}
+              </p>
+            </div>
+          ))}
+        </fieldset>
+      )}
       {givesUi && (
         <OwnerProofFields
           id={id("proof")}
@@ -303,6 +426,25 @@ function KeyForm({ gatewayKey }: { gatewayKey: GatewayKey }) {
       </Button>
     </form>
   );
+}
+
+/** What a period's cap setting means, for the hint under it. */
+function capHint(
+  mode: CapMode,
+  period: CapPeriod,
+  officeCap: number | undefined,
+): string {
+  const per = period === "daily" ? "a day" : "a month";
+  switch (mode) {
+    case "office":
+      return officeCap === undefined
+        ? "Held to the office's Token Cap."
+        : `Held to the office's Token Cap: ${formatTokens(officeCap)} tokens ${per}.`;
+    case "own":
+      return `Its calls are refused once it has used this many tokens ${per}.`;
+    case "unlimited":
+      return "Never refused at a Token Cap.";
+  }
 }
 
 /**

@@ -217,6 +217,7 @@ const cases: Case[] = [
           "profile",
           "access",
           "enabled",
+          "tokenCaps",
         ].sort(),
       );
       expect(gatewayKey).toMatchObject({
@@ -362,6 +363,46 @@ const cases: Case[] = [
       expect(
         (await request(setup, "PATCH", url, { name: "Aider" })).statusCode,
       ).toBe(409);
+    },
+  ],
+  [
+    "sets an Owner tool's key's own Token Caps, unlimited or a number of tokens, and keeps them",
+    async (setup) => {
+      const { gatewayKey } = createdGatewayKeySchema.parse(
+        (
+          await request(setup, "POST", "/api/gateway-keys", { name: "Codex" })
+        ).json(),
+      );
+      // Held to the office's caps until set.
+      expect(gatewayKey.tokenCaps).toEqual({ daily: null, monthly: null });
+      const url = `/api/gateway-keys/${gatewayKey.id}`;
+      const tokenCaps = { daily: 250_000, monthly: "unlimited" };
+      const set = await request(setup, "PATCH", url, { tokenCaps });
+      expect(set.statusCode).toBe(200);
+      expect(set.json()).toMatchObject({ tokenCaps });
+      const listed = gatewayKeyListSchema.parse(
+        (await request(setup, "GET", "/api/gateway-keys")).json(),
+      );
+      expect(listed.keys.find(({ id }) => id === gatewayKey.id)).toMatchObject({
+        tokenCaps,
+      });
+
+      for (const bad of [
+        { daily: 0, monthly: null },
+        { daily: 1.5, monthly: null },
+        { daily: "lots", monthly: null },
+        { daily: 1_000 },
+      ]) {
+        expect(
+          (await request(setup, "PATCH", url, { tokenCaps: bad })).statusCode,
+        ).toBe(400);
+      }
+      const back = await request(setup, "PATCH", url, {
+        tokenCaps: { daily: null, monthly: null },
+      });
+      expect(back.json()).toMatchObject({
+        tokenCaps: { daily: null, monthly: null },
+      });
     },
   ],
   [
