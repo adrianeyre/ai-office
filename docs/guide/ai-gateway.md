@@ -503,11 +503,13 @@ see [Internal addresses](#internal-addresses).
   compatible endpoints, which are sent any Model. With none, it is a
   `503`. A Model of no known AI Provider goes to the compatible endpoints
   while one can serve it, and otherwise to any account.
-- **Order.** The Gateway serves each request from the active accounts with
-  the lowest priority (1 first, up to 100), as the load-balancing strategy
-  chooses among them (below); accounts of a worse priority serve only when
-  none of a better one can. A new account goes after the others. Changes
-  apply from the next request.
+- **Priority.** Each account's priority (1 to 100) is its weight in the
+  load-balancing strategy (below): an account of priority `p` takes `1/p`
+  of the share one of priority 1 does. Two accounts of the same priority
+  share the load evenly; one of priority 1 takes twice what one of
+  priority 2 does, and three times what one of priority 3 does. The
+  draining strategies instead use the lowest priority first. A new
+  account goes after the others. Changes apply from the next request.
 - **Actions.** Rename, change the priority, pause, resume and delete. A
   paused account is left alone until it is resumed. Each change is a
   `config.changed` event naming what changed (`aiAccounts.paused`, …).
@@ -532,11 +534,13 @@ in this order:
    elsewhere. Agents' requests cannot force an account (their sandboxes
    are untrusted); the header is ignored from them, and never forwarded.
 2. **The strategy**, among the unpaused accounts that can serve the
-   request, keeping to the best (lowest) priority among them:
+   request. Session, session affinity and least used share the load across
+   all of them, by each account's priority weight; the drain-soonest
+   strategies keep to the best (lowest) priority among them:
    - **Session** (the default): each session stays on the account it
      started on for the session window (300 minutes by default, from 1
      minute to 7 days), and a new session starts on the account with the
-     fewest sessions. A session is an Agent's sandbox run (its sandbox
+     fewest sessions for its weight. A session is an Agent's sandbox run (its sandbox
      sends `x-ai-office-session: <sandbox id>` with its model calls) or,
      for a request without one, the caller's Gateway Key. A session whose
      account is paused, or can no longer serve it, moves and starts a new
@@ -544,8 +548,10 @@ in this order:
    - **Session affinity**: each session stays on its account for as long
      as it is in use. Every call renews it, and it lets go only after the
      session window passes without one, however long the session runs (so
-     its prompt cache stays warm). A new session starts on the least-used
-     account (below).
+     its prompt cache stays warm). A new session starts on the account
+     with the fewest sessions in use for its weight, the least-used (below)
+     for its weight on a tie, so sessions started together spread out
+     before any has used a token.
    - **Drain soonest**: a new session starts on the account whose usage
      window resets first (the sooner of its five-hour and weekly resets,
      as its AI Provider reports them; see [Usage windows](#usage-windows-pause-thresholds-and-force-reset)),
@@ -556,15 +562,18 @@ in this order:
      window resets first, sessions or not, so a session moves as soon as
      another account's window resets sooner.
    - **Least used**: each request goes to the account that has used the
-     fewest tokens (input and output) in the last five hours, counted from
-     the request history (read back when the server starts).
+     fewest tokens (input and output) in the last five hours for its
+     weight, counted from the request history (read back when the server
+     starts).
 
-   Every strategy keeps to the best priority first, and a tie goes to the
-   account first in the Owner's order.
+   A tie goes to the better priority, then the account first in the
+   Owner's order.
 
    **Back to the preferred account** (PRD FR-39, §5 scenario 6). A session
-   keeps to its account only among the accounts of that account's
-   priority. When a session falls back to a worse priority because every
+   the strategy placed on an account stays there, whatever its priority.
+   One that had to fall back, because the account ranked ahead of it was
+   held back, keeps to its new account only among the accounts of that
+   account's priority. When a session falls back to a worse priority because every
    better account is held back (rate-limited, overloaded, at a pause
    threshold or failing), it stays there only while they are. Once one of
    them can serve again, because its limit reset or its circuit breaker's

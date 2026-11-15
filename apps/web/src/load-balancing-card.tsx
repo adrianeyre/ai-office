@@ -38,15 +38,15 @@ export const loadBalancingQuery = queryOptions({
 /** What each strategy does, as the Owner reads it. */
 const strategyHints: Record<LoadBalancingStrategy, string> = {
   session:
-    "Each Agent session (a sandbox run), or each of your tools, stays on one account for the session window. New sessions go to the account with the fewest.",
+    "Each Agent session (a sandbox run), or each of your tools, stays on one account for the session window. New sessions go to the account with the fewest for its priority's weight.",
   session_affinity:
-    "Each session stays on its account for as long as it is in use; it lets go after the session window without a call. New sessions go to the least-used account.",
+    "Each session stays on its account for as long as it is in use; it lets go after the session window without a call. New sessions go to the account with the fewest sessions in use for its priority's weight.",
   drain_soonest:
     "New sessions go to the account whose usage window resets first, so what is left of it is used before it resets. Sessions stay on their accounts while in use.",
   drain_soonest_strict:
     "Every request goes to the account whose usage window resets first, moving sessions as soon as another account's resets sooner.",
   least_used:
-    "Each request goes to the account that has used the fewest tokens in the last five hours.",
+    "Each request goes to the account that has used the fewest tokens in the last five hours for its priority's weight.",
 };
 
 interface FormValues {
@@ -179,9 +179,10 @@ function LoadBalancingForm({ settings }: { settings: LoadBalancingSettings }) {
 }
 
 /**
- * How the AI Gateway chooses each request's AI Account (PRD FR-37). Every
- * strategy keeps to the best priority that can serve, and skips paused
- * accounts.
+ * How the AI Gateway chooses each request's AI Account (PRD FR-37). The
+ * sharing strategies spread requests across every account by its
+ * priority's weight; the draining ones keep to the best priority. Every
+ * strategy skips paused accounts.
  */
 export function LoadBalancingCard() {
   const { data: settings, isError } = useQuery(loadBalancingQuery);
@@ -192,11 +193,13 @@ export function LoadBalancingCard() {
           <h2>Load balancing</h2>
         </CardTitle>
         <CardDescription>
-          How the AI Gateway spreads requests across the AI Accounts. Whichever
-          it is, it uses only the active accounts with the lowest priority
-          number that can serve a request, and others only when none of those
-          can. Your own tools can send <code>x-ai-office-account</code> with an
-          account&apos;s name to use that account.
+          How the AI Gateway spreads requests across the AI Accounts. Session,
+          session affinity and least used share them across every active account
+          that can serve a request, weighted by priority: accounts of one
+          priority share evenly, and one of priority 2 takes half the share of
+          one of priority 1. Drain soonest uses the lowest priority number
+          first. Your own tools can send <code>x-ai-office-account</code> with
+          an account&apos;s name to use that account.
         </CardDescription>
       </CardHeader>
       <CardContent>

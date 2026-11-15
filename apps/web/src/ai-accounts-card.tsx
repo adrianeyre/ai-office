@@ -2021,15 +2021,16 @@ export function AiAccountsCard({
           <h2>AI Accounts</h2>
         </CardTitle>
         <CardDescription>
-          The AI Gateway serves every Agent&apos;s model calls from these: the
-          active account with the lowest priority number first. Sandboxes never
-          hold their keys. Each request goes to an account of its Model&apos;s
-          AI Provider. A subscription serves only its AI Provider&apos;s agent
-          tool (Claude Code for Claude, Codex for ChatGPT, opencode for Grok,
-          Gemini and Qwen), and its token is refreshed before it expires. A
-          coding plan (Z.ai&apos;s, MiniMax&apos;s, Kimi&apos;s or Qwen&apos;s)
-          is added with the plan&apos;s own key. An AWS Bedrock or Google Vertex
-          AI account serves Claude Models in its region, signed with its own
+          The AI Gateway serves every Agent&apos;s model calls from these,
+          shared across the active accounts by priority: one of priority 2 takes
+          half the share of one of priority 1. Sandboxes never hold their keys.
+          Each request goes to an account of its Model&apos;s AI Provider. A
+          subscription serves only its AI Provider&apos;s agent tool (Claude
+          Code for Claude, Codex for ChatGPT, opencode for Grok, Gemini and
+          Qwen), and its token is refreshed before it expires. A coding plan
+          (Z.ai&apos;s, MiniMax&apos;s, Kimi&apos;s or Qwen&apos;s) is added
+          with the plan&apos;s own key. An AWS Bedrock or Google Vertex AI
+          account serves Claude Models in its region, signed with its own
           credentials. An Anthropic- or OpenAI-compatible endpoint is sent any
           Model asked of it, and those no AI Provider claims before any other
           account. An account its AI Provider says is rate-limited or
