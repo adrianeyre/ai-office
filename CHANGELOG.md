@@ -1,3 +1,9 @@
+## [1.10.0](https://github.com/adrianeyre/ai-office/compare/v1.9.0...v1.10.0) (2026-11-15)
+
+### Features
+
+* **gateway:** weight load balancing by priority across all accounts ([04524cb](https://github.com/adrianeyre/ai-office/commit/04524cb3f9a7469db089aa123b7eb0363dbeb156))
+
 ## [1.9.0](https://github.com/adrianeyre/ai-office/compare/v1.8.1...v1.9.0) (2026-11-14)
 
 ### Features
