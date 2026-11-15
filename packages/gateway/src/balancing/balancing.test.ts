@@ -16,9 +16,10 @@ import {
   type RoutingChecks,
 } from "./balancing.ts";
 
-// Load-balancing strategies (PRD FR-37): session, session-affinity,
-// drain-soonest (and its strict variant) and least-used, each choosing
-// within the best priority among the accounts that can serve.
+// Load-balancing strategies (PRD FR-37): session, session-affinity and
+// least-used, each spreading the load across the accounts that can serve
+// by their priority's weight (1/priority); drain-soonest (and its strict
+// variant), each draining the best priority first.
 
 const minute = 60 * 1000;
 const hour = 60 * minute;
@@ -41,7 +42,7 @@ describe("the best priority tier", () => {
 });
 
 describe("the session strategy", () => {
-  it("keeps a session on its account for the window, and spreads new sessions across the best priority", () => {
+  it("keeps a session on its account for the window, and spreads new sessions across every account", () => {
     const strategy = sessionStrategy(createSessionTable(), 5 * hour);
     expect(strategy.choose(all, session("ada:sbx-1"), at(0))).toBe(work);
     // A new session goes to the account with the fewest sessions.
@@ -60,13 +61,27 @@ describe("the session strategy", () => {
         strategy.choose(all, session("ada:sbx-1"), at(minutes * minute)),
       ).toBe(work);
     }
-    // Never on an account of a worse priority while a better one serves.
-    expect(
-      [1, 2, 3, 4, 5].map(
-        (n) =>
-          strategy.choose(all, session(`new:${String(n)}`), at(3 * minute))?.id,
-      ),
-    ).not.toContain("spare");
+  });
+
+  it("spreads new sessions by weight: evenly within a priority, half as many to priority 2", () => {
+    const strategy = sessionStrategy(createSessionTable(), 5 * hour);
+    const placed = Array.from(
+      { length: 10 },
+      (_, n) => strategy.choose(all, session(`s:${String(n)}`), at(0))?.id,
+    );
+    expect(placed.filter((id) => id === "work")).toHaveLength(4);
+    expect(placed.filter((id) => id === "team")).toHaveLength(4);
+    expect(placed.filter((id) => id === "spare")).toHaveLength(2);
+  });
+
+  it("splits sessions evenly between two accounts of one priority", () => {
+    const strategy = sessionStrategy(createSessionTable(), 5 * hour);
+    const placed = Array.from(
+      { length: 6 },
+      (_, n) =>
+        strategy.choose([work, team], session(`s:${String(n)}`), at(0))?.id,
+    );
+    expect(placed).toEqual(["work", "team", "work", "team", "work", "team"]);
   });
 
   it("chooses afresh once the window ends", () => {
@@ -94,7 +109,7 @@ describe("the session strategy", () => {
     );
   });
 
-  it("falls back to a worse priority only when no account of a better one can serve", () => {
+  it("serves from whichever accounts can, and from none when none can", () => {
     const strategy = sessionStrategy(createSessionTable(), 5 * hour);
     expect(strategy.choose([spare], session("ada:sbx-1"), at(0))).toBe(spare);
     expect(
@@ -112,25 +127,24 @@ describe("the session strategy", () => {
 });
 
 describe("the least-used strategy", () => {
-  it("chooses the account of the best priority that used the fewest tokens lately", () => {
+  it("chooses the account that used the fewest tokens lately for its weight", () => {
     const usage = createUsageTracker({ windowMs: 5 * hour });
     const strategy = leastUsedStrategy(usage);
-    // A tie goes to the first in the Owner's order.
+    // A tie goes to the better priority, then the first in the Owner's order.
     expect(strategy.choose(all, session("ada:sbx-1"), at(0))).toBe(work);
 
     usage.record("work", 5_000, at(0));
     expect(strategy.choose(all, session("ada:sbx-1"), at(minute))).toBe(team);
     usage.record("team", 8_000, at(2 * minute));
+    // Spare, of priority 2, has used nothing: less than half the others.
     expect(strategy.choose(all, session("ada:sbx-1"), at(3 * minute))).toBe(
+      spare,
+    );
+    // Once it has used more than half of what Work has, Work is next.
+    usage.record("spare", 3_000, at(3 * minute));
+    expect(strategy.choose(all, session("ada:sbx-1"), at(4 * minute))).toBe(
       work,
     );
-    // An unused account of a worse priority is not chosen over them.
-    expect(usage.used("spare", at(3 * minute))).toBe(0);
-    expect(
-      strategy.choose(all, session("ada:sbx-1"), at(3 * minute))?.priority,
-    ).toBe(1);
-    // It falls back to it only when the better ones cannot serve.
-    expect(strategy.choose([spare], session(null), at(3 * minute))).toBe(spare);
   });
 
   it("counts only the tokens used in its window", () => {
@@ -138,10 +152,11 @@ describe("the least-used strategy", () => {
     usage.record("work", 9_000, at(0));
     usage.record("team", 1_000, at(4 * hour));
     const strategy = leastUsedStrategy(usage);
-    expect(strategy.choose(all, session(null), at(4 * hour))).toBe(team);
+    const both = [work, team];
+    expect(strategy.choose(both, session(null), at(4 * hour))).toBe(team);
     // Work's tokens leave the window five hours after they were used.
     expect(usage.used("work", at(5 * hour))).toBe(0);
-    expect(strategy.choose(all, session(null), at(5 * hour))).toBe(work);
+    expect(strategy.choose(both, session(null), at(5 * hour))).toBe(work);
   });
 });
 
@@ -164,7 +179,7 @@ describe("the session-affinity strategy", () => {
     }
   });
 
-  it("starts each new session on the least-used account of the best priority", () => {
+  it("starts each new session on the account with the fewest sessions for its weight, the least-used on a tie", () => {
     const usage = createUsageTracker({ windowMs: 5 * hour });
     usage.record("work", 9_000, at(0));
     usage.record("team", 2_000, at(0));
@@ -178,10 +193,20 @@ describe("the session-affinity strategy", () => {
     expect(strategy.choose(all, session("bea:sbx-2"), at(3 * minute))).toBe(
       work,
     );
-    // Spare has used nothing, but its priority is worse.
-    expect(usage.used("spare", at(3 * minute))).toBe(0);
-    // A request in no session goes where a new session would, unkept.
-    expect(strategy.choose(all, session(null), at(4 * minute))).toBe(work);
+    // Spare, of priority 2, takes one session to their two.
+    expect(strategy.choose(all, session(null), at(4 * minute))).toBe(spare);
+  });
+
+  it("spreads sessions started together, before any has used a token", () => {
+    const strategy = sessionAffinityStrategy(
+      createSessionTable(),
+      createUsageTracker({ windowMs: 5 * hour }),
+      30 * minute,
+    );
+    const placed = ["a", "b", "c", "d", "e"].map(
+      (key) => strategy.choose(all, session(key), at(0))?.id,
+    );
+    expect(placed).toEqual(["work", "team", "work", "team", "spare"]);
   });
 
   it("lets a session go once it has been idle for the window, and moves one whose account cannot serve it", () => {
@@ -393,6 +418,7 @@ describe("the load balancer", () => {
     };
     const usage = createUsageTracker();
     usage.record("work", 1_000, at(0));
+    usage.record("spare", 1_000, at(0));
     const balancer = createLoadBalancer({ settings: () => settings, usage });
     const windows = [
       { ...work, fiveHourResetsAt: at(3 * hour) },
@@ -513,6 +539,15 @@ describe("the fallback back to a preferred account (FR-39)", () => {
     // Then both return.
     expect(serve("ada:sbx-1", at(30 * minute))).toBe("preferred");
     expect(serve("bea:sbx-2", at(30 * minute))).toBe("preferred");
+  });
+
+  it("keeps a session its weight placed on a worse priority there, as it did not fall back", () => {
+    const strategy = sessionStrategy(createSessionTable(), 5 * hour);
+    const both = [work, spare];
+    expect(strategy.choose(both, session("ada:sbx-1"), at(0))).toBe(work);
+    expect(strategy.choose(both, session("bea:sbx-2"), at(0))).toBe(work);
+    expect(strategy.choose(both, session("cy:sbx-3"), at(0))).toBe(spare);
+    expect(strategy.choose(both, session("cy:sbx-3"), at(hour))).toBe(spare);
   });
 
   it("does not move a session between accounts of the best priority", () => {

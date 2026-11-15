@@ -7,28 +7,34 @@ import {
 
 // Load balancing (PRD FR-37): which of the AI Accounts that can serve a
 // request does. The candidates come in the Owner's priority order, paused
-// accounts and those that cannot serve the request already left out, and
-// every strategy respects priority: it ranks the accounts of the best
-// (lowest) priority first, so an account of a worse priority serves only
-// while none of a better one can. Within a priority:
+// accounts and those that cannot serve the request already left out.
+// Priority is a weight: an account of priority p takes 1/p of the share an
+// account of priority 1 does, so two accounts of one priority split the
+// load evenly, and one of priority 1 takes twice what one of priority 2
+// does. The sharing strategies spread by that weight:
 // - `session` keeps a session (an Agent's sandbox run, or an Owner tool)
 //   on the account it started on for a window (5 hours by default), and
-//   starts each new session on the account with the fewest sessions;
+//   starts each new session on the account with the fewest sessions for
+//   its weight;
 // - `session_affinity` keeps a session on its account for as long as it
 //   is in use (each call renews the window), and starts each new session
-//   on the account that has used the fewest tokens lately;
+//   on the account with the fewest sessions in use for its weight, the one
+//   that has used the fewest tokens lately for its weight on a tie;
+// - `least_used` sends each request to the account that has used the
+//   fewest tokens in the last five hours for its weight.
+// The draining strategies spend one account at a time, so they keep to the
+// best (lowest) priority first:
 // - `drain_soonest` starts each new session on the account whose usage
 //   window resets first, so what is left of it is used rather than lost,
 //   keeping sessions on their accounts as session-affinity does;
-//   `drain_soonest_strict` sends every request there, sessions or not;
-// - `least_used` sends each request to the account that has used the
-//   fewest tokens in the last five hours.
+//   `drain_soonest_strict` sends every request there, sessions or not.
 // Each strategy ranks the candidates, best first: the AI Gateway serves
 // from the first that is not held back, then tells the strategy which
-// that was. Ties go to the account first in the Owner's order. A session
-// keeps to its account only among those of its priority, so one that fell
-// back to a worse priority, while the better accounts were held back,
-// returns to them once their limit resets (FR-39's fallback back).
+// that was. Ties go to the better priority, then the account first in the
+// Owner's order. A session that had to fall back (its account held back)
+// keeps to its new account only among those of its priority, so one that
+// fell back to a worse priority returns to the better accounts once their
+// limit resets (FR-39's fallback back).
 
 /** An AI Account a request could be served from. */
 export interface Candidate {
@@ -61,8 +67,16 @@ export interface Strategy {
     request: BalancingRequest,
     now: Date,
   ): C[];
-  /** Told the account that serves the request, so a session can stay on it. */
-  served(account: Candidate, request: BalancingRequest, now: Date): void;
+  /**
+   * Told the account that serves the request, so a session can stay on it;
+   * `fellBack` when it is not the one ranked first, which was held back.
+   */
+  served(
+    account: Candidate,
+    request: BalancingRequest,
+    now: Date,
+    fellBack?: boolean,
+  ): void;
   /** The first of `rank`, told it serves: for a request nothing else filters. */
   choose<C extends Candidate>(
     candidates: readonly C[],
@@ -105,26 +119,54 @@ function byPriorityThen<C extends Candidate>(
   candidates: readonly C[],
   score: (candidate: C) => number,
 ): C[] {
-  const scored = candidates.map((candidate, index) => ({
-    candidate,
-    index,
-    score: score(candidate),
-  }));
-  scored.sort(
-    (a, b) =>
-      a.candidate.priority - b.candidate.priority ||
-      a.score - b.score ||
-      a.index - b.index,
-  );
-  return scored.map(({ candidate }) => candidate);
+  return rankBy(candidates, (candidate) => [
+    candidate.priority,
+    score(candidate),
+  ]);
 }
 
 /**
- * `ranked` (by priority first), with the session's current account, if it
- * is a candidate, first among the accounts of its own priority. It never
- * goes ahead of a better priority: a session that fell back to a worse
- * one while the better accounts were held back moves back to them as
- * soon as one can serve again, its limit reset (FR-39).
+ * `candidates` by least load for their weight (1/priority): the account
+ * whose share would be least once it takes one more. `loads` are compared
+ * in turn, the first deciding unless tied; a tie goes to the better
+ * priority, then the Owner's order.
+ */
+export function byWeightedLoad<C extends Candidate>(
+  candidates: readonly C[],
+  ...loads: ((candidate: C) => number)[]
+): C[] {
+  return rankBy(candidates, (candidate) => [
+    ...loads.map((load) => (load(candidate) + 1) * candidate.priority),
+    candidate.priority,
+  ]);
+}
+
+function rankBy<C extends Candidate>(
+  candidates: readonly C[],
+  keys: (candidate: C) => readonly number[],
+): C[] {
+  const keyed = candidates.map((candidate, index) => ({
+    candidate,
+    keys: [...keys(candidate), index],
+  }));
+  keyed.sort((a, b) => {
+    for (const [position, key] of a.keys.entries()) {
+      const difference = key - (b.keys[position] ?? 0);
+      if (difference !== 0) {
+        return difference;
+      }
+    }
+    return 0;
+  });
+  return keyed.map(({ candidate }) => candidate);
+}
+
+/**
+ * `ranked`, with the session's current account, if it is a candidate,
+ * first. A session that fell back to its account, while the one ranked
+ * ahead of it was held back, goes first only among the accounts of its own
+ * priority: it moves back to a better one as soon as one can serve again,
+ * its limit reset (FR-39).
  */
 function stickyFirst<C extends Candidate>(
   sessions: SessionTable,
@@ -135,27 +177,37 @@ function stickyFirst<C extends Candidate>(
   const current =
     request.sessionKey === null
       ? undefined
-      : sessions.get(request.sessionKey, now);
-  const sticky = ranked.find(({ id }) => id === current);
-  if (sticky === undefined) {
+      : sessions.find(request.sessionKey, now);
+  const sticky = ranked.find(({ id }) => id === current?.accountId);
+  if (sticky === undefined || current === undefined) {
     return ranked;
   }
   const rest = ranked.filter((candidate) => candidate !== sticky);
-  const better = rest.filter(({ priority }) => priority < sticky.priority);
-  return [...better, sticky, ...rest.slice(better.length)];
+  const better = current.fellBack
+    ? rest.filter(({ priority }) => priority < sticky.priority)
+    : [];
+  return [...better, sticky, ...rest.filter((c) => !better.includes(c))];
 }
 
 /** Which account each session is on, and until when. */
 export interface SessionTable {
   /** The session's account, if its window has not ended. */
   get(key: string, now: Date): string | undefined;
-  set(key: string, accountId: string, until: Date): void;
+  /** The session's account, and whether it fell back to it. */
+  find(
+    key: string,
+    now: Date,
+  ): { readonly accountId: string; readonly fellBack: boolean } | undefined;
+  set(key: string, accountId: string, until: Date, fellBack?: boolean): void;
   /** How many sessions are on the account now. */
   sessionsOn(accountId: string, now: Date): number;
 }
 
 export function createSessionTable(): SessionTable {
-  const sessions = new Map<string, { accountId: string; until: Date }>();
+  const sessions = new Map<
+    string,
+    { accountId: string; until: Date; fellBack: boolean }
+  >();
   const prune = (now: Date) => {
     for (const [key, session] of sessions) {
       if (session.until <= now) {
@@ -165,12 +217,18 @@ export function createSessionTable(): SessionTable {
   };
   return {
     get(key, now) {
+      return this.find(key, now)?.accountId;
+    },
+    find(key, now) {
       // Sessions that ended are forgotten, so the table stays small.
       prune(now);
-      return sessions.get(key)?.accountId;
+      const session = sessions.get(key);
+      return session === undefined
+        ? undefined
+        : { accountId: session.accountId, fellBack: session.fellBack };
     },
-    set(key, accountId, until) {
-      sessions.set(key, { accountId, until });
+    set(key, accountId, until, fellBack = false) {
+      sessions.set(key, { accountId, until, fellBack });
     },
     sessionsOn(accountId, now) {
       prune(now);
@@ -201,15 +259,16 @@ export function sessionStrategy(
         sessions,
         request,
         now,
-        byPriorityThen(candidates, ({ id }) => sessions.sessionsOn(id, now)),
+        byWeightedLoad(candidates, ({ id }) => sessions.sessionsOn(id, now)),
       ),
-    (account, { sessionKey }, now) => {
+    (account, { sessionKey }, now, fellBack = false) => {
       // A new window only when the session starts, or moves.
       if (sessionKey !== null && sessions.get(sessionKey, now) !== account.id) {
         sessions.set(
           sessionKey,
           account.id,
           new Date(now.getTime() + windowMs),
+          fellBack,
         );
       }
     },
@@ -219,9 +278,14 @@ export function sessionStrategy(
 /** Keeps the session on `account` until `windowMs` after this call. */
 const renew =
   (sessions: SessionTable, windowMs: number): Strategy["served"] =>
-  (account, { sessionKey }, now) => {
+  (account, { sessionKey }, now, fellBack = false) => {
     if (sessionKey !== null) {
-      sessions.set(sessionKey, account.id, new Date(now.getTime() + windowMs));
+      sessions.set(
+        sessionKey,
+        account.id,
+        new Date(now.getTime() + windowMs),
+        fellBack,
+      );
     }
   };
 
@@ -234,7 +298,9 @@ export interface UsageSource {
 /**
  * Keeps each session on its account for as long as it is in use: every
  * call renews it, and it lapses only after `windowMs` without one. A new
- * session (or a request in none) goes to the least-used account.
+ * session (or a request in none) goes to the account with the fewest
+ * sessions in use for its weight, the least-used for its weight on a tie:
+ * sessions started together spread out, though none has used a token yet.
  */
 export function sessionAffinityStrategy(
   sessions: SessionTable,
@@ -248,7 +314,11 @@ export function sessionAffinityStrategy(
         sessions,
         request,
         now,
-        byPriorityThen(candidates, ({ id }) => usage.used(id, now)),
+        byWeightedLoad(
+          candidates,
+          ({ id }) => sessions.sessionsOn(id, now),
+          ({ id }) => usage.used(id, now),
+        ),
       ),
     renew(sessions, windowMs),
   );
@@ -298,10 +368,13 @@ export function drainSoonestStrategy(
   );
 }
 
-/** Sends each request to the account that has used the fewest tokens. */
+/**
+ * Sends each request to the account that has used the fewest tokens for
+ * its weight.
+ */
 export function leastUsedStrategy(usage: UsageSource): Strategy {
   return strategy("least_used", (candidates, _request, now) =>
-    byPriorityThen(candidates, ({ id }) => usage.used(id, now)),
+    byWeightedLoad(candidates, ({ id }) => usage.used(id, now)),
   );
 }
 
@@ -345,7 +418,12 @@ export interface LoadBalancer {
     now: Date,
   ): C[];
   /** Tells the strategy which account serves the request. */
-  served(account: Candidate, request: BalancingRequest, now: Date): void;
+  served(
+    account: Candidate,
+    request: BalancingRequest,
+    now: Date,
+    fellBack?: boolean,
+  ): void;
   /** The first of `rank`, told it serves. */
   choose<C extends Candidate>(
     candidates: readonly C[],
@@ -386,8 +464,8 @@ export function createLoadBalancer(
     rank(candidates, request, now) {
       return current().rank(candidates, request, now);
     },
-    served(account, request, now) {
-      current().served(account, request, now);
+    served(account, request, now, fellBack) {
+      current().served(account, request, now, fellBack);
     },
     choose(candidates, request, now) {
       return current().choose(candidates, request, now);
@@ -434,7 +512,8 @@ export function route<C extends Candidate>(
   if (candidates.length === 0) {
     return undefined;
   }
-  let left = balancer.rank(candidates, request, now);
+  const ranked = balancer.rank(candidates, request, now);
+  let left = ranked;
   for (const [check, status] of [
     [checks.capacity, 429],
     [checks.throttling, 529],
@@ -458,7 +537,7 @@ export function route<C extends Candidate>(
   const avoid = new Set(request.avoid ?? []);
   const chosen = left.find(({ id }) => !avoid.has(id)) ?? left[0];
   if (chosen !== undefined) {
-    balancer.served(chosen, request, now);
+    balancer.served(chosen, request, now, chosen !== ranked[0]);
   }
   return chosen;
 }

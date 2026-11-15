@@ -136,17 +136,19 @@ const cases: Case[] = [
     },
   ],
   [
-    "sends each request to the least-used account of the best priority, once the Owner chooses it",
+    "sends each request to the least-used account for its weight, once the Owner chooses it",
     async (setup) => {
       const { accounts, ids, usage, at } = setup;
       setup.settings = { strategy: "least_used", sessionWindowMinutes: 300 };
       usage.record(ids.work, 4_000, new Date(start));
       usage.record(ids.team, 1_000, new Date(start));
       at(minute);
+      // Spare, of priority 2, has used less than half of either.
+      expect(await chosen(accounts)).toBe("Spare");
+      usage.record(ids.spare, 3_000, new Date(start));
       expect(await chosen(accounts, { sessionKey: "ada:sbx-1" })).toBe("Team");
       usage.record(ids.team, 5_000, new Date(start + minute));
       expect(await chosen(accounts, { sessionKey: "ada:sbx-1" })).toBe("Work");
-      // Spare has used nothing, but its priority is worse.
       expect(await chosen(accounts)).toBe("Work");
       await accounts.update(ids.work, { paused: true });
       expect(await chosen(accounts)).toBe("Team");

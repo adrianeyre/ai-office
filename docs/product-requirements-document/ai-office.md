@@ -280,7 +280,7 @@ The AI Gateway is built into AI Office ([ADR 0001](../architectural-decision-rec
   - Force-reset a rate-limit state.
   - Re-authenticate.
   - See token health in real time: valid, expiring or expired, with automatic refresh ahead of expiry.
-- **FR-37 (load-balancing strategies):** chosen at runtime.
+- **FR-37 (load-balancing strategies):** chosen at runtime. Session, session-affinity and least-used share the load across every account that can serve, weighted by priority (an account of priority `p` has weight `1/p`); drain-soonest keeps to the best priority first.
   - **Session:** sticky to one account for a configurable window, default 5 hours.
   - **Session-affinity.**
   - **Drain-soonest:** prefer the account whose window resets first, with a strict variant.
