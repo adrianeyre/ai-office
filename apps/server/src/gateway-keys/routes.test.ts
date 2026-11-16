@@ -218,6 +218,7 @@ const cases: Case[] = [
           "access",
           "enabled",
           "tokenCaps",
+          "aiProviders",
         ].sort(),
       );
       expect(gatewayKey).toMatchObject({
@@ -403,6 +404,41 @@ const cases: Case[] = [
       expect(back.json()).toMatchObject({
         tokenCaps: { daily: null, monthly: null },
       });
+    },
+  ],
+  [
+    "limits an Owner tool's key to the AI Providers it names, or lets it use every one",
+    async (setup) => {
+      const { gatewayKey } = createdGatewayKeySchema.parse(
+        (
+          await request(setup, "POST", "/api/gateway-keys", { name: "Codex" })
+        ).json(),
+      );
+      // Every AI Provider until set.
+      expect(gatewayKey.aiProviders).toBeNull();
+      const url = `/api/gateway-keys/${gatewayKey.id}`;
+      // Each once, in the office's order.
+      const set = await request(setup, "PATCH", url, {
+        aiProviders: ["OpenRouter", "Claude", "OpenRouter"],
+      });
+      expect(set.statusCode).toBe(200);
+      expect(set.json()).toMatchObject({
+        aiProviders: ["Claude", "OpenRouter"],
+      });
+      const listed = gatewayKeyListSchema.parse(
+        (await request(setup, "GET", "/api/gateway-keys")).json(),
+      );
+      expect(listed.keys.find(({ id }) => id === gatewayKey.id)).toMatchObject({
+        aiProviders: ["Claude", "OpenRouter"],
+      });
+
+      for (const bad of [[], ["Skynet"], "Claude"]) {
+        expect(
+          (await request(setup, "PATCH", url, { aiProviders: bad })).statusCode,
+        ).toBe(400);
+      }
+      const back = await request(setup, "PATCH", url, { aiProviders: null });
+      expect(back.json()).toMatchObject({ aiProviders: null });
     },
   ],
   [

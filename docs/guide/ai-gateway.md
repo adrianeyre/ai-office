@@ -424,7 +424,8 @@ one client there, and one sandbox would lock every Agent out.
   also change its access, set its own **daily** and **monthly limit**
   (**Office default**, **Own limit** in tokens, or **Unlimited**; see
   [Owner tools' caps](floors-and-agents.md#owner-tools-caps)), with
-  today's and this month's use beside them, be **disabled** (the Gateway and sign-in refuse
+  today's and this month's use beside them, choose its **AI Providers**
+  (see [A key's AI Providers](#a-keys-ai-providers)), be **disabled** (the Gateway and sign-in refuse
   it, and its web sessions end, until it is **enabled** again) and be
   revoked. An Agent's key keeps its Agent's name, is always enabled and
   only calls models.
@@ -432,9 +433,11 @@ one client there, and one sandbox would lock every Agent out.
   `{"currentPassword", "code"}` for `proxy_and_ui` (`403 proof_required`
   without them, or from a session begun with an API key; `422
   wrong_password` or `wrong_code`). `PATCH /api/gateway-keys/:id` with any
-  of `{"name", "access", "enabled", "tokenCaps"}`, where `tokenCaps` is
-  `{"daily", "monthly"}`, each a number of tokens, `"unlimited"`, or
-  `null` for the office's cap (an Owner tool's key only; `409
+  of `{"name", "access", "enabled", "tokenCaps", "aiProviders"}`, where
+  `tokenCaps` is `{"daily", "monthly"}`, each a number of tokens,
+  `"unlimited"`, or `null` for the office's cap, and `aiProviders` is a
+  list of one or more AI Providers (`["Claude", "OpenRouter"]`), or `null`
+  for every one (an Owner tool's key only; `409
   agent_key_no_ui` for an Agent's), with the same proof when the change
   lets the key sign in where it could not, `PUT /api/gateway-keys/:id/profile` with `{"nickname",
   "timeZone"}`, `GET /api/gateway-keys/usage`, and `POST
@@ -442,6 +445,27 @@ one client there, and one sandbox would lock every Agent out.
   password sign-in is (`401 wrong_api_key` for a key that is not in use,
   enabled and with UI access). A session records the key that began it
   (`sessions.gateway_key_id`, and `gatewayKeyId` in `GET /api/session`).
+
+#### A key's AI Providers
+
+By default, one of your tools' keys is served by any AI Provider you have
+an AI Account for, now or later (**All AI Providers**). Choose **Only
+these** on its card and tick one or more of the AI Providers you have set
+up, and the Gateway serves it from those AI Providers' AI Accounts alone,
+as if you had no others:
+
+- **Its calls.** A Model of another AI Provider's goes to an allowed
+  compatible endpoint (Anthropic- or OpenAI-compatible, which is sent any
+  Model) if one can serve it, and is otherwise refused with a `503`
+  naming the AI Providers the key may use. A Combo's slots on other AI Providers' accounts are
+  skipped, and an `x-ai-office-account` header forcing one of their
+  accounts is refused.
+- **Its Models.** `GET /v1/models` lists only the Models of its AI
+  Providers' accounts.
+- **Kept** in `gateway_keys.ai_providers` (null for every AI Provider).
+  Agents' keys and the Terminal's always use every AI Provider: an Agent
+  is served by its own AI Provider (see
+  [Floors and Agents](floors-and-agents.md)).
 
 With `GATEWAY_FIXTURES_DIR` set, the Gateway also writes each
 request/response pair there as a contract-test fixture

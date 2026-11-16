@@ -220,6 +220,7 @@ const gatewayKey = (
   access: "proxy",
   enabled: true,
   tokenCaps: { daily: null, monthly: null },
+  aiProviders: null,
   ...overrides,
 });
 

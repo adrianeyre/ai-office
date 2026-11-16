@@ -12,6 +12,7 @@ import {
   type GatewayKey,
   type GatewayKeyAccess,
   type GatewayKeyUsage,
+  type KeyAiProviders,
   type KeyTokenCap,
 } from "@ai-office/shared";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -43,6 +44,7 @@ import {
   problemsIn,
   problemsOf,
 } from "./gateway-keys-card.tsx";
+import { aiProvidersQuery } from "./ai-providers-card.tsx";
 import { OwnerPasswords } from "./owner-passwords.tsx";
 import { OwnerProofFields, useOwnerProof } from "./owner-proof.tsx";
 import { timeZoneLabel, timeZones } from "./time-zones.ts";
@@ -127,7 +129,22 @@ interface KeyFormValues {
   dailyCap: string;
   monthlyMode: CapMode;
   monthlyCap: string;
+  /** Every AI Provider, or only those ticked. */
+  providersMode: "all" | "only";
+  providers: string[];
 }
+
+/** The AI Providers a key may use, from the form; null for all. */
+const aiProvidersFrom = (values: KeyFormValues): string[] | null =>
+  values.providersMode === "all" ? null : values.providers;
+
+const sameAiProviders = (
+  a: readonly string[] | null,
+  b: KeyAiProviders,
+): boolean =>
+  a === null || b === null
+    ? a === b
+    : a.length === b.length && a.every((each) => b.includes(each as never));
 
 const capModeOf = (cap: KeyTokenCap): CapMode =>
   cap === null ? "office" : cap === unlimitedTokenCap ? "unlimited" : "own";
@@ -171,6 +188,8 @@ function KeyForm({ gatewayKey }: { gatewayKey: GatewayKey }) {
     dailyCap: capFieldOf(key.tokenCaps.daily),
     monthlyMode: capModeOf(key.tokenCaps.monthly),
     monthlyCap: capFieldOf(key.tokenCaps.monthly),
+    providersMode: key.aiProviders === null ? "all" : "only",
+    providers: [...(key.aiProviders ?? [])],
   });
   const {
     register,
@@ -190,6 +209,19 @@ function KeyForm({ gatewayKey }: { gatewayKey: GatewayKey }) {
     ...officeTokenUsageQuery,
     enabled: ownerTool,
   });
+  const providersMode = useWatch({ control, name: "providersMode" });
+  // The AI Providers set up (with an AI Account), and any the key names.
+  const { data: aiProviderList } = useQuery({
+    ...aiProvidersQuery,
+    enabled: ownerTool,
+  });
+  const providerChoices = (aiProviderList ?? [])
+    .filter(
+      ({ aiProvider, hasAccount }) =>
+        hasAccount === true ||
+        (gatewayKey.aiProviders ?? []).includes(aiProvider),
+    )
+    .map(({ aiProvider }) => aiProvider);
   const toolUsage = officeUsage?.ownerTools.find(
     ({ ownerTool: name }) => name === gatewayKey.name,
   )?.usage;
@@ -215,6 +247,11 @@ function KeyForm({ gatewayKey }: { gatewayKey: GatewayKey }) {
       dirtyFields.dailyCap === true ||
       dirtyFields.monthlyMode === true ||
       dirtyFields.monthlyCap === true;
+    const chosenProviders = aiProvidersFrom(values);
+    const providersChanged = !sameAiProviders(
+      chosenProviders,
+      gatewayKey.aiProviders,
+    );
     const changes = gatewayKeyUpdateRequestSchema.safeParse({
       ...(dirtyFields.name === true ? { name: values.name } : {}),
       ...(dirtyFields.access === true ? { access: values.access } : {}),
@@ -226,13 +263,16 @@ function KeyForm({ gatewayKey }: { gatewayKey: GatewayKey }) {
             },
           }
         : {}),
+      ...(providersChanged ? { aiProviders: chosenProviders } : {}),
     });
+    const keyChanged =
+      dirtyFields.name === true ||
+      dirtyFields.access === true ||
+      capsChanged ||
+      providersChanged;
     const issues = [
       ...(profile.error?.issues ?? []),
-      ...(ownerTool &&
-      (dirtyFields.name === true || dirtyFields.access === true || capsChanged)
-        ? (changes.error?.issues ?? [])
-        : []),
+      ...(ownerTool && keyChanged ? (changes.error?.issues ?? []) : []),
     ];
     if (!profile.success || issues.length > 0) {
       setProblems(issues.map(({ message }) => message));
@@ -244,11 +284,7 @@ function KeyForm({ gatewayKey }: { gatewayKey: GatewayKey }) {
     }
     const keyUrl = `/api/gateway-keys/${encodeURIComponent(gatewayKey.id)}`;
     let updated = gatewayKey;
-    if (
-      ownerTool &&
-      changes.success &&
-      (dirtyFields.name === true || dirtyFields.access === true || capsChanged)
-    ) {
+    if (ownerTool && changes.success && keyChanged) {
       const response = await sendJson(
         "PATCH",
         keyUrl,
@@ -396,6 +432,60 @@ function KeyForm({ gatewayKey }: { gatewayKey: GatewayKey }) {
               </p>
             </div>
           ))}
+        </fieldset>
+      )}
+      {ownerTool && (
+        <fieldset className="space-y-2">
+          <legend className="mb-2 text-sm font-medium">AI Providers</legend>
+          <div className="flex flex-wrap gap-4">
+            {(["all", "only"] as const).map((mode) => (
+              <div key={mode} className="flex items-center gap-2">
+                <input
+                  id={id(`providers-${mode}`)}
+                  type="radio"
+                  value={mode}
+                  className="size-4"
+                  aria-describedby={id("providers-hint")}
+                  {...register("providersMode")}
+                />
+                <Label htmlFor={id(`providers-${mode}`)}>
+                  {mode === "all" ? "All AI Providers" : "Only these"}
+                </Label>
+              </div>
+            ))}
+          </div>
+          {providersMode === "only" && (
+            <div
+              role="group"
+              aria-label="AI Providers this key may use"
+              className="flex flex-wrap gap-4"
+            >
+              {providerChoices.map((aiProvider) => (
+                <div key={aiProvider} className="flex items-center gap-2">
+                  <input
+                    id={id(`provider-${aiProvider}`)}
+                    type="checkbox"
+                    value={aiProvider}
+                    className="size-4"
+                    {...register("providers")}
+                  />
+                  <Label htmlFor={id(`provider-${aiProvider}`)}>
+                    {aiProvider}
+                  </Label>
+                </div>
+              ))}
+            </div>
+          )}
+          <p
+            id={id("providers-hint")}
+            className="text-xs text-muted-foreground"
+          >
+            {providersMode === "all"
+              ? "Served by any AI Provider you have an AI Account for, now or later."
+              : providerChoices.length === 0
+                ? "Add an AI Account in AI Settings to choose its AI Provider."
+                : "Served only by these AI Providers' AI Accounts; a Model of another's is refused."}
+          </p>
         </fieldset>
       )}
       {givesUi && (

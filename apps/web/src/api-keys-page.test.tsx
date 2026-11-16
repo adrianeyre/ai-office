@@ -28,6 +28,7 @@ const toolKey: GatewayKey = {
   access: "proxy",
   enabled: true,
   tokenCaps: { daily: null, monthly: null },
+  aiProviders: null,
 };
 
 const agentKey: GatewayKey = {
@@ -119,6 +120,25 @@ function stubServer({
           return Promise.resolve(Response.json({ keys }));
         case "/api/office/token-caps":
           return Promise.resolve(Response.json(officeUsage));
+        case "/api/ai-providers":
+          return Promise.resolve(
+            Response.json({
+              aiProviders: (
+                [
+                  ["Claude", "Claude Code", true],
+                  ["ChatGPT", "Codex", false],
+                  ["OpenRouter", "opencode", true],
+                ] as const
+              ).map(([aiProvider, agentTool, hasAccount]) => ({
+                aiProvider,
+                agentTool,
+                defaultModel: null,
+                models: [],
+                catalogueFetchedAt: null,
+                hasAccount,
+              })),
+            }),
+          );
         case "/api/gateway-keys/usage":
           return Promise.resolve(
             Response.json({
@@ -278,6 +298,46 @@ describe("API Key Management", () => {
     ]);
     const ada = await keyCard("Ada");
     expect(ada.queryByLabelText("Daily limit")).toBeNull();
+  });
+
+  it("lets a tool's key use every AI Provider, or only those ticked of those set up", async () => {
+    const { sent } = stubServer();
+    renderPage();
+    const codex = await keyCard("Codex");
+    const form = within(codex.getByRole("form", { name: "Codex's settings" }));
+    expect(
+      form.getByLabelText<HTMLInputElement>("All AI Providers").checked,
+    ).toBe(true);
+    await userEvent.click(form.getByLabelText("Only these"));
+    const choices = within(
+      await form.findByRole("group", { name: "AI Providers this key may use" }),
+    );
+    // Only those with an AI Account are offered.
+    expect(await choices.findByLabelText("Claude")).toBeDefined();
+    expect(choices.getByLabelText("OpenRouter")).toBeDefined();
+    expect(choices.queryByLabelText("ChatGPT")).toBeNull();
+    // At least one.
+    await userEvent.click(form.getByRole("button", { name: "Save Codex" }));
+    expect(
+      await form.findByText("Allow the key at least one AI Provider."),
+    ).toBeDefined();
+    expect(sent).toEqual([]);
+    await userEvent.click(choices.getByLabelText("OpenRouter"));
+    await userEvent.click(choices.getByLabelText("Claude"));
+    await userEvent.click(form.getByRole("button", { name: "Save Codex" }));
+    expect(await form.findByRole("status")).toBeDefined();
+    // Back to every AI Provider.
+    await userEvent.click(form.getByLabelText("All AI Providers"));
+    await userEvent.click(form.getByRole("button", { name: "Save Codex" }));
+    await vi.waitFor(() => {
+      expect(sent).toHaveLength(2);
+    });
+    expect(sent.map(({ body }) => body)).toEqual([
+      { aiProviders: ["Claude", "OpenRouter"] },
+      { aiProviders: null },
+    ]);
+    const ada = await keyCard("Ada");
+    expect(ada.queryByLabelText("All AI Providers")).toBeNull();
   });
 
   it("disables and enables a tool's key, but never an Agent's", async () => {

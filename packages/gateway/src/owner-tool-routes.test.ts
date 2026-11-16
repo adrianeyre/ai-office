@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { collapsedV1 } from "./gateway.ts";
+import { collapsedV1, type AccountRequest } from "./gateway.ts";
+import { staticKeys } from "./keys/keys.ts";
 import {
   gatewayKey,
   startFakeUpstream,
+  testCaller,
   startGateway,
   type FakeUpstream,
   type RunningGateway,
@@ -140,5 +142,52 @@ describe("GET /v1/models", () => {
     const response = await fetch(`${gateway.url}/v1/models`);
 
     expect(response.status).toBe(401);
+  });
+});
+
+describe("a Gateway Key limited to some AI Providers", () => {
+  const limitedKey = "aio_gk_akeylimitedtosomeaiproviders00000000000";
+  const keys = staticKeys({
+    [gatewayKey]: testCaller,
+    [limitedKey]: {
+      kind: "owner_tool",
+      keyId: "limited-key",
+      name: "Script",
+      aiProviders: ["OpenRouter"],
+    },
+  });
+
+  it("asks for its calls' accounts, and its Models, of those AI Providers only", async () => {
+    const asked: (readonly string[] | undefined)[] = [];
+    const listed: (readonly string[] | undefined)[] = [];
+    gateway = await startGateway({
+      keys,
+      accounts: {
+        select: (request: AccountRequest) => {
+          asked.push(request.aiProviders);
+          return Promise.resolve(undefined);
+        },
+      },
+      models: (aiProviders) => {
+        listed.push(aiProviders);
+        return Promise.resolve([]);
+      },
+    });
+    for (const key of [gatewayKey, limitedKey]) {
+      await fetch(`${gateway.url}/v1/messages`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "anthropic-version": "2023-06-01",
+          "x-api-key": key,
+        },
+        body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: 1 }),
+      });
+      await fetch(`${gateway.url}/v1/models`, {
+        headers: { authorization: `Bearer ${key}` },
+      });
+    }
+    expect(asked).toEqual([undefined, ["OpenRouter"]]);
+    expect(listed).toEqual([undefined, ["OpenRouter"]]);
   });
 });

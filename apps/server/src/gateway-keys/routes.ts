@@ -52,6 +52,7 @@ export const gatewayKeyBody = (key: GatewayKeyInfo): GatewayKey => ({
   access: key.access ?? "proxy",
   enabled: key.enabled ?? true,
   tokenCaps: key.tokenCaps ?? noTokenCaps,
+  aiProviders: key.aiProviders ?? null,
 });
 
 /** Answers a `GatewayKeyError` with its status; anything else is rethrown. */

@@ -234,6 +234,12 @@ export const gatewayKeys = pgTable(
      * `"unlimited"`, or null for the office's. Null until set.
      */
     tokenCaps: jsonb("token_caps"),
+    /**
+     * The AI Providers an Owner tool's key may be served by, as
+     * `keyAiProvidersSchema` (packages/shared) checks them: a list, or
+     * null for every one. Null until set.
+     */
+    aiProviders: jsonb("ai_providers"),
   },
   (table) => [
     check(
