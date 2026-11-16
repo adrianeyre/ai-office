@@ -207,6 +207,12 @@ export interface AccountRequest {
    * no Responses API) is left out.
    */
   readonly endpoint?: GatewayEndpoint;
+  /**
+   * The AI Providers its caller's Gateway Key may be served by (FR-46):
+   * only their accounts are considered, a forced one included. Absent for
+   * every AI Provider.
+   */
+  readonly aiProviders?: readonly string[];
 }
 
 /** Where the Gateway finds the AI Account to serve each request from. */
@@ -399,9 +405,12 @@ export interface GatewayOptions {
   /**
    * The Models the Gateway lists at `GET /v1/models`, for clients that ask
    * which there are before they call one (OpenAI's SDKs, editors and chat
-   * apps, Anthropic's). Without it, the list is empty.
+   * apps, Anthropic's), only of the AI Providers the caller's key may use
+   * if it names them. Without it, the list is empty.
    */
-  readonly models?: () => Promise<readonly GatewayModel[]>;
+  readonly models?: (
+    aiProviders: readonly string[] | undefined,
+  ) => Promise<readonly GatewayModel[]>;
 }
 
 /** A Model `GET /v1/models` lists. */
@@ -1251,8 +1260,12 @@ export async function buildGateway(
     },
     async (request, reply) => {
       const format = listFormat(request);
+      const caller = callers.get(request);
       try {
-        const models = (await options.models?.()) ?? [];
+        const models =
+          (await options.models?.(
+            caller?.kind === "owner_tool" ? caller.aiProviders : undefined,
+          )) ?? [];
         return await reply.send(modelList(models, format));
       } catch (error) {
         request.log.error({ err: error }, "The Models could not be listed.");
@@ -1646,6 +1659,9 @@ export async function buildGateway(
             avoid: tried,
             model: requestedModel(body),
             endpoint,
+            ...(caller.kind === "owner_tool" && caller.aiProviders !== undefined
+              ? { aiProviders: caller.aiProviders }
+              : {}),
           });
         } catch (error) {
           if (lastFailure !== undefined) {

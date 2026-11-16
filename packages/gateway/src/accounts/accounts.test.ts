@@ -17,6 +17,10 @@ import {
 } from "@ai-office/shared/crypto";
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  AccountsUnavailableError,
+  ForcedAccountError,
+} from "../balancing/balancing.ts";
 import { databaseRequestLog, memoryRequestLog } from "../request-log.ts";
 import {
   gatewayKey,
@@ -422,6 +426,62 @@ const cases: Case[] = [
         await gateway.close();
         await upstream.close();
       }
+    },
+  ],
+  [
+    "serves a Gateway Key that names its AI Providers from their accounts only, a forced one too",
+    async ({ accounts }) => {
+      const claude = await accounts.add(apiKeyAccount(firstKey, "Claude"));
+      await accounts.add({
+        name: "OpenRouter",
+        aiProvider: "OpenRouter",
+        accountType: "api_key",
+        credential: "sk-or-v1-openrouteraccountsecret0123456789abcdef",
+        priority: 2,
+      });
+      // Every AI Provider: Claude's account, the better priority, serves.
+      expect((await accounts.select(anyCaller))?.name).toBe("Claude");
+      expect(
+        (await accounts.select({ ...anyCaller, aiProviders: ["OpenRouter"] }))
+          ?.name,
+      ).toBe("OpenRouter");
+      expect(
+        (
+          await accounts.select({
+            ...anyCaller,
+            aiProviders: ["Claude", "OpenRouter"],
+          })
+        )?.name,
+      ).toBe("Claude");
+      // A Model of an AI Provider the key may not use is refused, saying so.
+      const refused: unknown = await accounts
+        .select({
+          ...anyCaller,
+          model: "claude-opus-5-5",
+          aiProviders: ["Gemini"],
+        })
+        .catch((error: unknown) => error);
+      expect(refused).toBeInstanceOf(AccountsUnavailableError);
+      expect((refused as Error).message).toBe(
+        "This Gateway Key may use only Gemini, and no AI Account of theirs can serve this request.",
+      );
+      // Nor is an account of another AI Provider's forced on it.
+      await expect(
+        accounts.select({
+          ...anyCaller,
+          forcedAccount: claude.id,
+          aiProviders: ["OpenRouter"],
+        }),
+      ).rejects.toThrow(ForcedAccountError);
+      expect(
+        (
+          await accounts.select({
+            ...anyCaller,
+            forcedAccount: "Claude",
+            aiProviders: ["Claude"],
+          })
+        )?.name,
+      ).toBe("Claude");
     },
   ],
   [

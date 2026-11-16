@@ -443,6 +443,7 @@ export {
   gatewayKeyListSchema,
   gatewayKeyPrefix,
   gatewayKeySchema,
+  keyAiProvidersSchema,
   type CreatedGatewayKey,
   type CreateGatewayKeyRequest,
   type GatewayKey,
@@ -451,6 +452,7 @@ export {
   type GatewayKeyUsage,
   type GatewayKeyErrorCode,
   type GatewayKeyKind,
+  type KeyAiProviders,
 } from "./gateway-keys.ts";
 export {
   aiProviderAgentTools,

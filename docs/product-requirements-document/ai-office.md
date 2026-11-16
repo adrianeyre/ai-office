@@ -319,6 +319,7 @@ The AI Gateway is built into AI Office ([ADR 0001](../architectural-decision-rec
   - Each Agent gets a Gateway Key automatically.
   - The Owner can create named Gateway Keys for their own tools (local Claude Code, Codex and others).
   - Keys can be revoked, show when they were last used, and are scoped to calling models only.
+  - An Owner tool's key may use every AI Provider the Owner has an AI Account for (the default), or only the ones the Owner chooses for it, set in API Key Management.
 - **FR-47 (health):** a health endpoint with account and database status, used by `docker compose` health checks.
 
 ### 6.9 Notice Board and Activity Feed

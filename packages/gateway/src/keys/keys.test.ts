@@ -190,6 +190,36 @@ const cases: Case[] = [
     },
   ],
   [
+    "keeps the AI Providers an Owner tool key may use, and tells the Gateway them with its caller",
+    async ({ keys, bus }) => {
+      const { gatewayKey, key } = await keys.createOwnerToolKey("Script");
+      const aiProviders = ["Claude", "OpenRouter"] as const;
+      expect(
+        await keys.update(gatewayKey.id, { aiProviders: [...aiProviders] }),
+      ).toMatchObject({ aiProviders });
+      expect(await keys.authenticate(key)).toEqual({
+        kind: "owner_tool",
+        keyId: gatewayKey.id,
+        name: "Script",
+        aiProviders,
+      });
+      const events = await bus.eventsAfter(0);
+      expect(events.at(-1)?.event).toMatchObject({
+        type: "config.changed",
+        keys: ["gatewayKeys.aiProviders"],
+      });
+      // Back to every AI Provider.
+      expect(
+        (await keys.update(gatewayKey.id, { aiProviders: null })).aiProviders,
+      ).toBeUndefined();
+      expect(await keys.authenticate(key)).toEqual({
+        kind: "owner_tool",
+        keyId: gatewayKey.id,
+        name: "Script",
+      });
+    },
+  ],
+  [
     "refuses a second Owner tool key in use with the same name",
     async ({ keys }) => {
       const first = await keys.createOwnerToolKey("Codex");

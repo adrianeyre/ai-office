@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { aiProviders, type AiProvider } from "./agents.ts";
 import { ownerProofShape } from "./auth.ts";
 import { defaultKeyProfile, keyProfileSchema } from "./people.ts";
 import { keyTokenCapsSchema, noTokenCaps } from "./token-caps.ts";
@@ -63,6 +64,26 @@ export type CreateGatewayKeyRequest = z.infer<
   typeof createGatewayKeyRequestSchema
 >;
 
+/**
+ * The AI Providers an Owner tool's key may be served by: one or more, each
+ * once, kept in the order of `aiProviders`; null for every AI Provider the
+ * Owner has an AI Account for, now or later.
+ */
+export const keyAiProvidersSchema = z
+  .array(
+    z.enum(aiProviders, {
+      error: `An AI Provider is one of ${aiProviders.join(", ")}.`,
+    }),
+  )
+  .min(1, {
+    error: "Allow the key at least one AI Provider.",
+  })
+  .transform((chosen): AiProvider[] =>
+    aiProviders.filter((aiProvider) => chosen.includes(aiProvider)),
+  )
+  .nullable();
+export type KeyAiProviders = z.infer<typeof keyAiProvidersSchema>;
+
 /** A Gateway Key, as the API sends it: never the key itself. */
 export const gatewayKeySchema = z.object({
   id: z.string(),
@@ -91,11 +112,17 @@ export const gatewayKeySchema = z.object({
    * number of tokens, `unlimited`, or null to be held to the office's.
    */
   tokenCaps: keyTokenCapsSchema.default(noTokenCaps),
+  /**
+   * The AI Providers an Owner tool's key may be served by; null for all of
+   * them. Set in API Key Management.
+   */
+  aiProviders: keyAiProvidersSchema.default(null),
 });
 
 /**
  * The body of `PATCH /api/gateway-keys/:keyId`: an Owner tool's key's
- * name, access, whether it is enabled, and its own Token Caps. A change after which the key signs in
+ * name, access, whether it is enabled, its own Token Caps and the AI
+ * Providers it may use. A change after which the key signs in
  * where it did not (UI access given, or a UI key enabled again) needs a
  * fresh proof of the Owner (A1-3).
  */
@@ -105,18 +132,20 @@ export const gatewayKeyUpdateRequestSchema = z
     access: z.enum(gatewayKeyAccessLevels),
     enabled: z.boolean(),
     tokenCaps: keyTokenCapsSchema,
+    aiProviders: keyAiProvidersSchema,
   })
   .partial()
   .extend(ownerProofShape)
   .refine(
-    ({ name, access, enabled, tokenCaps }) =>
+    ({ name, access, enabled, tokenCaps, aiProviders: allowed }) =>
       name !== undefined ||
       access !== undefined ||
       enabled !== undefined ||
-      tokenCaps !== undefined,
+      tokenCaps !== undefined ||
+      allowed !== undefined,
     {
       error:
-        "Change the name, the access, whether it is enabled or its Token Caps.",
+        "Change the name, the access, whether it is enabled, its Token Caps or its AI Providers.",
     },
   );
 export type GatewayKeyUpdateRequest = z.infer<

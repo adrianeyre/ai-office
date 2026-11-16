@@ -8,6 +8,7 @@ import {
   terminalKeyName,
   type GatewayKeyAccess,
   type GatewayKeyErrorCode,
+  type KeyAiProviders,
   type KeyProfile,
   type KeyTokenCaps,
 } from "@ai-office/shared";
@@ -58,6 +59,11 @@ export type GatewayCaller =
        * where it is held to the office's.
        */
       readonly tokenCaps?: KeyTokenCaps;
+      /**
+       * The AI Providers the key may be served by; absent, as the
+       * Terminal's is, for every one.
+       */
+      readonly aiProviders?: readonly string[];
     };
 
 /** How the Gateway tells who is calling. */
@@ -93,8 +99,8 @@ export interface GatewayKeys extends GatewayKeyAuthenticator {
     access?: GatewayKeyAccess,
   ): Promise<{ gatewayKey: GatewayKeyInfo; key: string }>;
   /**
-   * Sets an Owner tool's key's name, access, whether it is enabled, and its
-   * own Token Caps.
+   * Sets an Owner tool's key's name, access, whether it is enabled, its
+   * own Token Caps and the AI Providers it may use.
    */
   update(
     id: string,
@@ -103,6 +109,7 @@ export interface GatewayKeys extends GatewayKeyAuthenticator {
       readonly access?: GatewayKeyAccess | undefined;
       readonly enabled?: boolean | undefined;
       readonly tokenCaps?: KeyTokenCaps | undefined;
+      readonly aiProviders?: KeyAiProviders | undefined;
     },
   ): Promise<GatewayKeyInfo>;
   /**
@@ -194,6 +201,7 @@ export const gatewayKeyInfo = (key: GatewayKeyRecord): GatewayKeyInfo => ({
   access: key.access ?? "proxy",
   enabled: key.enabled ?? true,
   ...(key.tokenCaps === undefined ? {} : { tokenCaps: key.tokenCaps }),
+  ...(key.aiProviders == null ? {} : { aiProviders: key.aiProviders }),
 });
 
 export function createGatewayKeys(options: GatewayKeysOptions): GatewayKeys {
@@ -328,6 +336,9 @@ export function createGatewayKeys(options: GatewayKeysOptions): GatewayKeys {
             ...(found.tokenCaps === undefined
               ? {}
               : { tokenCaps: found.tokenCaps }),
+            ...(found.aiProviders == null
+              ? {}
+              : { aiProviders: found.aiProviders }),
           };
     },
 

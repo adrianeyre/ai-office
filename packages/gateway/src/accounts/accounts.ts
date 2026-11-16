@@ -2159,7 +2159,23 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
     // Model `modelSentTo` gives it (FR-41), and judged by that Model.
     async select(request: AccountRequest): Promise<ChosenAccount | undefined> {
       const at = now();
-      const accounts = await store.list();
+      const every = await store.list();
+      // A Gateway Key that names its AI Providers (FR-46) is served by
+      // their accounts only, as if the Owner had no others: a Model of
+      // another AI Provider's goes to an allowed compatible endpoint, if
+      // there is one, and a Combo's slots of others' are skipped.
+      const allowed = request.aiProviders;
+      const accounts =
+        allowed === undefined
+          ? every
+          : every.filter((account) => allowed.includes(account.aiProvider));
+      /** What a key limited to its AI Providers is told when none serves. */
+      const notAllowed = () =>
+        new AccountsUnavailableError(
+          503,
+          `This Gateway Key may use only ${(allowed ?? []).join(", ")}, and no AI Account of theirs can serve this request.`,
+          undefined,
+        );
       const mappings = (await options.modelMappings?.rules()) ?? [];
       const requested = request.model ?? null;
       /** The Model an account would be sent, before its forced one. */
@@ -2253,12 +2269,17 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
           aiProviderOfModel(model) !== undefined);
       const forced = request.forcedAccount ?? null;
       if (forced !== null) {
-        const account = accounts.find(
+        const account = every.find(
           ({ id, name }) => id === forced || name === forced,
         );
         if (account === undefined) {
           throw new ForcedAccountError(
             `The forced AI Account "${forced}" does not exist.`,
+          );
+        }
+        if (!accounts.includes(account)) {
+          throw new ForcedAccountError(
+            `The forced AI Account "${account.name}" is a ${account.aiProvider} account, which this Gateway Key may not use.`,
           );
         }
         if (account.paused) {
@@ -2460,6 +2481,9 @@ export function createAiAccounts(options: AiAccountsOptions): AiAccounts {
             `${aliased ?? ""} is a ${host ?? ""} Model, and no ${host ?? ""} AI Account can serve this request now; it is not sent to another AI Provider's.`,
             undefined,
           );
+        }
+        if (allowed !== undefined) {
+          throw notAllowed();
         }
         return undefined;
       }

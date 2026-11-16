@@ -351,6 +351,7 @@ CREATE TABLE "gateway_keys" (
 	"access" text DEFAULT 'proxy' NOT NULL,
 	"enabled" boolean DEFAULT true NOT NULL,
 	"token_caps" jsonb,
+	"ai_providers" jsonb,
 	CONSTRAINT "gateway_keys_key_hash_unique" UNIQUE("key_hash"),
 	CONSTRAINT "gateway_keys_access" CHECK ("gateway_keys"."access" IN ('proxy', 'proxy_and_ui') AND ("gateway_keys"."access" = 'proxy' OR "gateway_keys"."kind" = 'owner_tool')),
 	CONSTRAINT "gateway_keys_enabled" CHECK ("gateway_keys"."enabled" OR "gateway_keys"."kind" = 'owner_tool'),

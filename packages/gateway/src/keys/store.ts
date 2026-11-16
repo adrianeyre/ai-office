@@ -1,9 +1,11 @@
 import { gatewayKeys, type Database } from "@ai-office/db";
 import {
+  keyAiProvidersSchema,
   keyProfileSchema,
   keyTokenCapsSchema,
   type GatewayKeyAccess,
   type GatewayKeyKind,
+  type KeyAiProviders,
   type KeyProfile,
   type KeyTokenCaps,
 } from "@ai-office/shared";
@@ -39,6 +41,8 @@ export interface GatewayKeyRecord {
   readonly enabled?: boolean | undefined;
   /** An Owner tool's key's own Token Caps; absent is the office's. */
   readonly tokenCaps?: KeyTokenCaps | undefined;
+  /** The AI Providers an Owner tool's key may use; absent or null is all. */
+  readonly aiProviders?: KeyAiProviders | undefined;
 }
 
 export interface GatewayKeyStore {
@@ -72,8 +76,9 @@ export interface GatewayKeyStore {
   ): Promise<GatewayKeyRecord | undefined>;
   /**
    * Sets an Owner tool key's name, what it may do, whether it is
-   * enabled, and its own Token Caps; undefined if there is none by that id in use, `name_taken`
-   * if another key in use has the name.
+   * enabled, its own Token Caps and the AI Providers it may use; undefined
+   * if there is none by that id in use, `name_taken` if another key in use
+   * has the name.
    */
   update(
     id: string,
@@ -82,6 +87,7 @@ export interface GatewayKeyStore {
       readonly access?: GatewayKeyAccess | undefined;
       readonly enabled?: boolean | undefined;
       readonly tokenCaps?: KeyTokenCaps | undefined;
+      readonly aiProviders?: KeyAiProviders | undefined;
     },
   ): Promise<GatewayKeyRecord | "name_taken" | undefined>;
 }
@@ -199,11 +205,13 @@ type GatewayKeyRow = typeof gatewayKeys.$inferSelect;
 const toRecord = ({
   profile,
   tokenCaps,
+  aiProviders,
   ...row
 }: GatewayKeyRow): GatewayKeyRecord => ({
   ...row,
   profile: keyProfileSchema.safeParse(profile).data,
   tokenCaps: keyTokenCapsSchema.safeParse(tokenCaps).data,
+  aiProviders: keyAiProvidersSchema.safeParse(aiProviders).data,
   access: row.access === "proxy_and_ui" ? "proxy_and_ui" : "proxy",
   enabled: row.enabled,
   kind:

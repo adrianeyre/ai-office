@@ -685,9 +685,17 @@ export async function startOffice(
     logger: logger.child({ component: "gateway" }),
     toolCallScreen: (request) => toolCallScreens.answer(request),
     accounts: aiAccounts,
-    // `GET /v1/models`: the catalogue's Models of the accounts there are.
-    models: async () =>
-      gatewayModels(await modelCatalogue.list(), await aiAccounts.list()),
+    // `GET /v1/models`: the catalogue's Models of the accounts there are,
+    // of the AI Providers the caller's key may use.
+    models: async (aiProviders) =>
+      gatewayModels(
+        await modelCatalogue.list(),
+        (await aiAccounts.list()).filter(
+          (account) =>
+            aiProviders === undefined ||
+            aiProviders.includes(account.aiProvider),
+        ),
+      ),
     // A paused Agent's key, an archived Floor's and a paused
     // Communications Agent's call no model (pen-testing G1-4).
     keys: keysAtWork({
