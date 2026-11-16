@@ -1,3 +1,9 @@
+## [1.11.0](https://github.com/adrianeyre/ai-office/compare/v1.10.0...v1.11.0) (2026-11-16)
+
+### Features
+
+* **gateway:** per-key Token Caps for Owner tool API keys, with unlimited ([fd76588](https://github.com/adrianeyre/ai-office/commit/fd76588a794775d1cf426f6c1f8e92361d6adbcd))
+
 ## [1.10.0](https://github.com/adrianeyre/ai-office/compare/v1.9.0...v1.10.0) (2026-11-15)
 
 ### Features
