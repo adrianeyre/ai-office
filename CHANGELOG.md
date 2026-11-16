@@ -1,3 +1,9 @@
+## [1.12.0](https://github.com/adrianeyre/ai-office/compare/v1.11.0...v1.12.0) (2026-11-16)
+
+### Features
+
+* **gateway:** per-key AI Providers for Owner tool API keys ([0921cfe](https://github.com/adrianeyre/ai-office/commit/0921cfeea7cec8996aeaeb04513c7f68d10783ea))
+
 ## [1.11.0](https://github.com/adrianeyre/ai-office/compare/v1.10.0...v1.11.0) (2026-11-16)
 
 ### Features
