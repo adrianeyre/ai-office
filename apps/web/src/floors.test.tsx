@@ -219,6 +219,7 @@ const gatewayKey = (
   profile: defaultOwnerProfile,
   access: "proxy",
   enabled: true,
+  tokenCaps: { daily: null, monthly: null },
   ...overrides,
 });
 

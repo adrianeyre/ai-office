@@ -1,9 +1,11 @@
 import { gatewayKeys, type Database } from "@ai-office/db";
 import {
   keyProfileSchema,
+  keyTokenCapsSchema,
   type GatewayKeyAccess,
   type GatewayKeyKind,
   type KeyProfile,
+  type KeyTokenCaps,
 } from "@ai-office/shared";
 import { and, desc, eq, isNull } from "drizzle-orm";
 
@@ -35,6 +37,8 @@ export interface GatewayKeyRecord {
   readonly access?: GatewayKeyAccess | undefined;
   /** False while disabled; absent is enabled. */
   readonly enabled?: boolean | undefined;
+  /** An Owner tool's key's own Token Caps; absent is the office's. */
+  readonly tokenCaps?: KeyTokenCaps | undefined;
 }
 
 export interface GatewayKeyStore {
@@ -67,8 +71,8 @@ export interface GatewayKeyStore {
     profile: KeyProfile,
   ): Promise<GatewayKeyRecord | undefined>;
   /**
-   * Sets an Owner tool key's name, what it may do, and whether it is
-   * enabled; undefined if there is none by that id in use, `name_taken`
+   * Sets an Owner tool key's name, what it may do, whether it is
+   * enabled, and its own Token Caps; undefined if there is none by that id in use, `name_taken`
    * if another key in use has the name.
    */
   update(
@@ -77,6 +81,7 @@ export interface GatewayKeyStore {
       readonly name?: string | undefined;
       readonly access?: GatewayKeyAccess | undefined;
       readonly enabled?: boolean | undefined;
+      readonly tokenCaps?: KeyTokenCaps | undefined;
     },
   ): Promise<GatewayKeyRecord | "name_taken" | undefined>;
 }
@@ -191,9 +196,14 @@ export function memoryGatewayKeyStore(): GatewayKeyStore & {
 
 type GatewayKeyRow = typeof gatewayKeys.$inferSelect;
 
-const toRecord = ({ profile, ...row }: GatewayKeyRow): GatewayKeyRecord => ({
+const toRecord = ({
+  profile,
+  tokenCaps,
+  ...row
+}: GatewayKeyRow): GatewayKeyRecord => ({
   ...row,
   profile: keyProfileSchema.safeParse(profile).data,
+  tokenCaps: keyTokenCapsSchema.safeParse(tokenCaps).data,
   access: row.access === "proxy_and_ui" ? "proxy_and_ui" : "proxy",
   enabled: row.enabled,
   kind:

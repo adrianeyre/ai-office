@@ -27,6 +27,7 @@ const toolKey: GatewayKey = {
   profile: defaultKeyProfile,
   access: "proxy",
   enabled: true,
+  tokenCaps: { daily: null, monthly: null },
 };
 
 const agentKey: GatewayKey = {
@@ -38,6 +39,30 @@ const agentKey: GatewayKey = {
   floorId: "web-shop",
   hint: "aio_gk_Ada1",
   lastUsedAt: null,
+};
+
+const used = (tokens: number) => ({
+  requests: 1,
+  inputTokens: tokens,
+  outputTokens: 0,
+  cacheReadTokens: 0,
+  cacheWriteTokens: 0,
+  tokens,
+  estimatedCostUsd: 0,
+});
+
+/** The office's caps, and what Codex used today and this month. */
+const officeUsage = {
+  caps: { daily: 5_000_000, monthly: 100_000_000 },
+  usage: { daily: used(1_200), monthly: used(80_000) },
+  busiestAgents: { daily: null, monthly: null },
+  floors: [],
+  ownerTools: [
+    {
+      ownerTool: "Codex",
+      usage: { daily: used(1_200), monthly: used(80_000) },
+    },
+  ],
 };
 
 const session = {
@@ -92,6 +117,8 @@ function stubServer({
           );
         case "/api/gateway-keys":
           return Promise.resolve(Response.json({ keys }));
+        case "/api/office/token-caps":
+          return Promise.resolve(Response.json(officeUsage));
         case "/api/gateway-keys/usage":
           return Promise.resolve(
             Response.json({
@@ -207,6 +234,50 @@ describe("API Key Management", () => {
         body: { nickname: "Ade", timeZone: "Asia/Tokyo" },
       },
     ]);
+  });
+
+  it("sets a tool's key's own daily limit and makes it unlimited monthly, but never an Agent's", async () => {
+    const { sent } = stubServer();
+    renderPage();
+    const codex = await keyCard("Codex");
+    const form = within(codex.getByRole("form", { name: "Codex's settings" }));
+    // Held to the office's caps until set, against what it used.
+    expect(
+      await form.findByText(
+        "Held to the office's Token Cap: 5,000,000 tokens a day. Used today: 1,200 tokens.",
+      ),
+    ).toBeDefined();
+    await userEvent.selectOptions(form.getByLabelText("Daily limit"), "own");
+    await userEvent.click(form.getByRole("button", { name: "Save Codex" }));
+    // A limit of its own needs a number of tokens.
+    expect(
+      await form.findByText(
+        'A key\'s Token Cap is a whole number of tokens, or "unlimited".',
+      ),
+    ).toBeDefined();
+    expect(sent).toEqual([]);
+    await userEvent.type(
+      form.getByLabelText("Daily limit in tokens"),
+      "250,000",
+    );
+    await userEvent.selectOptions(
+      form.getByLabelText("Monthly limit"),
+      "unlimited",
+    );
+    expect(
+      form.getByText(/^Never refused at a Token Cap\. Used this month: 80,000/),
+    ).toBeDefined();
+    await userEvent.click(form.getByRole("button", { name: "Save Codex" }));
+    expect(await form.findByRole("status")).toBeDefined();
+    expect(sent).toEqual([
+      {
+        method: "PATCH",
+        url: "/api/gateway-keys/codex-key",
+        body: { tokenCaps: { daily: 250_000, monthly: "unlimited" } },
+      },
+    ]);
+    const ada = await keyCard("Ada");
+    expect(ada.queryByLabelText("Daily limit")).toBeNull();
   });
 
   it("disables and enables a tool's key, but never an Agent's", async () => {

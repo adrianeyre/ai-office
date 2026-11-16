@@ -62,6 +62,48 @@ export type TokenCaps = z.infer<typeof tokenCapsSchema>;
 /** No caps of its own: the level falls back to the next. */
 export const noTokenCaps: TokenCaps = { daily: null, monthly: null };
 
+/** A Gateway Key's cap that lets its calls through whatever they use. */
+export const unlimitedTokenCap = "unlimited";
+
+/**
+ * One period's cap on an Owner tool's Gateway Key (FR-33, FR-46): a whole
+ * number of tokens, `unlimited`, or null to be held to the office's cap.
+ */
+export const keyTokenCapSchema = z
+  .union([tokenCapSchema.unwrap(), z.literal(unlimitedTokenCap)], {
+    error: 'A key\'s Token Cap is a whole number of tokens, or "unlimited".',
+  })
+  .nullable();
+export type KeyTokenCap = z.infer<typeof keyTokenCapSchema>;
+
+/** An Owner tool's key's daily and monthly caps; null uses the office's. */
+export const keyTokenCapsSchema = z.strictObject({
+  daily: keyTokenCapSchema,
+  monthly: keyTokenCapSchema,
+});
+export type KeyTokenCaps = z.infer<typeof keyTokenCapsSchema>;
+
+/** Where an Owner tool's cap in a period comes from. */
+export type KeyCapLevel = "office" | "key";
+
+/**
+ * The cap in force for an Owner tool's key in `period`: its own, else the
+ * office's; null when its own is `unlimited`.
+ */
+export function resolveKeyTokenCap(
+  office: OfficeTokenCaps,
+  key: KeyTokenCaps,
+  period: CapPeriod,
+): { readonly level: KeyCapLevel; readonly cap: number } | null {
+  const own = key[period];
+  if (own === unlimitedTokenCap) {
+    return null;
+  }
+  return own === null
+    ? { level: "office", cap: office[period] }
+    : { level: "key", cap: own };
+}
+
 /**
  * The office's default Token Caps until the Owner sets them: the tokens
  * each Agent may use a day and a month.

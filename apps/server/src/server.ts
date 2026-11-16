@@ -705,8 +705,10 @@ export async function startOffice(
     capCheck: (subject) => capEnforcement.check(subject),
     // The Communications Agent's Digests count against the office's caps.
     communicationsCapCheck: () => communicationsCapRefusal(tokenCaps),
-    // So do the Owner's tools', the Terminal's too, each its own.
-    ownerToolCapCheck: (ownerTool) => ownerToolCapRefusal(tokenCaps, ownerTool),
+    // So do the Owner's tools', the Terminal's too, each its own, unless
+    // its key sets caps of its own (API Key Management).
+    ownerToolCapCheck: (ownerTool, keyCaps) =>
+      ownerToolCapRefusal(tokenCaps, ownerTool, keyCaps),
     work: agentWork,
     keepAlive,
     fetch: upstream.fetch,

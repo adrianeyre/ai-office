@@ -252,7 +252,9 @@ AI Office makes the whole system visible, bounded and controllable, and makes it
   - The Agent pauses at a safe point.
   - An action Notice offers "raise cap" or "resume tomorrow".
 
-  Owner tools (FR-46) can have caps too.
+  Owner tools (FR-46) can have caps too: the office's by default, or
+  their key's own daily and monthly caps, each a number of tokens or
+  unlimited, set in API Key Management.
 
 ### 6.8 AI Gateway
 

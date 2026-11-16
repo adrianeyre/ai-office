@@ -265,7 +265,8 @@ async function office(options: { readonly hold?: number } = {}) {
     }),
     requestLog: requestHistory,
     capCheck: (subject) => enforcing.check(subject),
-    ownerToolCapCheck: (ownerTool) => ownerToolCapRefusal(caps, ownerTool),
+    ownerToolCapCheck: (ownerTool, keyCaps) =>
+      ownerToolCapRefusal(caps, ownerTool, keyCaps),
     work,
   });
   const url = await gateway.listen({ port: 0, host: "127.0.0.1" });

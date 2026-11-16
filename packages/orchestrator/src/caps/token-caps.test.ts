@@ -484,6 +484,56 @@ const cases: Case[] = [
       });
     },
   ],
+  [
+    "holds an Owner tool to its key's own cap, or none where it is unlimited, period by period",
+    async ({ caps, requests }) => {
+      await caps.setOfficeCaps({ daily: 1_000, monthly: 2_000 });
+      const laptop = {
+        floorId: null,
+        agentId: null,
+        issue: null,
+        ownerTool: "Laptop",
+      };
+      requests.push(
+        { at: today, ...laptop, input: 1_500, output: 0 },
+        { at: earlierThisMonth, ...laptop, input: 1_000, output: 0 },
+      );
+      // Past the office's caps, but under its own daily, unlimited monthly.
+      const own = { daily: 5_000, monthly: "unlimited" } as const;
+      expect(await caps.ownerToolCapUse("Laptop", own)).toEqual({
+        daily: { level: "key", cap: 5_000, used: 1_500 },
+        monthly: null,
+      });
+      expect(await ownerToolCapRefusal(caps, "Laptop", own)).toBeUndefined();
+      // A daily cap of its own lower than the office's is held to as well.
+      expect(
+        await ownerToolCapRefusal(caps, "Laptop", {
+          daily: 1_200,
+          monthly: "unlimited",
+        }),
+      ).toEqual({
+        message:
+          "The Owner tool \"Laptop\" reached its key's daily Token Cap (1,200 tokens), so AI Office refuses its calls until the day is over, or the Owner raises the key's cap in API Key Management.",
+      });
+      // Unlimited in both periods: never refused.
+      expect(
+        await ownerToolCapRefusal(caps, "Laptop", {
+          daily: "unlimited",
+          monthly: "unlimited",
+        }),
+      ).toBeUndefined();
+      // Null in a period falls back to the office's cap there.
+      expect(
+        await ownerToolCapRefusal(caps, "Laptop", {
+          daily: "unlimited",
+          monthly: null,
+        }),
+      ).toEqual({
+        message:
+          "The Owner tool \"Laptop\" reached the office's monthly Token Cap (2,000 tokens), so AI Office refuses its calls until the month is over, or the Owner raises the office's cap.",
+      });
+    },
+  ],
 ];
 
 describe("Token Caps, kept in memory", () => {

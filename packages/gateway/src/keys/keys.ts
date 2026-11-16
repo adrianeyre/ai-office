@@ -9,6 +9,7 @@ import {
   type GatewayKeyAccess,
   type GatewayKeyErrorCode,
   type KeyProfile,
+  type KeyTokenCaps,
 } from "@ai-office/shared";
 import type { Encryptor } from "@ai-office/shared/crypto";
 
@@ -52,6 +53,11 @@ export type GatewayCaller =
       readonly keyId: string;
       /** The Owner tool's name. */
       readonly name: string;
+      /**
+       * The key's own Token Caps (FR-33); absent, as the Terminal's are,
+       * where it is held to the office's.
+       */
+      readonly tokenCaps?: KeyTokenCaps;
     };
 
 /** How the Gateway tells who is calling. */
@@ -86,13 +92,17 @@ export interface GatewayKeys extends GatewayKeyAuthenticator {
     name: string,
     access?: GatewayKeyAccess,
   ): Promise<{ gatewayKey: GatewayKeyInfo; key: string }>;
-  /** Sets an Owner tool's key's access, and whether it is enabled. */
+  /**
+   * Sets an Owner tool's key's name, access, whether it is enabled, and its
+   * own Token Caps.
+   */
   update(
     id: string,
     changes: {
       readonly name?: string | undefined;
       readonly access?: GatewayKeyAccess | undefined;
       readonly enabled?: boolean | undefined;
+      readonly tokenCaps?: KeyTokenCaps | undefined;
     },
   ): Promise<GatewayKeyInfo>;
   /**
@@ -183,6 +193,7 @@ export const gatewayKeyInfo = (key: GatewayKeyRecord): GatewayKeyInfo => ({
   ...(key.profile === undefined ? {} : { profile: key.profile }),
   access: key.access ?? "proxy",
   enabled: key.enabled ?? true,
+  ...(key.tokenCaps === undefined ? {} : { tokenCaps: key.tokenCaps }),
 });
 
 export function createGatewayKeys(options: GatewayKeysOptions): GatewayKeys {
@@ -310,7 +321,14 @@ export function createGatewayKeys(options: GatewayKeysOptions): GatewayKeys {
             floorId: found.floorId,
             name: found.name,
           }
-        : { kind: "owner_tool", keyId: found.id, name: found.name };
+        : {
+            kind: "owner_tool",
+            keyId: found.id,
+            name: found.name,
+            ...(found.tokenCaps === undefined
+              ? {}
+              : { tokenCaps: found.tokenCaps }),
+          };
     },
 
     async list() {

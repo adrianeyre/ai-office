@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { ownerProofShape } from "./auth.ts";
 import { defaultKeyProfile, keyProfileSchema } from "./people.ts";
+import { keyTokenCapsSchema, noTokenCaps } from "./token-caps.ts";
 
 // Gateway Keys (PRD FR-46, ADR 0001): what callers of the AI Gateway
 // present to say who they are. Each Agent has one, made with it (the
@@ -85,11 +86,16 @@ export const gatewayKeySchema = z.object({
   access: z.enum(gatewayKeyAccessLevels).default("proxy"),
   /** False while disabled: refused everywhere, but kept to enable again. */
   enabled: z.boolean().default(true),
+  /**
+   * An Owner tool's key's own daily and monthly Token Caps (FR-33): a
+   * number of tokens, `unlimited`, or null to be held to the office's.
+   */
+  tokenCaps: keyTokenCapsSchema.default(noTokenCaps),
 });
 
 /**
  * The body of `PATCH /api/gateway-keys/:keyId`: an Owner tool's key's
- * access and whether it is enabled. A change after which the key signs in
+ * name, access, whether it is enabled, and its own Token Caps. A change after which the key signs in
  * where it did not (UI access given, or a UI key enabled again) needs a
  * fresh proof of the Owner (A1-3).
  */
@@ -98,13 +104,20 @@ export const gatewayKeyUpdateRequestSchema = z
     name,
     access: z.enum(gatewayKeyAccessLevels),
     enabled: z.boolean(),
+    tokenCaps: keyTokenCapsSchema,
   })
   .partial()
   .extend(ownerProofShape)
   .refine(
-    ({ name, access, enabled }) =>
-      name !== undefined || access !== undefined || enabled !== undefined,
-    { error: "Change the name, the access or whether it is enabled." },
+    ({ name, access, enabled, tokenCaps }) =>
+      name !== undefined ||
+      access !== undefined ||
+      enabled !== undefined ||
+      tokenCaps !== undefined,
+    {
+      error:
+        "Change the name, the access, whether it is enabled or its Token Caps.",
+    },
   );
 export type GatewayKeyUpdateRequest = z.infer<
   typeof gatewayKeyUpdateRequestSchema

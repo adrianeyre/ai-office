@@ -36,6 +36,7 @@ const ownerToolKey = (name: string, id: string): GatewayKey => ({
   profile: defaultOwnerProfile,
   access: "proxy",
   enabled: true,
+  tokenCaps: { daily: null, monthly: null },
 });
 
 const adaKey: GatewayKey = {
@@ -51,6 +52,7 @@ const adaKey: GatewayKey = {
   profile: defaultOwnerProfile,
   access: "proxy",
   enabled: true,
+  tokenCaps: { daily: null, monthly: null },
 };
 
 const session = {

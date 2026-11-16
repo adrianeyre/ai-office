@@ -7,8 +7,10 @@ import {
   communicationsAgentId,
   defaultGatewayRetrySettings,
   retryDelayMs,
+  unlimitedTokenCap,
   type AgentTool,
   type GatewayRetrySettings,
+  type KeyTokenCaps,
   type PromptCacheTtl,
 } from "@ai-office/shared";
 import { ownerFetch } from "@ai-office/shared/internal-hosts-guard";
@@ -348,10 +350,13 @@ export interface GatewayOptions {
   readonly communicationsCapCheck?: () => Promise<CapCheck>;
   /**
    * Asked before each call of an Owner tool's, the Terminal's included
-   * (FR-33; pen-testing G1-3): the Token Cap it is refused at, if it has
-   * reached one.
+   * (FR-33; pen-testing G1-3), with its key's own Token Caps if it has
+   * any: the Token Cap it is refused at, if it has reached one.
    */
-  readonly ownerToolCapCheck?: (ownerTool: string) => Promise<CapCheck>;
+  readonly ownerToolCapCheck?: (
+    ownerTool: string,
+    keyCaps: KeyTokenCaps | undefined,
+  ) => Promise<CapCheck>;
   /**
    * The work AI Office gave each Agent (FR-42; pen-testing G1-1), which
    * its calls count against whatever they name. Without it, an Agent's
@@ -555,6 +560,10 @@ function keptBody(text: string): { text: string; truncated: boolean } {
 
 // Anthropic accepts request bodies up to 32 MB.
 const bodyLimit = 32 * 1024 * 1024;
+
+/** Whether a key's own Token Caps let it through in every period. */
+const unlimited = (caps: KeyTokenCaps | undefined): boolean =>
+  caps?.daily === unlimitedTokenCap && caps.monthly === unlimitedTokenCap;
 
 // Request headers that are never forwarded: hop-by-hop headers, the
 // caller's own credentials (the AI Account's key replaces them) and
@@ -1446,14 +1455,17 @@ export async function buildGateway(
       };
 
       // A capped caller's calls run one at a time (pen-testing G1-2): this
-      // one waits until the caller's call before it has been counted.
+      // one waits until the caller's call before it has been counted. An
+      // Owner tool whose key is unlimited in both periods has no cap.
       const capped =
         caller.kind === "agent" && capCheck !== undefined
           ? caller.agentId
           : caller.kind === "communications" &&
               communicationsCapCheck !== undefined
             ? communicationsAgentId
-            : caller.kind === "owner_tool" && ownerToolCapCheck !== undefined
+            : caller.kind === "owner_tool" &&
+                ownerToolCapCheck !== undefined &&
+                !unlimited(caller.tokenCaps)
               ? `owner_tool:${caller.name}`
               : undefined;
       if (capped !== undefined) {
@@ -1530,13 +1542,13 @@ export async function buildGateway(
         }
       }
 
-      // An Owner tool's calls, the Terminal's too, count against the
-      // office's Token Caps (FR-33; pen-testing G1-3): at one, its next
-      // call is refused in the same way.
+      // An Owner tool's calls, the Terminal's too, count against its key's
+      // own Token Caps, else the office's (FR-33; pen-testing G1-3): at
+      // one, its next call is refused in the same way.
       if (ownerToolCapCheck !== undefined && caller.kind === "owner_tool") {
         let refusal: CapCheck;
         try {
-          refusal = await ownerToolCapCheck(caller.name);
+          refusal = await ownerToolCapCheck(caller.name, caller.tokenCaps);
         } catch (error) {
           request.log.error({ err: error }, "Token Caps could not be read.");
           return refuse(503, "The AI Gateway could not check Token Caps.");

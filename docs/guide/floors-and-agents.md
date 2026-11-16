@@ -955,12 +955,18 @@ Owner tools can have caps too (PRD FR-33; pen-testing G1-3). Each Owner
 tool's Gateway Key, the Terminal's included, is held to the office's daily
 and monthly caps against its own tokens, as each Agent is by default: one
 Owner tool's use never counts against another's, nor against an Agent's.
-Its calls go one at a time, as an Agent's do. At a cap, the Gateway
+One of the Owner's tools' keys can instead set its own **daily** and
+**monthly limit** in [API Key Management](ai-gateway.md#api-key-management),
+period by period: **Office default** (the office's cap), **Own limit** (a
+number of tokens, higher or lower than the office's), or **Unlimited**
+(never refused at a cap). Its calls go one at a time, as an Agent's do,
+unless its key is unlimited in both periods. At a cap, the Gateway
 refuses its next call with the same cap error (`403`,
-`x-ai-office-refusal: token_cap`), saying which cap it reached, until the
-day (or month) is over or the Owner raises the office's cap. Nothing is
-paused and no Notice is raised: the Owner's own tool shows the refusal.
-AI Settings' Token Caps card shows each Owner tool's use.
+`x-ai-office-refusal: token_cap`), saying which cap it reached, its key's
+or the office's, until the day (or month) is over or the Owner raises
+that cap. Nothing is paused and no Notice is raised: the Owner's own tool
+shows the refusal. AI Settings' Token Caps card shows each Owner tool's
+use.
 
 ## Git identity
 

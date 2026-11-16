@@ -8,10 +8,13 @@ import {
   noTokenCaps,
   noTokens,
   periodBounds,
+  resolveKeyTokenCap,
   resolveTokenCap,
   type CapPeriod,
   type CapUse,
   type FloorTokenUsage,
+  type KeyCapLevel,
+  type KeyTokenCaps,
   type OfficeTokenCaps,
   type OfficeTokenUsage,
   type PeriodCapUse,
@@ -57,24 +60,46 @@ export async function communicationsCapRefusal(
 
 /**
  * Why the Gateway refuses an Owner tool's call (FR-33, FR-46; pen-testing
- * G1-3): the office's cap its own tokens have reached; undefined while it
- * is under them. The Terminal is an Owner tool too.
+ * G1-3): the cap its own tokens have reached, its key's own or else the
+ * office's; undefined while it is under them, or unlimited. The Terminal
+ * is an Owner tool too, held to the office's.
  */
 export async function ownerToolCapRefusal(
   caps: Pick<TokenCapService, "ownerToolCapUse">,
   ownerTool: string,
+  keyCaps: KeyTokenCaps = noTokenCaps,
 ): Promise<{ readonly message: string } | undefined> {
-  const use = await caps.ownerToolCapUse(ownerTool);
-  const period = capPeriods.find(
-    (candidate) => use[candidate].used >= use[candidate].cap,
-  );
-  if (period === undefined) {
+  const use = await caps.ownerToolCapUse(ownerTool, keyCaps);
+  const period = capPeriods.find((candidate) => {
+    const inForce = use[candidate];
+    return inForce !== null && inForce.used >= inForce.cap;
+  });
+  const reached = period === undefined ? null : use[period];
+  if (period === undefined || reached === null) {
     return undefined;
   }
+  const until = period === "daily" ? "day" : "month";
+  const cap = reached.cap.toLocaleString("en-US");
   return {
-    message: `The Owner tool "${ownerTool}" reached the office's ${period} Token Cap (${use[period].cap.toLocaleString("en-US")} tokens), so AI Office refuses its calls until the ${period === "daily" ? "day" : "month"} is over, or the Owner raises the office's cap.`,
+    message:
+      reached.level === "key"
+        ? `The Owner tool "${ownerTool}" reached its key's ${period} Token Cap (${cap} tokens), so AI Office refuses its calls until the ${until} is over, or the Owner raises the key's cap in API Key Management.`
+        : `The Owner tool "${ownerTool}" reached the office's ${period} Token Cap (${cap} tokens), so AI Office refuses its calls until the ${until} is over, or the Owner raises the office's cap.`,
   };
 }
+
+/**
+ * An Owner tool's cap in force in a period, where it comes from, and what
+ * it has counted; null when its key is unlimited in that period.
+ */
+export type OwnerToolCapUse = Record<
+  CapPeriod,
+  {
+    readonly level: KeyCapLevel;
+    readonly cap: number;
+    readonly used: number;
+  } | null
+>;
 
 /** Who is working: an Agent on its Floor, perhaps on an issue. */
 export interface CapSubject {
@@ -107,11 +132,15 @@ export interface TokenCapService {
    */
   communicationsCapUse(): Promise<PeriodCapUse>;
   /**
-   * The office's caps, against one Owner tool's own use (FR-33; pen-testing
-   * G1-3): each Owner tool's key, the Terminal's too, is held to them as
-   * each Agent is by default.
+   * The caps in force for one Owner tool, against its own use (FR-33;
+   * pen-testing G1-3): its key's own, period by period, else the office's,
+   * as each Agent is held to them by default. The Terminal's key has none
+   * of its own.
    */
-  ownerToolCapUse(ownerTool: string): Promise<PeriodCapUse>;
+  ownerToolCapUse(
+    ownerTool: string,
+    keyCaps?: KeyTokenCaps,
+  ): Promise<OwnerToolCapUse>;
   /** The office's caps and the Office's use: totals, Floors, Owner tools. */
   officeUsage(): Promise<OfficeTokenUsage>;
   /** A Floor's caps and use: its Agents' against their caps, its issues'. */
@@ -329,15 +358,19 @@ export function createTokenCaps(options: TokenCapsOptions): TokenCapService {
       return { daily: use("daily"), monthly: use("monthly") };
     },
 
-    async ownerToolCapUse(ownerTool) {
+    async ownerToolCapUse(ownerTool, keyCaps = noTokenCaps) {
       const [office, usage] = await Promise.all([officeCaps(), usageNow()]);
-      const use = (period: CapPeriod): CapUse => ({
-        level: "office",
-        cap: office[period],
-        used: usage[period].where(
-          (row) => row.agentId === null && row.ownerTool === ownerTool,
-        ).tokens,
-      });
+      const use = (period: CapPeriod): OwnerToolCapUse[CapPeriod] => {
+        const inForce = resolveKeyTokenCap(office, keyCaps, period);
+        return inForce === null
+          ? null
+          : {
+              ...inForce,
+              used: usage[period].where(
+                (row) => row.agentId === null && row.ownerTool === ownerTool,
+              ).tokens,
+            };
+      };
       return { daily: use("daily"), monthly: use("monthly") };
     },
 

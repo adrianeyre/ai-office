@@ -421,7 +421,10 @@ one client there, and one sandbox would lock every Agent out.
   **nickname** and **time zone** (British time until set) are edited
   there; signed in with a key, the lobby's receptionist greets you by its
   nickname (else its name) in its time zone. One of your tools' keys can
-  also change its access, be **disabled** (the Gateway and sign-in refuse
+  also change its access, set its own **daily** and **monthly limit**
+  (**Office default**, **Own limit** in tokens, or **Unlimited**; see
+  [Owner tools' caps](floors-and-agents.md#owner-tools-caps)), with
+  today's and this month's use beside them, be **disabled** (the Gateway and sign-in refuse
   it, and its web sessions end, until it is **enabled** again) and be
   revoked. An Agent's key keeps its Agent's name, is always enabled and
   only calls models.
@@ -429,7 +432,9 @@ one client there, and one sandbox would lock every Agent out.
   `{"currentPassword", "code"}` for `proxy_and_ui` (`403 proof_required`
   without them, or from a session begun with an API key; `422
   wrong_password` or `wrong_code`). `PATCH /api/gateway-keys/:id` with any
-  of `{"name", "access", "enabled"}` (an Owner tool's key only; `409
+  of `{"name", "access", "enabled", "tokenCaps"}`, where `tokenCaps` is
+  `{"daily", "monthly"}`, each a number of tokens, `"unlimited"`, or
+  `null` for the office's cap (an Owner tool's key only; `409
   agent_key_no_ui` for an Agent's), with the same proof when the change
   lets the key sign in where it could not, `PUT /api/gateway-keys/:id/profile` with `{"nickname",
   "timeZone"}`, `GET /api/gateway-keys/usage`, and `POST

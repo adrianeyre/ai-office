@@ -163,6 +163,33 @@ const cases: Case[] = [
     },
   ],
   [
+    "keeps an Owner tool key's own Token Caps, and tells the Gateway them with its caller",
+    async ({ keys, bus }) => {
+      const { gatewayKey, key } = await keys.createOwnerToolKey("Script");
+      expect(await keys.authenticate(key)).toEqual({
+        kind: "owner_tool",
+        keyId: gatewayKey.id,
+        name: "Script",
+      });
+      const tokenCaps = { daily: 10_000, monthly: "unlimited" } as const;
+      expect(await keys.update(gatewayKey.id, { tokenCaps })).toMatchObject({
+        tokenCaps,
+      });
+      expect(await keys.authenticate(key)).toEqual({
+        kind: "owner_tool",
+        keyId: gatewayKey.id,
+        name: "Script",
+        tokenCaps,
+      });
+      // Which setting changed, never its value.
+      const events = await bus.eventsAfter(0);
+      expect(events.at(-1)?.event).toMatchObject({
+        type: "config.changed",
+        keys: ["gatewayKeys.tokenCaps"],
+      });
+    },
+  ],
+  [
     "refuses a second Owner tool key in use with the same name",
     async ({ keys }) => {
       const first = await keys.createOwnerToolKey("Codex");
