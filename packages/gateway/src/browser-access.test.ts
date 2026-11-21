@@ -331,6 +331,44 @@ describe("a page's request, with a key that allows its origin", () => {
     });
   });
 
+  it("sends none of the page's browser headers on, so the AI Provider sees AI Office's request", async () => {
+    upstream = await startFakeUpstream((_request, response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(message);
+    });
+    gateway = await startGateway({ upstream, keys: browserKeys });
+    const response = await fetch(`${gateway.url}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "anthropic-version": "2023-06-01",
+        origin: cvChecker,
+        referer: `${cvChecker}/settings/`,
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "cross-site",
+        "sec-ch-ua-platform": '"macOS"',
+        "x-api-key": anyKey,
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-5-5",
+        max_tokens: 16,
+        messages: [],
+      }),
+    });
+    expect(response.status).toBe(200);
+    const headers = upstream.received[0]?.headers ?? {};
+    // Not sec-fetch-mode: Node's fetch sets that on every request it sends.
+    for (const name of [
+      "origin",
+      "referer",
+      "sec-fetch-site",
+      "sec-ch-ua-platform",
+    ]) {
+      expect(headers[name], name).toBeUndefined();
+    }
+    expect(headers["anthropic-version"]).toBe("2023-06-01");
+  });
+
   it("grants its origin on a 503 when no AI Account can serve it", async () => {
     gateway = await startGateway({ account: undefined, keys: browserKeys });
     const response = await call(cvChecker, cvKey);

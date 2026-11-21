@@ -593,6 +593,11 @@ const droppedRequestHeaders = new Set([
   "proxy-authorization",
   "x-api-key",
   "cookie",
+  // A browser page's: the page called AI Office, and AI Office calls the AI
+  // Provider. Passed on, Anthropic would take the request for a browser's and
+  // refuse it without its browser-access header.
+  "origin",
+  "referer",
   // AI Office's own: what the request is for, and how it is routed, which
   // is no AI Provider's business.
   ...Object.values(aiOfficeHeaders),
@@ -614,7 +619,11 @@ function forwardedHeaders(
 ): Record<string, string> {
   const forwarded: Record<string, string> = {};
   for (const [name, value] of Object.entries(headers)) {
-    if (value !== undefined && !droppedRequestHeaders.has(name)) {
+    if (
+      value !== undefined &&
+      !droppedRequestHeaders.has(name) &&
+      !name.startsWith("sec-")
+    ) {
       forwarded[name] = Array.isArray(value) ? value.join(", ") : value;
     }
   }

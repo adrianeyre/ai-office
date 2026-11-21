@@ -547,10 +547,10 @@ How the Gateway answers a page:
   can be read by that page's scripts. Give browser apps their own key
   (**AI proxy only**), with its own daily and monthly limits and only the
   AI Providers it needs, and revoke it if a page is ever compromised.
-- A page calling an Anthropic-format AI Account through the Gateway sends
-  `anthropic-dangerous-direct-browser-access: true`, as Anthropic's SDK
-  does with `dangerouslyAllowBrowser`: the Gateway passes `Origin` on, and
-  Anthropic's API asks for that header with it.
+- **The AI Provider sees AI Office's request, not the page's.** The
+  page's `Origin`, `Referer` and `Sec-*` headers are not passed on, so a
+  page needs no `anthropic-dangerous-direct-browser-access` header to reach
+  an Anthropic-format AI Account through the Gateway.
 - **Kept** in `gateway_keys.browser_access` (null for off), so the
   development database needs `pnpm db:reset`. A change is a
   `config.changed` event naming `gatewayKeys.browserAccess`, never the
