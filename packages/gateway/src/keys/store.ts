@@ -1,11 +1,13 @@
 import { gatewayKeys, type Database } from "@ai-office/db";
 import {
   keyAiProvidersSchema,
+  keyBrowserAccessSchema,
   keyProfileSchema,
   keyTokenCapsSchema,
   type GatewayKeyAccess,
   type GatewayKeyKind,
   type KeyAiProviders,
+  type KeyBrowserAccess,
   type KeyProfile,
   type KeyTokenCaps,
 } from "@ai-office/shared";
@@ -43,6 +45,11 @@ export interface GatewayKeyRecord {
   readonly tokenCaps?: KeyTokenCaps | undefined;
   /** The AI Providers an Owner tool's key may use; absent or null is all. */
   readonly aiProviders?: KeyAiProviders | undefined;
+  /**
+   * Whether an Owner tool's key may be used from a web page in a browser
+   * (ADR 0013); absent is off.
+   */
+  readonly browserAccess?: KeyBrowserAccess | undefined;
 }
 
 export interface GatewayKeyStore {
@@ -88,6 +95,7 @@ export interface GatewayKeyStore {
       readonly enabled?: boolean | undefined;
       readonly tokenCaps?: KeyTokenCaps | undefined;
       readonly aiProviders?: KeyAiProviders | undefined;
+      readonly browserAccess?: KeyBrowserAccess | undefined;
     },
   ): Promise<GatewayKeyRecord | "name_taken" | undefined>;
 }
@@ -194,6 +202,10 @@ export function memoryGatewayKeyStore(): GatewayKeyStore & {
         return Promise.resolve("name_taken" as const);
       }
       const updated = { ...key, ...given(changes) } as GatewayKeyRecord;
+      // Off is kept as absent, as a key that never set it.
+      if (updated.browserAccess?.mode === "off") {
+        delete (updated as { browserAccess?: unknown }).browserAccess;
+      }
       keys.set(id, updated);
       return Promise.resolve(updated);
     },
@@ -206,9 +218,15 @@ const toRecord = ({
   profile,
   tokenCaps,
   aiProviders,
+  browserAccess,
   ...row
 }: GatewayKeyRow): GatewayKeyRecord => ({
   ...row,
+  // Null, or anything no longer valid, is off.
+  browserAccess:
+    row.kind === "owner_tool"
+      ? keyBrowserAccessSchema.safeParse(browserAccess).data
+      : undefined,
   profile: keyProfileSchema.safeParse(profile).data,
   tokenCaps: keyTokenCapsSchema.safeParse(tokenCaps).data,
   aiProviders: keyAiProvidersSchema.safeParse(aiProviders).data,
@@ -379,7 +397,18 @@ export function databaseGatewayKeyStore(db: Database): GatewayKeyStore {
       try {
         const [row] = await db
           .update(gatewayKeys)
-          .set(given(changes))
+          .set({
+            ...given(changes),
+            // Off is kept as null, as a key that never set it.
+            ...(changes.browserAccess === undefined
+              ? {}
+              : {
+                  browserAccess:
+                    changes.browserAccess.mode === "off"
+                      ? null
+                      : changes.browserAccess,
+                }),
+          })
           .where(and(eq(gatewayKeys.id, id), isNull(gatewayKeys.revokedAt)))
           .returning();
         return row === undefined ? undefined : toRecord(row);

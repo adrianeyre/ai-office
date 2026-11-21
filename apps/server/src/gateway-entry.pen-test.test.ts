@@ -622,6 +622,161 @@ describe("I2 (H21): the AI Gateway on the app's own port", () => {
   });
 });
 
+// ADR 0013: with an Owner tool's key open to a page's origin, the Gateway
+// answers that page's preflights through the app's one entry point too,
+// and nothing else changes: another key is still refused to the page, a
+// cookie is still no credential, and no route of the app's answers a
+// preflight, even for an origin a key allows.
+describe("ADR 0013: Browser access through the app's own port", () => {
+  const browserOrigin = "http://localhost:4870";
+  const browserKey = "aio_gk_i2probebrowseraccessfakekey000000000";
+  let upstream: Upstream;
+  let gateway: FastifyInstance;
+  let probed: ProbedApp;
+  let owner: SignedIn;
+  let port: number;
+  const requestLog = memoryRequestLog();
+
+  beforeAll(async () => {
+    upstream = await startUpstream();
+    gateway = await buildGateway({
+      logger: createLogger({ level: "silent", secrets: [] }).child({
+        component: "gateway",
+      }),
+      accounts: staticAccounts({
+        id: null,
+        name: "i2-account",
+        apiKey: "sk-ant-api03-i2probefakeaccountkey-00000000000",
+        baseUrl: upstream.url,
+        apiFormat: "anthropic",
+      }),
+      keys: staticKeys({
+        // Off, as every key is until the Owner sets it.
+        [ownerToolKey]: ownerTool,
+        [browserKey]: {
+          kind: "owner_tool",
+          keyId: "i2-browser-tool",
+          name: "i2-browser-page",
+          browserAccess: { mode: "origins", origins: [browserOrigin] },
+        },
+      }),
+      requestLog,
+    });
+    probed = await probedApp({ gateway });
+    await probed.server.listen({ port: 0, host: "127.0.0.1" });
+    port = (probed.server.server.address() as AddressInfo).port;
+    owner = await signIn(probed.server);
+  });
+
+  afterAll(async () => {
+    await probed.server.close();
+    await gateway.close();
+    await upstream.close();
+  });
+
+  beforeEach(() => {
+    requestLog.records.length = 0;
+    upstream.received.length = 0;
+  });
+
+  it("holds: a page's preflight to /v1 is granted when a key allows its origin, without a Gateway Key and unrecorded, never with credentials", async () => {
+    const preflight = await send(port, "OPTIONS", "/v1/messages", {
+      origin: browserOrigin,
+      "access-control-request-method": "POST",
+      "access-control-request-headers": "x-api-key,content-type",
+    });
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers["access-control-allow-origin"]).toBe(
+      browserOrigin,
+    );
+    expect(preflight.headers["access-control-allow-headers"]).toBe(
+      "x-api-key, content-type",
+    );
+    expect(
+      preflight.headers["access-control-allow-credentials"],
+    ).toBeUndefined();
+    const served = await send(
+      port,
+      "POST",
+      "/v1/messages",
+      { ...json, origin: browserOrigin, "x-api-key": browserKey },
+      messagesRequest,
+    );
+    expect(served.status).toBe(200);
+    expect(served.headers["access-control-allow-origin"]).toBe(browserOrigin);
+    expect(served.headers["access-control-allow-credentials"]).toBeUndefined();
+    await expect.poll(() => requestLog.records.length).toBe(1);
+  });
+
+  it("holds: another site's page is still refused its preflight, and granted nothing; a key that is off is refused to a page", async () => {
+    const preflight = await send(port, "OPTIONS", "/v1/messages", {
+      origin: "https://attacker.example",
+      "access-control-request-method": "POST",
+      "access-control-request-headers": "x-api-key,content-type",
+    });
+    expect(preflight.status).toBe(404);
+    expect(preflight.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(preflight.headers["access-control-allow-headers"]).toBeUndefined();
+    const simple = await send(
+      port,
+      "POST",
+      "/v1/messages",
+      { "content-type": "text/plain", origin: "https://attacker.example" },
+      messagesRequest,
+    );
+    expect(simple.status).toBe(401);
+    expect(simple.headers["access-control-allow-origin"]).toBeUndefined();
+    // A key that is off, from the page a key allows: refused, unread.
+    const off = await send(
+      port,
+      "POST",
+      "/v1/messages",
+      { ...json, origin: browserOrigin, "x-api-key": ownerToolKey },
+      messagesRequest,
+    );
+    expect(off.status).toBe(403);
+    expect(off.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(upstream.received).toEqual([]);
+    expect(requestLog.records).toEqual([]);
+  });
+
+  it("holds: a session cookie alone is still no Gateway credential, from a page a key allows too", async () => {
+    const answer = await send(
+      port,
+      "POST",
+      "/v1/messages",
+      { ...json, origin: browserOrigin, cookie: owner.cookie },
+      messagesRequest,
+    );
+    expect(answer.status).toBe(401);
+    // Its page may read the refusal, and never with credentials.
+    expect(answer.headers["access-control-allow-origin"]).toBe(browserOrigin);
+    expect(answer.headers["access-control-allow-credentials"]).toBeUndefined();
+    expect(upstream.received).toEqual([]);
+    expect(requestLog.records).toEqual([]);
+  });
+
+  it("holds: no route of the app's answers a preflight or names an origin, even one a key allows", async () => {
+    for (const path of ["/api/session", "/api/gateway-keys", "/"]) {
+      const preflight = await send(port, "OPTIONS", path, {
+        origin: browserOrigin,
+        "access-control-request-method": "GET",
+        "access-control-request-headers": "x-api-key",
+      });
+      expect(preflight.status, path).not.toBe(204);
+      expect(
+        preflight.headers["access-control-allow-origin"],
+        path,
+      ).toBeUndefined();
+      const read = await send(port, "GET", path, {
+        cookie: owner.cookie,
+        origin: browserOrigin,
+      });
+      expect(read.headers["access-control-allow-origin"], path).toBeUndefined();
+    }
+  });
+});
+
 /**
  * Sends the head of a 2 MiB request to `path` (`/v1/messages` by default),
  * with `headers` (none, so no Gateway Key, by default), and 1 KiB of its

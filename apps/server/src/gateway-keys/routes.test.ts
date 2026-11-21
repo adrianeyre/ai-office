@@ -140,7 +140,11 @@ const listKeys = async (setup: Setup) => {
  * Sends a request through a Gateway that checks `setup.keys`, with `key`,
  * to a fake AI Provider; resolves with its status.
  */
-async function callGateway(setup: Setup, key: string): Promise<number> {
+async function callGateway(
+  setup: Setup,
+  key: string,
+  headers: Record<string, string> = {},
+): Promise<number> {
   const provider = createServer((incoming, response) => {
     incoming.resume();
     response.writeHead(200, { "content-type": "application/json" });
@@ -167,6 +171,7 @@ async function callGateway(setup: Setup, key: string): Promise<number> {
       headers: {
         "content-type": "application/json",
         authorization: `Bearer ${key}`,
+        ...headers,
       },
       body: JSON.stringify({ model: "claude-haiku-5-5", messages: [] }),
     });
@@ -219,6 +224,7 @@ const cases: Case[] = [
           "enabled",
           "tokenCaps",
           "aiProviders",
+          "browserAccess",
         ].sort(),
       );
       expect(gatewayKey).toMatchObject({
@@ -439,6 +445,79 @@ const cases: Case[] = [
       }
       const back = await request(setup, "PATCH", url, { aiProviders: null });
       expect(back.json()).toMatchObject({ aiProviders: null });
+    },
+  ],
+  [
+    "opens an Owner tool's key to web pages on the origins it lists, or on any, and keeps it off until set",
+    async (setup) => {
+      const { gatewayKey, key } = createdGatewayKeySchema.parse(
+        (
+          await request(setup, "POST", "/api/gateway-keys", {
+            name: "CV checker",
+          })
+        ).json(),
+      );
+      const page = { origin: "http://localhost:4870" };
+      // Off until set: a page is refused the key.
+      expect(gatewayKey.browserAccess).toEqual({ mode: "off" });
+      expect(await callGateway(setup, key, page)).toBe(403);
+      expect(await callGateway(setup, key)).toBe(200);
+      const url = `/api/gateway-keys/${gatewayKey.id}`;
+      // Each origin once, as a browser sends it.
+      const set = await request(setup, "PATCH", url, {
+        browserAccess: {
+          mode: "origins",
+          origins: [
+            "http://localhost:4870",
+            "HTTPS://CV.example.com:443",
+            "https://cv.example.com",
+          ],
+        },
+      });
+      expect(set.statusCode).toBe(200);
+      const origins = {
+        mode: "origins",
+        origins: ["http://localhost:4870", "https://cv.example.com"],
+      };
+      expect(set.json()).toMatchObject({ browserAccess: origins });
+      const listed = gatewayKeyListSchema.parse(
+        (await request(setup, "GET", "/api/gateway-keys")).json(),
+      );
+      expect(listed.keys.find(({ id }) => id === gatewayKey.id)).toMatchObject({
+        browserAccess: origins,
+      });
+      expect(await callGateway(setup, key, page)).toBe(200);
+      expect(
+        await callGateway(setup, key, { origin: "https://attacker.example" }),
+      ).toBe(403);
+
+      for (const bad of [
+        { mode: "origins", origins: [] },
+        { mode: "origins", origins: ["https://*.github.io"] },
+        { mode: "origins", origins: ["null"] },
+        { mode: "origins", origins: ["http://cv.example.com"] },
+        { mode: "origins", origins: ["https://cv.example.com/"] },
+        { mode: "everywhere" },
+        "any",
+      ]) {
+        expect(
+          (await request(setup, "PATCH", url, { browserAccess: bad }))
+            .statusCode,
+          JSON.stringify(bad),
+        ).toBe(400);
+      }
+      const any = await request(setup, "PATCH", url, {
+        browserAccess: { mode: "any" },
+      });
+      expect(any.json()).toMatchObject({ browserAccess: { mode: "any" } });
+      expect(
+        await callGateway(setup, key, { origin: "https://anywhere.example" }),
+      ).toBe(200);
+      const off = await request(setup, "PATCH", url, {
+        browserAccess: { mode: "off" },
+      });
+      expect(off.json()).toMatchObject({ browserAccess: { mode: "off" } });
+      expect(await callGateway(setup, key, page)).toBe(403);
     },
   ],
   [

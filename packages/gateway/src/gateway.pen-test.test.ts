@@ -856,6 +856,119 @@ describe("H19: the Gateway on the host's loopback", () => {
     expect(upstream.received).toEqual([]);
   });
 
+  it("ADR 0013: with one Owner tool key open to any origin, another key, an Agent's or a cookie is still refused to another site's page, and nothing goes upstream", async () => {
+    upstream = await answering();
+    // `gatewayKey` (the test tool's) stays off; this one is open to any.
+    const browserKey = "aio_gk_penprobebrowseranyfakekey0000000000";
+    gateway = await startGateway({
+      upstream,
+      keys: staticKeys({
+        [gatewayKey]: testCaller,
+        [adaKey]: ada,
+        [browserKey]: {
+          kind: "owner_tool",
+          keyId: "browser-key",
+          name: "Any page",
+          browserAccess: { mode: "any" },
+        },
+      }),
+    });
+    const url = gateway.url;
+    const attacker = "https://attacker.example";
+    // Its preflight is answered now (a key allows any origin), but never
+    // with credentials.
+    const preflight = await fetch(`${url}/v1/messages`, {
+      method: "OPTIONS",
+      headers: {
+        origin: attacker,
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,content-type",
+      },
+    });
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("access-control-allow-credentials")).toBe(
+      null,
+    );
+    // Another key, off, used from that page: refused before anything goes
+    // upstream, and the page may not read why.
+    for (const key of [gatewayKey, adaKey]) {
+      for (const path of modelRoutes) {
+        const refused = await call(path, key, undefined, { origin: attacker });
+        expect(refused.status, `${path} ${key}`).toBe(403);
+        expect(refused.headers.get("access-control-allow-origin")).toBeNull();
+      }
+    }
+    // A cookie is still no Gateway Key, from any page.
+    for (const path of modelRoutes) {
+      const cookieOnly = await fetch(`${url}${path}`, {
+        method: "POST",
+        headers: {
+          origin: attacker,
+          cookie: `x-api-key=${browserKey}`,
+          "content-type": "application/json",
+        },
+        body: "{}",
+      });
+      expect(cookieOnly.status, path).toBe(401);
+      expect(cookieOnly.headers.get("access-control-allow-credentials")).toBe(
+        null,
+      );
+    }
+    expect(upstream.received).toEqual([]);
+    expect(records()).toEqual([]);
+    // The key that allows it is served; and only it.
+    const served = await call("/v1/messages", browserKey, undefined, {
+      origin: attacker,
+    });
+    expect(served.status).toBe(200);
+    expect(served.headers.get("access-control-allow-origin")).toBe(attacker);
+    expect(served.headers.get("access-control-allow-credentials")).toBeNull();
+    expect(upstream.received).toHaveLength(1);
+  });
+
+  it("ADR 0013: with a key open to listed origins only, another site's page is still refused its preflight and granted nothing", async () => {
+    upstream = await answering();
+    gateway = await startGateway({
+      upstream,
+      keys: staticKeys({
+        [gatewayKey]: {
+          kind: "owner_tool",
+          keyId: testCaller.keyId,
+          name: testCaller.name,
+          browserAccess: {
+            mode: "origins",
+            origins: ["http://localhost:4870"],
+          },
+        },
+        [adaKey]: ada,
+      }),
+    });
+    const url = gateway.url;
+    for (const origin of ["https://attacker.example", "null", undefined]) {
+      const preflight = await fetch(`${url}/v1/messages`, {
+        method: "OPTIONS",
+        headers: {
+          ...(origin === undefined ? {} : { origin }),
+          "access-control-request-method": "POST",
+          "access-control-request-headers": "authorization,content-type",
+        },
+      });
+      expect(preflight.status, String(origin)).toBe(404);
+      expect(preflight.headers.get("access-control-allow-origin")).toBeNull();
+    }
+    const simple = await fetch(`${url}/v1/messages`, {
+      method: "POST",
+      headers: {
+        origin: "https://attacker.example",
+        "content-type": "text/plain",
+      },
+      body: JSON.stringify({ model: "claude-haiku-5-5" }),
+    });
+    expect(simple.status).toBe(401);
+    expect(simple.headers.get("access-control-allow-origin")).toBeNull();
+    expect(upstream.received).toEqual([]);
+  });
+
   it("pins today: /health answers any Host, so a DNS-rebinding page reads whether an account is available, and nothing else", async () => {
     upstream = await answering();
     gateway = await startGateway({ upstream, keys });

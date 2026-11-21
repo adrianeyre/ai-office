@@ -29,6 +29,7 @@ const toolKey: GatewayKey = {
   enabled: true,
   tokenCaps: { daily: null, monthly: null },
   aiProviders: null,
+  browserAccess: { mode: "off" },
 };
 
 const agentKey: GatewayKey = {
@@ -338,6 +339,60 @@ describe("API Key Management", () => {
     ]);
     const ada = await keyCard("Ada");
     expect(ada.queryByLabelText("All AI Providers")).toBeNull();
+  });
+
+  it("opens a tool's key to web pages on listed origins or on any, and closes it again, but never an Agent's", async () => {
+    const { sent } = stubServer();
+    renderPage();
+    const codex = await keyCard("Codex");
+    const form = within(codex.getByRole("form", { name: "Codex's settings" }));
+    // Off until set.
+    expect(form.getByLabelText<HTMLInputElement>("Off").checked).toBe(true);
+    expect(
+      form.getByText(/Web pages in a browser cannot use this key/),
+    ).toBeDefined();
+    await userEvent.click(form.getByLabelText("Only these origins"));
+    const origins = await form.findByLabelText("Origins");
+    // The key's exposure is spelled out.
+    expect(form.getByText(/The page's scripts can read the key/)).toBeDefined();
+    // An origin it cannot take is refused here, and nothing is sent.
+    await userEvent.type(origins, "https://*.github.io");
+    await userEvent.click(form.getByRole("button", { name: "Save Codex" }));
+    expect(
+      await form.findByText(
+        "https://*.github.io: list each origin in full; a wildcard is not allowed.",
+      ),
+    ).toBeDefined();
+    expect(sent).toEqual([]);
+    await userEvent.clear(origins);
+    await userEvent.type(
+      origins,
+      "http://localhost:4870{enter}HTTPS://CV.example.com",
+    );
+    await userEvent.click(form.getByRole("button", { name: "Save Codex" }));
+    expect(await form.findByRole("status")).toBeDefined();
+    await userEvent.click(form.getByLabelText("Any origin"));
+    await userEvent.click(form.getByRole("button", { name: "Save Codex" }));
+    await vi.waitFor(() => {
+      expect(sent).toHaveLength(2);
+    });
+    await userEvent.click(form.getByLabelText("Off"));
+    await userEvent.click(form.getByRole("button", { name: "Save Codex" }));
+    await vi.waitFor(() => {
+      expect(sent).toHaveLength(3);
+    });
+    expect(sent.map(({ body }) => body)).toEqual([
+      {
+        browserAccess: {
+          mode: "origins",
+          origins: ["http://localhost:4870", "https://cv.example.com"],
+        },
+      },
+      { browserAccess: { mode: "any" } },
+      { browserAccess: { mode: "off" } },
+    ]);
+    const ada = await keyCard("Ada");
+    expect(ada.queryByLabelText("Any origin")).toBeNull();
   });
 
   it("disables and enables a tool's key, but never an Agent's", async () => {

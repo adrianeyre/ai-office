@@ -221,6 +221,7 @@ const gatewayKey = (
   enabled: true,
   tokenCaps: { daily: null, monthly: null },
   aiProviders: null,
+  browserAccess: { mode: "off" },
   ...overrides,
 });
 

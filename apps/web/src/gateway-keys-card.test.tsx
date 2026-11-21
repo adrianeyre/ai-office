@@ -38,6 +38,7 @@ const ownerToolKey = (name: string, id: string): GatewayKey => ({
   enabled: true,
   tokenCaps: { daily: null, monthly: null },
   aiProviders: null,
+  browserAccess: { mode: "off" },
 });
 
 const adaKey: GatewayKey = {
@@ -55,6 +56,7 @@ const adaKey: GatewayKey = {
   enabled: true,
   tokenCaps: { daily: null, monthly: null },
   aiProviders: null,
+  browserAccess: { mode: "off" },
 };
 
 const session = {

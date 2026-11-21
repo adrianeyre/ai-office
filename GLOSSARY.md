@@ -80,6 +80,10 @@ _Avoid_: Proxy, load balancer, router
 A credential issued by the AI Gateway to one Agent (or to one of the Owner's own tools) to identify the caller. It is never an AI Account credential.
 _Avoid_: API key, token
 
+**Browser access**:
+Whether one of the Owner's own tools' Gateway Keys may be used from a web page in a browser: off (the default), from the exact origins the Owner lists, or from any origin. Never with cookies (ADR 0013).
+_Avoid_: CORS, allowed origins, browser mode
+
 **Decision Model**:
 An optional fast model (Jev) used only by Managers and safety checks for quick judgements. It is never an Agent's AI Provider.
 _Avoid_: Classifier, judge

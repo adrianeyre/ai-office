@@ -87,5 +87,12 @@ export function keysAtWork(options: {
       }
       return caller;
     },
+    // Only Owner tools' keys open to browsers (ADR 0013): no Agent's.
+    ...(keys.allowsBrowserOrigin === undefined
+      ? {}
+      : {
+          allowsBrowserOrigin: (origin: string) =>
+            keys.allowsBrowserOrigin?.(origin) ?? Promise.resolve(false),
+        }),
   };
 }

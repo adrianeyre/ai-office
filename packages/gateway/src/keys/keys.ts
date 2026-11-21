@@ -5,10 +5,12 @@ import {
   gatewayKeyErrorCodes,
   gatewayKeyHintLength,
   gatewayKeyPrefix,
+  browserAccessAllows,
   terminalKeyName,
   type GatewayKeyAccess,
   type GatewayKeyErrorCode,
   type KeyAiProviders,
+  type KeyBrowserAccess,
   type KeyProfile,
   type KeyTokenCaps,
 } from "@ai-office/shared";
@@ -64,12 +66,23 @@ export type GatewayCaller =
        * Terminal's is, for every one.
        */
       readonly aiProviders?: readonly string[];
+      /**
+       * Whether the key may be used from a web page in a browser (ADR
+       * 0013); absent, as the Terminal's is, for off.
+       */
+      readonly browserAccess?: KeyBrowserAccess;
     };
 
 /** How the Gateway tells who is calling. */
 export interface GatewayKeyAuthenticator {
   /** The caller a key belongs to; undefined for an unknown or revoked key. */
   authenticate(key: string): Promise<GatewayCaller | undefined>;
+  /**
+   * Whether any Gateway Key in use lets a web page on `origin` use it
+   * (ADR 0013): asked for a browser's preflight, which presents no key.
+   * Without it, none does.
+   */
+  allowsBrowserOrigin?(origin: string): Promise<boolean>;
 }
 
 /** Why a Gateway Key operation was refused. */
@@ -91,6 +104,11 @@ export interface KeyedAgent {
 }
 
 export interface GatewayKeys extends GatewayKeyAuthenticator {
+  /**
+   * Whether any Owner tool's key in use, enabled, lets a web page on
+   * `origin` use it (ADR 0013).
+   */
+  allowsBrowserOrigin(origin: string): Promise<boolean>;
   /** The keys in use, newest first: Agents' and Owner tools'. */
   list(): Promise<GatewayKeyInfo[]>;
   /** Makes a key for one of the Owner's tools: the only time it is shown. */
@@ -100,7 +118,7 @@ export interface GatewayKeys extends GatewayKeyAuthenticator {
   ): Promise<{ gatewayKey: GatewayKeyInfo; key: string }>;
   /**
    * Sets an Owner tool's key's name, access, whether it is enabled, its
-   * own Token Caps and the AI Providers it may use.
+   * own Token Caps, the AI Providers it may use and its Browser access.
    */
   update(
     id: string,
@@ -110,6 +128,7 @@ export interface GatewayKeys extends GatewayKeyAuthenticator {
       readonly enabled?: boolean | undefined;
       readonly tokenCaps?: KeyTokenCaps | undefined;
       readonly aiProviders?: KeyAiProviders | undefined;
+      readonly browserAccess?: KeyBrowserAccess | undefined;
     },
   ): Promise<GatewayKeyInfo>;
   /**
@@ -164,6 +183,12 @@ export interface GatewayKeysOptions {
    * written on every request; a minute by default.
    */
   readonly lastUsedResolutionMs?: number;
+  /**
+   * How long the keys' Browser access is kept in memory for preflights
+   * before it is read again, should it change elsewhere; a minute by
+   * default. A change made here applies at once.
+   */
+  readonly browserAccessCacheMs?: number;
   readonly now?: () => Date;
   readonly newId?: () => string;
 }
@@ -202,7 +227,18 @@ export const gatewayKeyInfo = (key: GatewayKeyRecord): GatewayKeyInfo => ({
   enabled: key.enabled ?? true,
   ...(key.tokenCaps === undefined ? {} : { tokenCaps: key.tokenCaps }),
   ...(key.aiProviders == null ? {} : { aiProviders: key.aiProviders }),
+  ...(key.browserAccess === undefined
+    ? {}
+    : { browserAccess: key.browserAccess }),
 });
+
+/** Whether a key in use lets a page in a browser use it at all. */
+const opensToBrowsers = (key: GatewayKeyRecord): boolean =>
+  key.revokedAt === null &&
+  key.kind === "owner_tool" &&
+  key.enabled !== false &&
+  key.browserAccess !== undefined &&
+  key.browserAccess.mode !== "off";
 
 export function createGatewayKeys(options: GatewayKeysOptions): GatewayKeys {
   const { store, encryptor, events } = options;
@@ -213,6 +249,37 @@ export function createGatewayKeys(options: GatewayKeysOptions): GatewayKeys {
   // When each key's use was last written, so it is written at most once
   // per `resolutionMs`.
   const lastWritten = new Map<string, number>();
+  // The Browser access of every key in use that has it on, for browsers'
+  // preflights, which present no key: read at most once per
+  // `browserAccessCacheMs`, and again after any change to a key.
+  const browserAccessCacheMs = options.browserAccessCacheMs ?? 60_000;
+  let browserAccess:
+    | { readonly at: number; readonly read: Promise<KeyBrowserAccess[]> }
+    | undefined;
+  const forgetBrowserAccess = () => {
+    browserAccess = undefined;
+  };
+  const openBrowserAccess = (): Promise<KeyBrowserAccess[]> => {
+    const at = now().getTime();
+    if (
+      browserAccess === undefined ||
+      at - browserAccess.at >= browserAccessCacheMs
+    ) {
+      const read = store
+        .list()
+        .then((keys) =>
+          keys
+            .filter(opensToBrowsers)
+            .flatMap(({ browserAccess: access }) =>
+              access === undefined ? [] : [access],
+            ),
+        );
+      // A failed read is not kept: the next preflight reads again.
+      read.catch(forgetBrowserAccess);
+      browserAccess = { at, read };
+    }
+    return browserAccess.read;
+  };
 
   const tell = (key: string): void => {
     if (!told.has(key)) {
@@ -339,7 +406,16 @@ export function createGatewayKeys(options: GatewayKeysOptions): GatewayKeys {
             ...(found.aiProviders == null
               ? {}
               : { aiProviders: found.aiProviders }),
+            ...(found.browserAccess === undefined
+              ? {}
+              : { browserAccess: found.browserAccess }),
           };
+    },
+
+    async allowsBrowserOrigin(origin) {
+      return (await openBrowserAccess()).some((access) =>
+        browserAccessAllows(access, origin),
+      );
     },
 
     async list() {
@@ -382,6 +458,7 @@ export function createGatewayKeys(options: GatewayKeysOptions): GatewayKeys {
       if ((await store.revoke(id, now())) === undefined) {
         throw notFound(id);
       }
+      forgetBrowserAccess();
       await changed(["gatewayKeys.revoked"]);
     },
 
@@ -397,6 +474,8 @@ export function createGatewayKeys(options: GatewayKeysOptions): GatewayKeys {
         );
       }
       const updated = await store.update(id, changes);
+      // Enabling, disabling and Browser access change who may preflight.
+      forgetBrowserAccess();
       if (updated === undefined) {
         throw notFound(id);
       }
@@ -515,4 +594,12 @@ export const staticKeys = (
   callers: Readonly<Record<string, GatewayCaller>>,
 ): GatewayKeyAuthenticator => ({
   authenticate: (key) => Promise.resolve(callers[key]),
+  allowsBrowserOrigin: (origin) =>
+    Promise.resolve(
+      Object.values(callers).some(
+        (caller) =>
+          caller.kind === "owner_tool" &&
+          browserAccessAllows(caller.browserAccess, origin),
+      ),
+    ),
 });
