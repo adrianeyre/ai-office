@@ -1,3 +1,13 @@
+## [1.13.0](https://github.com/adrianeyre/ai-office/compare/v1.12.0...v1.13.0) (2026-11-21)
+
+### Features
+
+* **gateway:** per-key Browser access for Owner tool API keys ([c405b3b](https://github.com/adrianeyre/ai-office/commit/c405b3bfde818160e28ae14b4f875deafb7a1ac8))
+
+### Bug Fixes
+
+* **gateway:** send a browser page's Origin, Referer and Sec-* headers to no AI Provider ([6220e7f](https://github.com/adrianeyre/ai-office/commit/6220e7f60a039e5f9fa4f153ecbd8c18908a44b5))
+
 ## [1.12.0](https://github.com/adrianeyre/ai-office/compare/v1.11.0...v1.12.0) (2026-11-16)
 
 ### Features
