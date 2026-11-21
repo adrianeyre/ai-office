@@ -2,6 +2,7 @@ import { Readable, Transform, pipeline } from "node:stream";
 
 import {
   aiOfficeHeaders,
+  browserAccessAllows,
   toolCallScreenPath,
   aiProviderAgentTools,
   communicationsAgentId,
@@ -28,6 +29,7 @@ import {
   ForcedAccountError,
 } from "./balancing/balancing.ts";
 import { authHeaders } from "./accounts/auth-headers.ts";
+import { allowBrowserOrigins, crossOriginOf } from "./browser-access.ts";
 import { CloudRequestError, type CloudSigner } from "./cloud/cloud.ts";
 import { comboSlotKey } from "./combos/combos.ts";
 import type { Fixture, FixtureRecorder } from "./fixtures.ts";
@@ -1156,6 +1158,29 @@ export async function buildGateway(
   // arrives (an `onRequest` hook), before its body is read.
   const callers = new WeakMap<FastifyRequest, GatewayCaller>();
   /**
+   * Whether a caller's key may be used from a web page on `origin` (ADR
+   * 0013): only an Owner tool's, as its Browser access says; never an
+   * Agent's, the Communications Agent's or the Terminal's.
+   */
+  const callerAllowsOrigin = (caller: GatewayCaller, origin: string) =>
+    caller.kind === "owner_tool" &&
+    browserAccessAllows(caller.browserAccess, origin);
+  // A browser's preflight is answered first of all, when any key in use
+  // allows its origin: without a Gateway Key, unrecorded and its body
+  // unread. Every answer to a page its key allows names its origin.
+  allowBrowserOrigins(app, {
+    anyKeyAllows: (origin) =>
+      keys.allowsBrowserOrigin?.(origin) ?? Promise.resolve(false),
+    callerAllows: (request, origin) => {
+      const caller = callers.get(request);
+      return caller === undefined
+        ? undefined
+        : callerAllowsOrigin(caller, origin);
+    },
+    refusalHeader,
+  });
+
+  /**
    * Every request presents a Gateway Key in use (ADR 0001). One that does
    * not is refused before anything else, its body unread (pen-testing
    * I2-2), so a caller without a key never has the Gateway buffer up to
@@ -1214,6 +1239,23 @@ export async function buildGateway(
       }
       check?.succeeded();
       callers.set(request, caller);
+      // A web page on another origin uses only a key whose Browser access
+      // allows its origin (ADR 0013); refused before anything is sent on.
+      const origin = crossOriginOf(request);
+      if (origin !== undefined && !callerAllowsOrigin(caller, origin)) {
+        request.log.warn(
+          { endpoint: refusal.route, origin },
+          "A request from a web page was refused: its Gateway Key does not allow the page's origin.",
+        );
+        return reply
+          .code(403)
+          .send(
+            refusal.body(
+              403,
+              `This API key doesn't allow browser requests from ${origin}. Turn on Browser access for it in API Key Management.`,
+            ),
+          );
+      }
       return undefined;
     };
   const noSuchRoute = (reply: FastifyReply) =>

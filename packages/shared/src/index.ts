@@ -480,6 +480,14 @@ export {
   type PriceSource,
 } from "./pricing.ts";
 export {
+  browserAccessAllows,
+  browserOriginSchema,
+  keyBrowserAccessSchema,
+  maxBrowserOrigins,
+  noBrowserAccess,
+  type KeyBrowserAccess,
+} from "./browser-access.ts";
+export {
   aiOfficeHeaders,
   gatewayEndpoints,
   gatewayLogLineSchema,

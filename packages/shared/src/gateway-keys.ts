@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { aiProviders, type AiProvider } from "./agents.ts";
 import { ownerProofShape } from "./auth.ts";
+import { keyBrowserAccessSchema, noBrowserAccess } from "./browser-access.ts";
 import { defaultKeyProfile, keyProfileSchema } from "./people.ts";
 import { keyTokenCapsSchema, noTokenCaps } from "./token-caps.ts";
 
@@ -117,12 +118,18 @@ export const gatewayKeySchema = z.object({
    * them. Set in API Key Management.
    */
   aiProviders: keyAiProvidersSchema.default(null),
+  /**
+   * Whether an Owner tool's key may be used from a web page in a browser
+   * (ADR 0013): off, from listed origins, or from any. Set in API Key
+   * Management.
+   */
+  browserAccess: keyBrowserAccessSchema.default(noBrowserAccess),
 });
 
 /**
  * The body of `PATCH /api/gateway-keys/:keyId`: an Owner tool's key's
- * name, access, whether it is enabled, its own Token Caps and the AI
- * Providers it may use. A change after which the key signs in
+ * name, access, whether it is enabled, its own Token Caps, the AI
+ * Providers it may use and its Browser access. A change after which the key signs in
  * where it did not (UI access given, or a UI key enabled again) needs a
  * fresh proof of the Owner (A1-3).
  */
@@ -133,19 +140,28 @@ export const gatewayKeyUpdateRequestSchema = z
     enabled: z.boolean(),
     tokenCaps: keyTokenCapsSchema,
     aiProviders: keyAiProvidersSchema,
+    browserAccess: keyBrowserAccessSchema,
   })
   .partial()
   .extend(ownerProofShape)
   .refine(
-    ({ name, access, enabled, tokenCaps, aiProviders: allowed }) =>
+    ({
+      name,
+      access,
+      enabled,
+      tokenCaps,
+      aiProviders: allowed,
+      browserAccess,
+    }) =>
       name !== undefined ||
       access !== undefined ||
       enabled !== undefined ||
       tokenCaps !== undefined ||
-      allowed !== undefined,
+      allowed !== undefined ||
+      browserAccess !== undefined,
     {
       error:
-        "Change the name, the access, whether it is enabled, its Token Caps or its AI Providers.",
+        "Change the name, the access, whether it is enabled, its Token Caps, its AI Providers or its browser access.",
     },
   );
 export type GatewayKeyUpdateRequest = z.infer<

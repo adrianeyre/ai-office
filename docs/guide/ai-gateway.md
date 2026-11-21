@@ -425,7 +425,8 @@ one client there, and one sandbox would lock every Agent out.
   (**Office default**, **Own limit** in tokens, or **Unlimited**; see
   [Owner tools' caps](floors-and-agents.md#owner-tools-caps)), with
   today's and this month's use beside them, choose its **AI Providers**
-  (see [A key's AI Providers](#a-keys-ai-providers)), be **disabled** (the Gateway and sign-in refuse
+  (see [A key's AI Providers](#a-keys-ai-providers)) and its **Browser
+  access** (see [Browser access](#browser-access)), be **disabled** (the Gateway and sign-in refuse
   it, and its web sessions end, until it is **enabled** again) and be
   revoked. An Agent's key keeps its Agent's name, is always enabled and
   only calls models.
@@ -433,11 +434,13 @@ one client there, and one sandbox would lock every Agent out.
   `{"currentPassword", "code"}` for `proxy_and_ui` (`403 proof_required`
   without them, or from a session begun with an API key; `422
   wrong_password` or `wrong_code`). `PATCH /api/gateway-keys/:id` with any
-  of `{"name", "access", "enabled", "tokenCaps", "aiProviders"}`, where
+  of `{"name", "access", "enabled", "tokenCaps", "aiProviders",
+  "browserAccess"}`, where
   `tokenCaps` is `{"daily", "monthly"}`, each a number of tokens,
-  `"unlimited"`, or `null` for the office's cap, and `aiProviders` is a
+  `"unlimited"`, or `null` for the office's cap, `aiProviders` is a
   list of one or more AI Providers (`["Claude", "OpenRouter"]`), or `null`
-  for every one (an Owner tool's key only; `409
+  for every one, and `browserAccess` is `{"mode": "off"}`, `{"mode":
+  "any"}` or `{"mode": "origins", "origins": [...]}` (an Owner tool's key only; `409
   agent_key_no_ui` for an Agent's), with the same proof when the change
   lets the key sign in where it could not, `PUT /api/gateway-keys/:id/profile` with `{"nickname",
   "timeZone"}`, `GET /api/gateway-keys/usage`, and `POST
@@ -481,6 +484,77 @@ rate limit and a token refresh are not recorded, and why a subscription
 is recorded through its own agent tool instead. How to run it, and #45's
 steps with it, are in [the fixtures'
 README](../../packages/gateway/fixtures/README.md#recording).
+
+#### Browser access
+
+By default a key cannot be used from a web page in a browser: the
+Gateway answers no browser's preflight, and a request that carries
+another site's `Origin` is refused. Set a key's **Browser access** on its
+card in API Key Management to let web apps of your own call the
+Gateway's `/v1` routes straight from the browser (CORS), such as a page
+on `http://localhost:4870` or on an https GitHub Pages site
+([ADR 0013](../architectural-decision-record/0013-browser-pages-use-a-gateway-key-only-when-it-allows-them.md)):
+
+- **Off** (the default, for keys made before it too): as before.
+- **Only these origins**: pages on the origins listed, each a scheme, a
+  host and a port if it is not the default, exactly as the browser sends
+  it in `Origin`: `https://` for any host, `http://` only for
+  `localhost`, `127.0.0.1` and `[::1]`. No path, not even a trailing
+  slash, no wildcard and no `null`; one to 20, each once.
+  `HTTPS://CV.Example.com:443` is kept as `https://cv.example.com`.
+- **Any origin**: a page on any origin, to make a key once and use it
+  from any web app of yours without coming back to it.
+
+How the Gateway answers a page:
+
+- **Its preflight** (`OPTIONS /v1/…` with `Origin` and
+  `Access-Control-Request-Method` `GET` or `POST`) carries no key, so it
+  is answered `204` when any key in use (an Owner tool's, enabled and not
+  revoked) allows that origin, before anything else and unrecorded:
+  `Access-Control-Allow-Origin` its origin, `Vary: Origin`,
+  `Access-Control-Allow-Methods: GET, POST`, `Access-Control-Max-Age:
+  600`, and `Access-Control-Allow-Headers` the headers it asked for of
+  `authorization`, `x-api-key`, `content-type`, `anthropic-version`,
+  `anthropic-beta`, `anthropic-dangerous-direct-browser-access`,
+  `openai-organization`, `openai-project` and the `x-stainless-*`
+  headers Anthropic's and OpenAI's SDKs send. Never `user-agent`, so a
+  page cannot pass for an agent tool and a subscription never serves it.
+  Otherwise it is `404` with no CORS header, as before. Which keys allow
+  which origins is kept in memory, read again at once after a key
+  changes, and at least once a minute.
+- **Its request**, once its key is checked, is refused `403` in the
+  route's own error format ("This API key doesn't allow browser requests
+  from …") if that key does not allow its origin, before anything is sent
+  to an AI Provider, and without a CORS grant. An Agent's, the
+  Communications Agent's and the Terminal's keys never allow one.
+- **Every answer** to a request whose key allows its origin, refusals and
+  errors included (a `503` with no AI Account, a Token Cap's `403`, a
+  `404`, a streamed answer), carries `Access-Control-Allow-Origin` its
+  origin, `Vary: Origin` and `Access-Control-Expose-Headers: retry-after,
+  request-id, x-request-id, x-ai-office-refusal`, so the page can read why
+  a call failed. A `401` or `429` sent before a key is checked (none, or
+  one not in use) carries them when any key allows the origin, as its
+  preflight did, so the page can say "wrong key".
+- **Never credentials.** No answer carries
+  `Access-Control-Allow-Credentials`: the Gateway takes a Gateway Key
+  only, and a cookie is never one.
+- **Unchanged without `Origin`**: Claude Code, curl, sandboxes and SDKs on
+  a server send none. Nor is a request whose `Origin` names the address it
+  was sent to (a page of AI Office's own) treated as another site's.
+  AI Office's own `/api` routes never answer a preflight.
+- **The key is the page's.** Opening a key to any origin is safe in the
+  sense that the key is the only credential, but a key used in a browser
+  can be read by that page's scripts. Give browser apps their own key
+  (**AI proxy only**), with its own daily and monthly limits and only the
+  AI Providers it needs, and revoke it if a page is ever compromised.
+- A page calling an Anthropic-format AI Account through the Gateway sends
+  `anthropic-dangerous-direct-browser-access: true`, as Anthropic's SDK
+  does with `dangerouslyAllowBrowser`: the Gateway passes `Origin` on, and
+  Anthropic's API asks for that header with it.
+- **Kept** in `gateway_keys.browser_access` (null for off), so the
+  development database needs `pnpm db:reset`. A change is a
+  `config.changed` event naming `gatewayKeys.browserAccess`, never the
+  origins.
 
 ### AI Accounts
 

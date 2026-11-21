@@ -12,6 +12,7 @@ import {
   gatewayKeyErrorCodes,
   gatewayKeyUpdateRequestSchema,
   keyProfileSchema,
+  noBrowserAccess,
   noTokenCaps,
   type ApiError,
   type CreatedGatewayKey,
@@ -53,6 +54,7 @@ export const gatewayKeyBody = (key: GatewayKeyInfo): GatewayKey => ({
   enabled: key.enabled ?? true,
   tokenCaps: key.tokenCaps ?? noTokenCaps,
   aiProviders: key.aiProviders ?? null,
+  browserAccess: key.browserAccess ?? noBrowserAccess,
 });
 
 /** Answers a `GatewayKeyError` with its status; anything else is rethrown. */

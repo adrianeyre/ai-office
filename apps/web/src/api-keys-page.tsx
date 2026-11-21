@@ -7,12 +7,14 @@ import {
   gatewayKeyUpdateRequestSchema,
   gatewayKeyUsageListSchema,
   keyProfileSchema,
+  maxBrowserOrigins,
   unlimitedTokenCap,
   type CapPeriod,
   type GatewayKey,
   type GatewayKeyAccess,
   type GatewayKeyUsage,
   type KeyAiProviders,
+  type KeyBrowserAccess,
   type KeyTokenCap,
 } from "@ai-office/shared";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -132,7 +134,29 @@ interface KeyFormValues {
   /** Every AI Provider, or only those ticked. */
   providersMode: "all" | "only";
   providers: string[];
+  /** Whether web pages may use the key in a browser (ADR 0013). */
+  browserMode: KeyBrowserAccess["mode"];
+  /** The origins they may be on, one per line. */
+  browserOrigins: string;
 }
+
+/** The key's Browser access, from the form. */
+const browserAccessFrom = (values: KeyFormValues): unknown =>
+  values.browserMode === "origins"
+    ? {
+        mode: "origins",
+        origins: values.browserOrigins
+          .split(/[\s,]+/)
+          .filter((origin) => origin !== ""),
+      }
+    : { mode: values.browserMode };
+
+/** Each Browser access, for people. */
+const browserModeNames: Record<KeyBrowserAccess["mode"], string> = {
+  off: "Off",
+  origins: "Only these origins",
+  any: "Any origin",
+};
 
 /** The AI Providers a key may use, from the form; null for all. */
 const aiProvidersFrom = (values: KeyFormValues): string[] | null =>
@@ -190,6 +214,11 @@ function KeyForm({ gatewayKey }: { gatewayKey: GatewayKey }) {
     monthlyCap: capFieldOf(key.tokenCaps.monthly),
     providersMode: key.aiProviders === null ? "all" : "only",
     providers: [...(key.aiProviders ?? [])],
+    browserMode: key.browserAccess.mode,
+    browserOrigins:
+      key.browserAccess.mode === "origins"
+        ? key.browserAccess.origins.join("\n")
+        : "",
   });
   const {
     register,
@@ -210,6 +239,7 @@ function KeyForm({ gatewayKey }: { gatewayKey: GatewayKey }) {
     enabled: ownerTool,
   });
   const providersMode = useWatch({ control, name: "providersMode" });
+  const browserMode = useWatch({ control, name: "browserMode" });
   // The AI Providers set up (with an AI Account), and any the key names.
   const { data: aiProviderList } = useQuery({
     ...aiProvidersQuery,
@@ -247,6 +277,9 @@ function KeyForm({ gatewayKey }: { gatewayKey: GatewayKey }) {
       dirtyFields.dailyCap === true ||
       dirtyFields.monthlyMode === true ||
       dirtyFields.monthlyCap === true;
+    const browserChanged =
+      dirtyFields.browserMode === true ||
+      (values.browserMode === "origins" && dirtyFields.browserOrigins === true);
     const chosenProviders = aiProvidersFrom(values);
     const providersChanged = !sameAiProviders(
       chosenProviders,
@@ -264,12 +297,14 @@ function KeyForm({ gatewayKey }: { gatewayKey: GatewayKey }) {
           }
         : {}),
       ...(providersChanged ? { aiProviders: chosenProviders } : {}),
+      ...(browserChanged ? { browserAccess: browserAccessFrom(values) } : {}),
     });
     const keyChanged =
       dirtyFields.name === true ||
       dirtyFields.access === true ||
       capsChanged ||
-      providersChanged;
+      providersChanged ||
+      browserChanged;
     const issues = [
       ...(profile.error?.issues ?? []),
       ...(ownerTool && keyChanged ? (changes.error?.issues ?? []) : []),
@@ -485,6 +520,51 @@ function KeyForm({ gatewayKey }: { gatewayKey: GatewayKey }) {
               : providerChoices.length === 0
                 ? "Add an AI Account in AI Settings to choose its AI Provider."
                 : "Served only by these AI Providers' AI Accounts; a Model of another's is refused."}
+          </p>
+        </fieldset>
+      )}
+      {ownerTool && (
+        <fieldset className="space-y-2">
+          <legend className="mb-2 text-sm font-medium">Browser access</legend>
+          <div className="flex flex-wrap gap-4">
+            {(["off", "origins", "any"] as const).map((mode) => (
+              <div key={mode} className="flex items-center gap-2">
+                <input
+                  id={id(`browser-${mode}`)}
+                  type="radio"
+                  value={mode}
+                  className="size-4"
+                  aria-describedby={id("browser-hint")}
+                  {...register("browserMode")}
+                />
+                <Label htmlFor={id(`browser-${mode}`)}>
+                  {browserModeNames[mode]}
+                </Label>
+              </div>
+            ))}
+          </div>
+          {browserMode === "origins" && (
+            <div className="space-y-1">
+              <Label htmlFor={id("browser-origin-list")}>Origins</Label>
+              <textarea
+                id={id("browser-origin-list")}
+                rows={3}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={"http://localhost:4870\nhttps://you.github.io"}
+                className="w-full rounded-md border bg-transparent p-2 font-mono text-xs"
+                {...register("browserOrigins")}
+              />
+            </div>
+          )}
+          <p id={id("browser-hint")} className="text-xs text-muted-foreground">
+            {browserMode === "off"
+              ? "Web pages in a browser cannot use this key; tools, scripts and servers can."
+              : browserMode === "origins"
+                ? `Web pages on these origins may use this key from a browser: one per line, at most ${String(maxBrowserOrigins)}, such as https://you.github.io; http:// only for localhost.`
+                : "Web pages on any origin may use this key from a browser."}{" "}
+            {browserMode !== "off" &&
+              "The page's scripts can read the key, so keep it for browser apps, with its own limits and AI Providers. Cookies are never accepted in its place."}
           </p>
         </fieldset>
       )}

@@ -320,6 +320,7 @@ The AI Gateway is built into AI Office ([ADR 0001](../architectural-decision-rec
   - The Owner can create named Gateway Keys for their own tools (local Claude Code, Codex and others).
   - Keys can be revoked, show when they were last used, and are scoped to calling models only.
   - An Owner tool's key may use every AI Provider the Owner has an AI Account for (the default), or only the ones the Owner chooses for it, set in API Key Management.
+  - An Owner tool's key may be used from web pages in a browser (CORS), set in API Key Management as its Browser access: off (the default), from the exact origins the Owner lists, or from any origin; never with cookies or other credentials ([ADR 0013](../architectural-decision-record/0013-browser-pages-use-a-gateway-key-only-when-it-allows-them.md)).
 - **FR-47 (health):** a health endpoint with account and database status, used by `docker compose` health checks.
 
 ### 6.9 Notice Board and Activity Feed

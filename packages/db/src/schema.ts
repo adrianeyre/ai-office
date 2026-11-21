@@ -240,8 +240,19 @@ export const gatewayKeys = pgTable(
      * null for every one. Null until set.
      */
     aiProviders: jsonb("ai_providers"),
+    /**
+     * Whether an Owner tool's key may be used from a web page in a browser
+     * (ADR 0013), as `keyBrowserAccessSchema` (packages/shared) checks it:
+     * `{"mode":"origins","origins":[…]}` or `{"mode":"any"}`; null for
+     * off, as every key is until it is set.
+     */
+    browserAccess: jsonb("browser_access"),
   },
   (table) => [
+    check(
+      "gateway_keys_browser_access",
+      sql`${table.browserAccess} IS NULL OR ${table.kind} = 'owner_tool'`,
+    ),
     check(
       "gateway_keys_access",
       sql`${table.access} IN ('proxy', 'proxy_and_ui') AND (${table.access} = 'proxy' OR ${table.kind} = 'owner_tool')`,

@@ -220,6 +220,87 @@ const cases: Case[] = [
     },
   ],
   [
+    "keeps an Owner tool key's Browser access, tells the Gateway it with its caller, and answers preflights by the keys in use",
+    async ({ keys, bus, advance }) => {
+      const cv = "http://localhost:4870";
+      const { gatewayKey, key } = await keys.createOwnerToolKey("CV checker");
+      // Off until set, for preflights too.
+      expect(gatewayKey.browserAccess).toBeUndefined();
+      expect(await keys.allowsBrowserOrigin(cv)).toBe(false);
+      const origins = { mode: "origins" as const, origins: [cv] };
+      expect(
+        await keys.update(gatewayKey.id, { browserAccess: origins }),
+      ).toMatchObject({ browserAccess: origins });
+      expect(await keys.authenticate(key)).toEqual({
+        kind: "owner_tool",
+        keyId: gatewayKey.id,
+        name: "CV checker",
+        browserAccess: origins,
+      });
+      const events = await bus.eventsAfter(0);
+      expect(events.at(-1)?.event).toMatchObject({
+        type: "config.changed",
+        keys: ["gatewayKeys.browserAccess"],
+      });
+      // A change here applies to the next preflight at once.
+      expect(await keys.allowsBrowserOrigin(cv)).toBe(true);
+      expect(await keys.allowsBrowserOrigin("https://attacker.example")).toBe(
+        false,
+      );
+      await keys.update(gatewayKey.id, { browserAccess: { mode: "any" } });
+      expect(await keys.allowsBrowserOrigin("https://attacker.example")).toBe(
+        true,
+      );
+      // A disabled key opens nothing; enabled again, it does.
+      await keys.update(gatewayKey.id, { enabled: false });
+      expect(await keys.allowsBrowserOrigin(cv)).toBe(false);
+      await keys.update(gatewayKey.id, { enabled: true });
+      expect(await keys.allowsBrowserOrigin(cv)).toBe(true);
+      // Back to off.
+      expect(
+        (await keys.update(gatewayKey.id, { browserAccess: { mode: "off" } }))
+          .browserAccess,
+      ).toBeUndefined();
+      expect(await keys.authenticate(key)).toEqual({
+        kind: "owner_tool",
+        keyId: gatewayKey.id,
+        name: "CV checker",
+      });
+      expect(await keys.allowsBrowserOrigin(cv)).toBe(false);
+      // A revoked key opens nothing.
+      await keys.update(gatewayKey.id, { browserAccess: { mode: "any" } });
+      expect(await keys.allowsBrowserOrigin(cv)).toBe(true);
+      await keys.revoke(gatewayKey.id);
+      expect(await keys.allowsBrowserOrigin(cv)).toBe(false);
+      advance(61_000);
+      expect(await keys.allowsBrowserOrigin(cv)).toBe(false);
+    },
+  ],
+  [
+    "never opens an Agent's, the Communications Agent's or the Terminal's key to browsers",
+    async ({ keys }) => {
+      await keys.ensureAgentKey(ada);
+      const agentKey = await keys.agentKeyInfo(ada.id);
+      if (agentKey === undefined) {
+        throw new Error("Ada has no key.");
+      }
+      await expect(
+        keys.update(agentKey.id, { browserAccess: { mode: "any" } }),
+      ).rejects.toMatchObject({ code: gatewayKeyErrorCodes.agentKeyNoUi });
+      await keys.terminalKey();
+      const terminal = (await keys.list()).find(
+        ({ kind }) => kind === "terminal",
+      );
+      if (terminal === undefined) {
+        throw new Error("The Terminal has no key.");
+      }
+      await expect(
+        keys.update(terminal.id, { browserAccess: { mode: "any" } }),
+      ).rejects.toMatchObject({ code: gatewayKeyErrorCodes.agentKeyNoUi });
+      expect(await keys.allowsBrowserOrigin("https://x.example")).toBe(false);
+    },
+  ],
+  [
     "refuses a second Owner tool key in use with the same name",
     async ({ keys }) => {
       const first = await keys.createOwnerToolKey("Codex");
