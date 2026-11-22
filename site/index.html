@@ -4,10 +4,12 @@
   site/build.ts, which holds the repository's address and builds the page
   with Vite; the screenshots and icons it names are copied in from
   docs/images/ and apps/web at build time, and the fonts from site/fonts/.
-  Everything reads without JavaScript: demos/main.tsx adds the product demos
-  (each a picture, aria-hidden, with its description beside it), and
+  The page is the Floor's planning wall: felt, with every word on card
+  stock. Everything reads without JavaScript: demos/main.tsx adds the product
+  demos (each a picture, aria-hidden, with its description beside it), and
   script.mts the menu button, the system tabs, copy buttons, the screenshot
-  viewer, the setup guide's progress and the policies' dialogs.
+  viewer, the setup guide's progress, the Stage rail and the policies'
+  dialogs.
 -->
 <html lang="en-GB" class="no-js">
   <head>
@@ -38,12 +40,12 @@
     <meta name="color-scheme" content="light dark" />
     <meta
       name="theme-color"
-      content="#fafaff"
+      content="#24494d"
       media="(prefers-color-scheme: light)"
     />
     <meta
       name="theme-color"
-      content="#0c0d1a"
+      content="#173235"
       media="(prefers-color-scheme: dark)"
     />
     <link rel="canonical" href="{{SITE_URL}}/" />
@@ -90,6 +92,13 @@
     <link
       rel="preload"
       href="fonts/inter-latin-wght-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="fonts/archivo-latin.woff2"
       as="font"
       type="font/woff2"
       crossorigin
@@ -246,6 +255,15 @@
       <symbol id="i-chevron-right" viewBox="0 0 24 24">
         <path d="m9 18 6-6-6-6" />
       </symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24">
+        <rect x="14" y="3" width="5" height="18" rx="1" />
+        <rect x="5" y="3" width="5" height="18" rx="1" />
+      </symbol>
+      <symbol id="i-play" viewBox="0 0 24 24">
+        <path
+          d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"
+        />
+      </symbol>
       <symbol id="i-x" viewBox="0 0 24 24">
         <path d="M18 6 6 18" />
         <path d="m6 6 12 12" />
@@ -261,62 +279,61 @@
     <a class="skip-link" href="#main">Skip to content</a>
 
     <header class="site-header">
-      <div class="container header-inner">
-        <a class="brand" href="#top">
-          <picture>
-            <source
-              srcset="brand/logo-dark.svg"
-              media="(prefers-color-scheme: dark)"
-            />
+      <div class="header-strip">
+        <div class="container header-inner">
+          <a class="brand" href="#top">
             <img src="brand/logo.svg" alt="AI Office" width="152" height="40" />
-          </picture>
-        </a>
-        <button
-          class="menu-toggle icon-button"
-          type="button"
-          aria-expanded="false"
-          aria-controls="site-nav"
-          aria-label="Open the menu"
-          hidden
-        >
-          <svg class="icon" aria-hidden="true"><use href="#i-menu" /></svg>
-        </button>
-        <nav class="site-nav" id="site-nav" aria-label="Sections">
-          <ul class="nav-links">
-            <li><a href="#about">How it works</a></li>
-            <li><a href="#features">Features</a></li>
-            <li><a href="#screenshots">Screenshots</a></li>
-            <li><a href="#quick-start">Quick start</a></li>
-            <li><a href="#setup">Full setup</a></li>
-            <li><a href="#docs">Docs</a></li>
-            <li class="nav-cta">
-              <a class="button button-small" href="{{REPO_URL}}">
-                <svg class="icon" aria-hidden="true">
-                  <use href="#i-github-mark" />
-                </svg>
-                GitHub
-              </a>
-            </li>
-          </ul>
-        </nav>
+          </a>
+          <button
+            class="menu-toggle icon-button"
+            type="button"
+            aria-expanded="false"
+            aria-controls="site-nav"
+            aria-label="Open the menu"
+            hidden
+          >
+            <svg class="icon" aria-hidden="true"><use href="#i-menu" /></svg>
+          </button>
+          <nav class="site-nav" id="site-nav" aria-label="Sections">
+            <ul class="nav-links">
+              <li><a href="#about">How it works</a></li>
+              <li><a href="#features">Features</a></li>
+              <li><a href="#screenshots">Screenshots</a></li>
+              <li><a href="#quick-start">Quick start</a></li>
+              <li><a href="#setup">Full setup</a></li>
+              <li><a href="#docs">Docs</a></li>
+              <li class="nav-cta">
+                <a class="button button-small" href="{{REPO_URL}}">
+                  <svg class="icon" aria-hidden="true">
+                    <use href="#i-github-mark" />
+                  </svg>
+                  GitHub
+                </a>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      </div>
+      <!-- The page read as an issue's journey: the rail fills Stage by
+           Stage as you scroll, and reaches ready-to-merge at the foot. -->
+      <div class="stage-rail" aria-hidden="true">
+        <ol class="container">
+          <li data-stage="work"><span>needs-work</span></li>
+          <li data-stage="review"><span>needs-review</span></li>
+          <li data-stage="qa"><span>needs-qa</span></li>
+          <li data-stage="docs"><span>needs-docs</span></li>
+          <li data-stage="ok"><span>ready-to-merge</span></li>
+        </ol>
+        <span class="rail-fill"></span>
       </div>
     </header>
 
     <main id="main" tabindex="-1">
       <section class="hero" id="top" aria-labelledby="hero-title">
-        <div class="hero-backdrop" aria-hidden="true"></div>
-        <div class="container hero-inner">
-          <div class="hero-text">
-            <p class="eyebrow">
-              <svg class="icon" aria-hidden="true">
-                <use href="#i-server" />
-              </svg>
-              Self-hosted · Bring your own AI Accounts
-            </p>
+        <div class="container hero-grid">
+          <div class="hero-card card pinned pinned-pair">
             <h1 id="hero-title">
-              A 3D office where
-              <span class="gradient-text">AI Agents</span> work your GitHub
-              issues
+              A 3D office where AI Agents work your GitHub issues
             </h1>
             <p class="lead">
               Each repository is a Floor with a Manager and a team of Agents.
@@ -324,6 +341,13 @@
               watch them plan, code, review and merge, each in its own sandbox,
               on the AI Accounts you already pay for.
             </p>
+            <pre
+              class="install"
+              tabindex="0"
+              aria-label="Get AI Office and run it"
+            ><code><span class="prompt" aria-hidden="true">$ </span>git clone {{REPO_URL}}.git
+<span class="prompt" aria-hidden="true">$ </span>cd {{REPO_NAME}} && pnpm install
+<span class="prompt" aria-hidden="true">$ </span>cp .env.example .env && pnpm dev</code></pre>
             <div class="hero-actions">
               <a class="button button-large" href="#quick-start">
                 Get started
@@ -341,34 +365,36 @@
                 View on GitHub
               </a>
             </div>
-            <div class="terminal terminal-mini">
-              <pre
-                tabindex="0"
-                aria-label="Get AI Office and run it"
-              ><code><span class="prompt" aria-hidden="true">$ </span>git clone {{REPO_URL}}.git
-<span class="prompt" aria-hidden="true">$ </span>cd {{REPO_NAME}} && pnpm install
-<span class="prompt" aria-hidden="true">$ </span>cp .env.example .env && pnpm dev</code></pre>
-            </div>
           </div>
-          <figure class="demo-figure hero-figure">
+
+          <figure class="wall-figure">
             <div
-              class="demo-slot demo-slot--hero"
-              data-demo="hero"
+              class="demo-slot demo-slot--wall"
+              data-demo="wall"
               aria-hidden="true"
             ></div>
             <figcaption class="visually-hidden">
-              An animation of one issue on a Floor: issue #42, “Add a dark mode
-              toggle”, arrives labelled ai-office; the Manager triages it to
-              needs-work and Ada, the coder, takes it. Ada's live view shows her
-              reading and editing the code, the tests passing and pull request
-              #43 opening. The issue moves to needs-review with Rex, then
-              needs-qa with Quinn, and is merged, with a Notice saying so.
+              An animation of the web-shop Floor's planning wall: issue cards
+              move across the Stages, needs-work with Ada the coder,
+              needs-review with Rex, needs-qa with Quinn and needs-docs with
+              Iris, to ready-to-merge, where each is stamped merged and a Notice
+              says so, and the next issue is pinned up in needs-work.
             </figcaption>
+            <button
+              class="wall-toggle"
+              type="button"
+              data-wall-toggle
+              aria-pressed="false"
+              hidden
+            >
+              <svg class="icon" aria-hidden="true"><use href="#i-pause" /></svg>
+              <span>Pause the wall</span>
+            </button>
           </figure>
         </div>
 
-        <div class="container">
-          <ul class="facts" aria-label="At a glance">
+        <div class="container glance">
+          <ul class="facts card" aria-label="At a glance">
             <li>
               <svg class="icon" aria-hidden="true">
                 <use href="#i-server" />
@@ -401,7 +427,9 @@
             </li>
           </ul>
           <div class="providers">
-            <p class="providers-title">Pool your AI Accounts</p>
+            <p class="providers-title tape">
+              Pool your AI Accounts from 12 AI Providers
+            </p>
             <ul class="provider-list">
               <li>Claude</li>
               <li>ChatGPT</li>
@@ -423,9 +451,10 @@
       <section id="about" class="section" aria-labelledby="about-title">
         <div class="container">
           <div class="section-head">
-            <p class="kicker">How it works</p>
-            <h2 id="about-title">From an issue to a merged pull request</h2>
-            <p class="section-intro">
+            <h2 class="tape-heading" id="about-title">
+              From an issue to a merged pull request
+            </h2>
+            <p class="section-intro card">
               Coding agents do real work on well-scoped issues, but running
               several at once is hard to see and hard to steer. AI Office makes
               it visible, bounded and controllable, and fun to watch: a web app
@@ -433,8 +462,8 @@
             </p>
           </div>
           <ol class="pipeline">
-            <li>
-              <span class="pipeline-number" aria-hidden="true">1</span>
+            <li class="index-card pinned" data-stage="neutral">
+              <span class="step-mark" aria-hidden="true">1</span>
               <h3>You file it</h3>
               <p>
                 Label one of your issues <code>ai-office</code>, or name issues
@@ -442,32 +471,32 @@
                 you approve.
               </p>
             </li>
-            <li>
-              <span class="pipeline-number" aria-hidden="true">2</span>
+            <li class="index-card pinned" data-stage="neutral">
+              <span class="step-mark" aria-hidden="true">2</span>
               <h3>The Manager triages it</h3>
               <p>
                 It checks the issue is clear enough to work, comments its
                 decision, and asks you on the Notice Board when it is not.
               </p>
             </li>
-            <li>
-              <span class="pipeline-number" aria-hidden="true">3</span>
+            <li class="index-card pinned" data-stage="work">
+              <span class="step-mark" aria-hidden="true">3</span>
               <h3>Agents work it in sandboxes</h3>
               <p>
                 Each Agent works in its own Docker sandbox, reaching models only
                 through the AI Gateway and never with your credentials.
               </p>
             </li>
-            <li>
-              <span class="pipeline-number" aria-hidden="true">4</span>
+            <li class="index-card pinned" data-stage="review">
+              <span class="step-mark" aria-hidden="true">4</span>
               <h3>AI reviewers and QA check it</h3>
               <p>
                 In a Review Loop capped by a Round Cap, so AIs never argue
                 forever; QA and design checks retry before they give up.
               </p>
             </li>
-            <li>
-              <span class="pipeline-number" aria-hidden="true">5</span>
+            <li class="index-card pinned" data-stage="ok">
+              <span class="step-mark" aria-hidden="true">5</span>
               <h3>The Merge Policy decides</h3>
               <p>
                 The Floor merges once CI passes, or sends the pull request to
@@ -475,35 +504,34 @@
               </p>
             </li>
           </ol>
-          <div class="stage-track">
+          <div class="stage-track card">
             <p class="stage-track-title">The four Stages, by label</p>
             <ol class="stage-chips">
-              <li><code>needs-work</code></li>
-              <li><code>needs-review</code></li>
-              <li><code>needs-qa</code></li>
-              <li><code>needs-docs</code></li>
+              <li data-stage="work"><code>needs-work</code></li>
+              <li data-stage="review"><code>needs-review</code></li>
+              <li data-stage="qa"><code>needs-qa</code></li>
+              <li data-stage="docs"><code>needs-docs</code></li>
             </ol>
           </div>
         </div>
       </section>
 
-      <section
-        id="features"
-        class="section section-alt"
-        aria-labelledby="features-title"
-      >
+      <section id="features" class="section" aria-labelledby="features-title">
         <div class="container">
           <div class="section-head">
-            <p class="kicker">Features</p>
-            <h2 id="features-title">Everything a team of Agents needs</h2>
-            <p class="section-intro">
+            <h2 class="tape-heading" id="features-title">
+              Everything a team of Agents needs
+            </h2>
+            <p class="section-intro card">
               An office to work in, a Manager to steer it, sandboxes to keep it
               safe and a Gateway to pay for it, all in one app you run yourself.
+              The demonstrations on this page show a sample Floor, web-shop,
+              with sample data.
             </p>
           </div>
 
           <article class="feature" aria-labelledby="feature-gateway-title">
-            <div class="feature-text">
+            <div class="feature-text card pinned">
               <span class="card-icon">
                 <svg class="icon" aria-hidden="true">
                   <use href="#i-network" />
@@ -535,7 +563,7 @@
                 </li>
               </ul>
             </div>
-            <figure class="demo-figure">
+            <figure class="demo-figure mounted">
               <div
                 class="demo-slot demo-slot--gateway"
                 data-demo="gateway"
@@ -555,7 +583,7 @@
             class="feature feature-flip"
             aria-labelledby="feature-manager-title"
           >
-            <div class="feature-text">
+            <div class="feature-text card pinned">
               <span class="card-icon">
                 <svg class="icon" aria-hidden="true">
                   <use href="#i-message-square-text" />
@@ -582,7 +610,7 @@
                 </li>
               </ul>
             </div>
-            <figure class="demo-figure">
+            <figure class="demo-figure mounted">
               <div
                 class="demo-slot demo-slot--chat"
                 data-demo="chat"
@@ -599,7 +627,7 @@
           </article>
 
           <article class="feature" aria-labelledby="feature-floors-title">
-            <div class="feature-text">
+            <div class="feature-text card pinned">
               <span class="card-icon">
                 <svg class="icon" aria-hidden="true">
                   <use href="#i-layout-template" />
@@ -630,7 +658,7 @@
                 </li>
               </ul>
             </div>
-            <figure class="demo-figure">
+            <figure class="demo-figure mounted">
               <div
                 class="demo-slot demo-slot--templates"
                 data-demo="templates"
@@ -649,142 +677,138 @@
       <section id="more" class="section" aria-labelledby="more-title">
         <div class="container">
           <div class="section-head">
-            <p class="kicker">And the rest</p>
-            <h2 id="more-title">Visible, bounded and controllable</h2>
+            <h2 class="tape-heading" id="more-title">
+              Visible, bounded and controllable
+            </h2>
           </div>
-          <ul class="bento">
-            <li class="tile tile-notices">
-              <p class="tile-copy">
+          <ul class="board">
+            <li class="wall-note note-notices card pinned">
+              <p class="note-copy">
                 <strong>Everything that needs you, in one place.</strong>
                 Pull requests to approve, blocked Agents and reached caps, on
                 the Notice Board.
               </p>
               <div
-                class="tile-picture"
+                class="note-picture"
                 data-demo="notices"
                 aria-hidden="true"
               ></div>
             </li>
-            <li class="tile tile-stat">
-              <p class="stat-lead">Pool AI Accounts from</p>
-              <p class="stat-number">12</p>
-              <p class="stat-label">
-                AI Providers, from Claude and ChatGPT to Ollama, Bedrock and
-                Vertex AI.
-              </p>
-            </li>
-            <li class="tile tile-cap">
-              <p class="tile-copy">
-                <strong>Token Caps.</strong> Office-wide, per Floor, per Agent
-                and per issue: nothing spends without bound.
-              </p>
-              <div
-                class="tile-picture"
-                data-demo="token-cap"
-                aria-hidden="true"
-              ></div>
-            </li>
-            <li class="tile tile-statement">
+            <li class="wall-note note-sticky note-ollama pinned">
               <p class="statement">
                 Run Agents on models you host, through Ollama.
               </p>
-              <p class="tile-note">
+              <p class="note-small">
                 The Local Floor Template sizes prompt budgets and diff limits to
                 each model's context window.
               </p>
             </li>
-            <li class="tile tile-policy">
-              <p class="tile-copy">
+            <li class="wall-note note-cap card pinned">
+              <p class="note-copy">
+                <strong>Token Caps.</strong> Office-wide, per Floor, per Agent
+                and per issue: nothing spends without bound.
+              </p>
+              <div
+                class="note-picture"
+                data-demo="token-cap"
+                aria-hidden="true"
+              ></div>
+            </li>
+            <li class="wall-note note-policy card pinned">
+              <p class="note-copy">
                 <strong>Merge on your terms.</strong> Each Floor merges once CI
                 passes or sends the pull request to you, and any issue can say
                 otherwise.
               </p>
               <div
-                class="tile-picture"
+                class="note-picture"
                 data-demo="merge-policy"
                 aria-hidden="true"
               ></div>
             </li>
-            <li class="tile tile-connections">
-              <p class="tile-copy">
+            <li class="wall-note note-sticky note-sandbox pinned">
+              <svg class="icon note-icon" aria-hidden="true">
+                <use href="#i-shield-check" />
+              </svg>
+              <p class="statement">Credentials never reach a sandbox.</p>
+              <p class="note-small">
+                Each Agent gets a Gateway Key of its own and a read-only,
+                short-lived GitHub token.
+              </p>
+            </li>
+            <li class="wall-note note-connections card pinned">
+              <p class="note-copy">
                 <strong>Hear about it anywhere.</strong> The Communications
                 Agent tells you through Slack, email, webhooks and phone push,
                 and files Wrap-up reports in Notion and Google Docs.
               </p>
               <div
-                class="tile-picture"
+                class="note-picture"
                 data-demo="connections"
                 aria-hidden="true"
               ></div>
             </li>
-            <li class="tile tile-sandbox">
-              <svg class="icon tile-statement-icon" aria-hidden="true">
-                <use href="#i-shield-check" />
-              </svg>
-              <p class="statement">Credentials never reach a sandbox.</p>
-              <p class="tile-note">
-                Each Agent gets a Gateway Key of its own and a read-only,
-                short-lived GitHub token.
-              </p>
-            </li>
           </ul>
 
-          <ul class="more-list" aria-label="Also in AI Office">
-            <li>
-              <svg class="icon" aria-hidden="true">
-                <use href="#i-building-2" />
-              </svg>
-              <div>
-                <h3>The 3D Office</h3>
-                <p>
-                  A lobby with the office-wide Notice Board and a lift to every
-                  Floor. Agents walk tickets to the next desk on a Handoff, meet
-                  for a Kickoff and Wrap-up, and take breaks. On phones and
-                  tablets too, with a 2D view and reduced motion.
-                </p>
-              </div>
-            </li>
-            <li>
-              <svg class="icon" aria-hidden="true">
-                <use href="#i-container" />
-              </svg>
-              <div>
-                <h3>Sandboxed Agents</h3>
-                <p>
-                  Claude Code, Codex or opencode in Docker sandboxes with no
-                  route out but the Gateway. Commits are authored as you, with
-                  an <code>Agent:</code> trailer naming the Agent.
-                </p>
-              </div>
-            </li>
-            <li>
-              <svg class="icon" aria-hidden="true">
-                <use href="#i-activity" />
-              </svg>
-              <div>
-                <h3>Activity and Analytics</h3>
-                <p>
-                  A read-only Activity Feed of everything that happens, and
-                  Analytics of requests, tokens, estimated cost, latency and
-                  errors, with every Gateway request's history.
-                </p>
-              </div>
-            </li>
-            <li>
-              <svg class="icon" aria-hidden="true">
-                <use href="#i-shield-check" />
-              </svg>
-              <div>
-                <h3>Secure by default</h3>
-                <p>
-                  No default password, optional TOTP, sign-in rate limits, AI
-                  Account credentials encrypted at rest, and every Gateway call
-                  checked against a Gateway Key. HTTPS with Caddy when you
-                  deploy it.
-                </p>
-              </div>
-            </li>
-          </ul>
+          <div class="more">
+            <h3 class="more-title tape">Also in AI Office</h3>
+            <ul class="more-list">
+              <li>
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-building-2" />
+                </svg>
+                <div>
+                  <h4>The 3D Office</h4>
+                  <p>
+                    A lobby with the office-wide Notice Board and a lift to
+                    every Floor. Agents walk tickets to the next desk on a
+                    Handoff, meet for a Kickoff and Wrap-up, and take breaks. On
+                    phones and tablets too, with a 2D view and reduced motion.
+                  </p>
+                </div>
+              </li>
+              <li>
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-container" />
+                </svg>
+                <div>
+                  <h4>Sandboxed Agents</h4>
+                  <p>
+                    Claude Code, Codex or opencode in Docker sandboxes with no
+                    route out but the Gateway. Commits are authored as you, with
+                    an <code>Agent:</code> trailer naming the Agent.
+                  </p>
+                </div>
+              </li>
+              <li>
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-activity" />
+                </svg>
+                <div>
+                  <h4>Activity and Analytics</h4>
+                  <p>
+                    A read-only Activity Feed of everything that happens, and
+                    Analytics of requests, tokens, estimated cost, latency and
+                    errors, with every Gateway request's history.
+                  </p>
+                </div>
+              </li>
+              <li>
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-shield-check" />
+                </svg>
+                <div>
+                  <h4>Secure by default</h4>
+                  <p>
+                    No default password, optional TOTP, sign-in rate limits, AI
+                    Account credentials encrypted at rest, and every Gateway
+                    call checked against a Gateway Key. HTTPS with Caddy when
+                    you deploy it.
+                  </p>
+                </div>
+              </li>
+            </ul>
+          </div>
         </div>
       </section>
 
@@ -795,22 +819,21 @@
       >
         <div class="container">
           <div class="section-head">
-            <p class="kicker">Screenshots</p>
-            <h2 id="screenshots-title">See it at work</h2>
-            <p class="section-intro">
+            <h2 class="tape-heading" id="screenshots-title">See it at work</h2>
+            <p class="section-intro card">
               Taken from the running app by its own end-to-end tooling. Select a
               picture to see it full size.
             </p>
           </div>
           <div class="gallery">
-            <figure class="gallery-wide">
+            <figure class="print print-wide">
               <a href="images/office-floor.png" data-lightbox>
                 <img
                   src="images/office-floor.png"
                   width="1440"
                   height="900"
                   loading="lazy"
-                  alt="A Floor of the 3D Office: Agents at their desks with the tokens they have used today above their heads, the Manager's office, a meeting room with a whiteboard, a break area with table football and table tennis, and a Chat with the Manager button."
+                  alt="A Floor of the 3D Office: Agents at their desks with the tokens they have used today above their heads, the Manager's office, a meeting room with a whiteboard, a break area with table football and table tennis, and a Status update panel with what each Agent did and plans today."
                 />
               </a>
               <figcaption>
@@ -818,22 +841,37 @@
                 room and the break area.
               </figcaption>
             </figure>
-            <figure>
+            <figure class="print">
               <a href="images/office.png" data-lightbox>
                 <img
                   src="images/office.png"
                   width="1440"
                   height="900"
                   loading="lazy"
-                  alt="The 3D Office in overview: the lift menu listing the Lobby and a web-shop Floor, and the Floor's desks, meeting room and break area."
+                  alt="The 3D Office's lobby: the receptionist greets the Owner, a visitor waits on a sofa, the lift menu lists the Lobby and a web-shop Floor, and a panel says what is on the Notice Board."
                 />
               </a>
               <figcaption>
-                <strong>The Office.</strong> The lobby, the lift to each Floor
-                and the Notice Board.
+                <strong>The lobby.</strong> Reception, where the Communications
+                Agent greets you, the lift to each Floor and the Notice Board.
               </figcaption>
             </figure>
-            <figure>
+            <figure class="print">
+              <a href="images/overview.png" data-lightbox>
+                <img
+                  src="images/overview.png"
+                  width="1440"
+                  height="900"
+                  loading="lazy"
+                  alt="The Overview page: every Agent's work and every Manager's answer across the Floors, each with a Stop button."
+                />
+              </a>
+              <figcaption>
+                <strong>Overview.</strong> Every Agent's work across the Floors,
+                live, each with a Stop button.
+              </figcaption>
+            </figure>
+            <figure class="print">
               <a href="images/notice-board.png" data-lightbox>
                 <img
                   src="images/notice-board.png"
@@ -848,7 +886,7 @@
                 office-wide and per Floor.
               </figcaption>
             </figure>
-            <figure>
+            <figure class="print">
               <a href="images/agent-live-view.png" data-lightbox>
                 <img
                   src="images/agent-live-view.png"
@@ -863,7 +901,7 @@
                 text, tool calls and diffs.
               </figcaption>
             </figure>
-            <figure>
+            <figure class="print">
               <a href="images/activity.png" data-lightbox>
                 <img
                   src="images/activity.png"
@@ -878,7 +916,7 @@
                 Agent, issue, type and time.
               </figcaption>
             </figure>
-            <figure>
+            <figure class="print">
               <a href="images/gateway-requests.png" data-lightbox>
                 <img
                   src="images/gateway-requests.png"
@@ -893,7 +931,7 @@
                 Gateway, with its tokens, cost and timings.
               </figcaption>
             </figure>
-            <figure>
+            <figure class="print">
               <a href="images/analytics.png" data-lightbox>
                 <img
                   src="images/analytics.png"
@@ -908,7 +946,7 @@
                 errors over time.
               </figcaption>
             </figure>
-            <figure>
+            <figure class="print">
               <a href="images/ai-settings.png" data-lightbox>
                 <img
                   src="images/ai-settings.png"
@@ -923,124 +961,125 @@
                 Gateway's configuration.
               </figcaption>
             </figure>
-            <figure>
+            <figure class="print">
+              <a href="images/agent-settings.png" data-lightbox>
+                <img
+                  src="images/agent-settings.png"
+                  width="1440"
+                  height="900"
+                  loading="lazy"
+                  alt="Agent Settings: a tab for each Agent on a Floor, with its AI Provider, Model, Token Caps and Avatar."
+                />
+              </a>
+              <figcaption>
+                <strong>Agent Settings.</strong> Each Agent's AI Provider,
+                Model, Token Caps and Avatar.
+              </figcaption>
+            </figure>
+            <figure class="print">
               <a href="images/admin-storage.png" data-lightbox>
                 <img
                   src="images/admin-storage.png"
                   width="1440"
                   height="900"
                   loading="lazy"
-                  alt="The Admin page: office settings, the prompt-cache TTL and the Storage card."
+                  alt="The General Settings page: office settings, the prompt-cache TTL and the Storage card."
                 />
               </a>
               <figcaption>
-                <strong>Admin.</strong> Office settings, the prompt-cache TTL
-                and Storage.
+                <strong>General Settings.</strong> Office settings, the
+                prompt-cache TTL and Storage.
               </figcaption>
             </figure>
-            <figure>
-              <a href="images/lobby-people.png" data-lightbox>
+            <figure class="print">
+              <a href="images/floor-settings.png" data-lightbox>
                 <img
-                  src="images/lobby-people.png"
-                  width="1400"
+                  src="images/floor-settings.png"
+                  width="1440"
                   height="900"
                   loading="lazy"
-                  alt="The lobby: the receptionist greets the Owner by name, a visitor waits on a sofa, and a panel says the Notice Board is empty."
+                  alt="Floor Settings: the GitHub Apps and access tokens AI Office works through, and every Floor."
                 />
               </a>
               <figcaption>
-                <strong>The lobby.</strong> Reception, where the Communications
-                Agent greets you.
+                <strong>Floor Settings.</strong> The GitHub Apps and tokens AI
+                Office works through, and every Floor.
               </figcaption>
             </figure>
           </div>
         </div>
       </section>
 
-      <section
-        id="requirements"
-        class="section section-alt"
-        aria-labelledby="requirements-title"
-      >
-        <div class="container">
-          <div class="section-head">
-            <p class="kicker">Before you start</p>
-            <h2 id="requirements-title">Requirements</h2>
-          </div>
-          <ul class="requirements">
-            <li class="card">
-              <span class="card-icon">
+      <div class="container start-grid">
+        <section
+          id="requirements"
+          class="section requirements-section"
+          aria-labelledby="requirements-title"
+        >
+          <div class="checklist card">
+            <h2 class="tape-heading" id="requirements-title">Requirements</h2>
+            <ul class="requirements">
+              <li>
                 <svg class="icon" aria-hidden="true">
                   <use href="#i-laptop" />
                 </svg>
-              </span>
-              <p>
-                <strong>Windows, macOS or Linux</strong>, or a single server
-                such as an EC2 instance.
-              </p>
-            </li>
-            <li class="card">
-              <span class="card-icon">
+                <p>
+                  <strong>Windows, macOS or Linux</strong>, or a single server
+                  such as an EC2 instance.
+                </p>
+              </li>
+              <li>
                 <svg class="icon" aria-hidden="true">
                   <use href="#i-container" />
                 </svg>
-              </span>
-              <p>
-                <strong>Docker</strong>: Docker Desktop on Windows and macOS (on
-                Windows it runs on WSL 2), or Docker Engine on Linux. It runs
-                Postgres 18 and the Agents' sandboxes.
-              </p>
-            </li>
-            <li class="card">
-              <span class="card-icon">
+                <p>
+                  <strong>Docker</strong>: Docker Desktop on Windows and macOS
+                  (on Windows it runs on WSL 2), or Docker Engine on Linux. It
+                  runs Postgres 18 and the Agents' sandboxes.
+                </p>
+              </li>
+              <li>
                 <svg class="icon" aria-hidden="true">
                   <use href="#i-terminal" />
                 </svg>
-              </span>
-              <p>
-                <strong>Node 26 or later and pnpm 12 or later</strong>, as the
-                repository's <code>package.json</code> requires (older versions
-                are refused), and Git.
-              </p>
-            </li>
-            <li class="card">
-              <span class="card-icon">
+                <p>
+                  <strong>Node 26 or later and pnpm 12 or later</strong>, as the
+                  repository's <code>package.json</code> requires (older
+                  versions are refused), and Git.
+                </p>
+              </li>
+              <li>
                 <svg class="icon" aria-hidden="true">
                   <use href="#i-git-branch" />
                 </svg>
-              </span>
-              <p>
-                <strong>A GitHub account</strong>, to create the AI Office
-                GitHub App and install it on the repositories that will be
-                Floors.
-              </p>
-            </li>
-            <li class="card">
-              <span class="card-icon">
+                <p>
+                  <strong>A GitHub account</strong>, to create the AI Office
+                  GitHub App and install it on the repositories that will be
+                  Floors.
+                </p>
+              </li>
+              <li>
                 <svg class="icon" aria-hidden="true">
                   <use href="#i-key-round" />
                 </svg>
-              </span>
-              <p>
-                <strong>At least one AI Account</strong>: a Claude or ChatGPT
-                subscription, or an API key for one of the supported AI
-                Providers.
-              </p>
-            </li>
-          </ul>
-        </div>
-      </section>
+                <p>
+                  <strong>At least one AI Account</strong>: a Claude or ChatGPT
+                  subscription, or an API key for one of the supported AI
+                  Providers.
+                </p>
+              </li>
+            </ul>
+          </div>
+        </section>
 
-      <section
-        id="quick-start"
-        class="section"
-        aria-labelledby="quick-start-title"
-      >
-        <div class="container narrow">
+        <section
+          id="quick-start"
+          class="section quick-section"
+          aria-labelledby="quick-start-title"
+        >
           <div class="section-head">
-            <p class="kicker">Five minutes</p>
-            <h2 id="quick-start-title">Quick start</h2>
-            <p class="section-intro">
+            <h2 class="tape-heading" id="quick-start-title">Quick start</h2>
+            <p class="section-intro card">
               From nothing to AI Office running on
               <a href="http://localhost:3045">http://localhost:3045</a>, in
               development. Pick your system. For Agents to work issues, carry on
@@ -1048,7 +1087,7 @@
             </p>
           </div>
 
-          <div class="os-tabs terminal" data-os-tabs>
+          <div class="os-tabs card" data-os-tabs>
             <section
               class="os-panel"
               id="quick-windows"
@@ -1156,7 +1195,7 @@ pnpm dev</code></pre>
           </div>
 
           <div class="callout-grid">
-            <div class="callout">
+            <div class="callout card">
               <h3>
                 <svg class="icon" aria-hidden="true">
                   <use href="#i-monitor" />
@@ -1171,7 +1210,7 @@ pnpm dev</code></pre>
                 the first run it asks you to create the Owner password.
               </p>
             </div>
-            <div class="callout">
+            <div class="callout card">
               <h3>
                 <svg class="icon" aria-hidden="true">
                   <use href="#i-network" />
@@ -1187,26 +1226,21 @@ pnpm dev</code></pre>
               </p>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
-      <section
-        id="setup"
-        class="section section-alt"
-        aria-labelledby="setup-title"
-      >
+      <section id="setup" class="section" aria-labelledby="setup-title">
         <div class="container">
           <div class="section-head">
-            <p class="kicker">Step by step</p>
-            <h2 id="setup-title">Full setup guide</h2>
-            <p class="section-intro">
+            <h2 class="tape-heading" id="setup-title">Full setup guide</h2>
+            <p class="section-intro card">
               Everything from a fresh machine to Agents opening pull requests.
               Each step links to the detailed guide in the repository.
             </p>
           </div>
 
           <div class="setup-layout">
-            <nav class="toc" aria-label="Setup steps">
+            <nav class="toc card" aria-label="Setup steps">
               <p class="toc-title" aria-hidden="true">On this guide</p>
               <ol>
                 <li>
@@ -1236,7 +1270,7 @@ pnpm dev</code></pre>
             </nav>
 
             <div class="setup-steps">
-              <article class="setup-step" id="setup-prerequisites">
+              <article class="setup-step card" id="setup-prerequisites">
                 <h3>
                   <span class="step-number">1</span> Install the prerequisites
                 </h3>
@@ -1340,7 +1374,7 @@ pnpm --version   <span class="comment"># 12 or later</span></code></pre>
                 </p>
               </article>
 
-              <article class="setup-step" id="setup-clone">
+              <article class="setup-step card" id="setup-clone">
                 <h3><span class="step-number">2</span> Clone and install</h3>
                 <pre tabindex="0"><code>git clone {{REPO_URL}}.git
 cd {{REPO_NAME}}
@@ -1352,7 +1386,7 @@ pnpm install</code></pre>
                 </p>
               </article>
 
-              <article class="setup-step" id="setup-env">
+              <article class="setup-step card" id="setup-env">
                 <h3>
                   <span class="step-number">3</span> Create <code>.env</code>
                 </h3>
@@ -1391,7 +1425,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"</cod
                 </p>
               </article>
 
-              <article class="setup-step" id="setup-run">
+              <article class="setup-step card" id="setup-run">
                 <h3><span class="step-number">4</span> Run AI Office</h3>
                 <h4>In development</h4>
                 <pre tabindex="0"><code>pnpm dev</code></pre>
@@ -1444,7 +1478,7 @@ curl localhost:3045/health   <span class="comment"># {"status":"ok","database":"
                 </p>
               </article>
 
-              <article class="setup-step" id="setup-sign-in">
+              <article class="setup-step card" id="setup-sign-in">
                 <h3>
                   <span class="step-number">5</span> Sign in for the first time
                 </h3>
@@ -1479,7 +1513,7 @@ curl localhost:3045/health   <span class="comment"># {"status":"ok","database":"
                 </ul>
               </article>
 
-              <article class="setup-step" id="setup-github-app">
+              <article class="setup-step card" id="setup-github-app">
                 <h3>
                   <span class="step-number">6</span> Create the GitHub App
                 </h3>
@@ -1617,7 +1651,7 @@ curl localhost:3045/health   <span class="comment"># {"status":"ok","database":"
                 </p>
               </article>
 
-              <article class="setup-step" id="setup-install-app">
+              <article class="setup-step card" id="setup-install-app">
                 <h3><span class="step-number">7</span> Install the App</h3>
                 <p>
                   On the App's page choose <strong>Install App</strong>, pick
@@ -1629,7 +1663,7 @@ curl localhost:3045/health   <span class="comment"># {"status":"ok","database":"
                 </p>
               </article>
 
-              <article class="setup-step" id="setup-sandboxes">
+              <article class="setup-step card" id="setup-sandboxes">
                 <h3>
                   <span class="step-number">8</span> Build the sandbox images
                 </h3>
@@ -1721,7 +1755,7 @@ pnpm sandbox:build claude   <span class="comment"># or only those your Agents' A
                 </p>
               </article>
 
-              <article class="setup-step" id="setup-ai-accounts">
+              <article class="setup-step card" id="setup-ai-accounts">
                 <h3><span class="step-number">9</span> Add your AI Accounts</h3>
                 <p>
                   In <strong>AI Settings → AI Accounts</strong>. None come from
@@ -1766,7 +1800,7 @@ pnpm sandbox:build claude   <span class="comment"># or only those your Agents' A
                 </p>
               </article>
 
-              <article class="setup-step" id="setup-floor">
+              <article class="setup-step card" id="setup-floor">
                 <h3><span class="step-number">10</span> Add a Floor</h3>
                 <p>
                   Admin's <strong>Floors</strong> card lists the repositories
@@ -1788,7 +1822,7 @@ pnpm sandbox:build claude   <span class="comment"># or only those your Agents' A
                 </p>
               </article>
 
-              <article class="setup-step" id="setup-first-issue">
+              <article class="setup-step card" id="setup-first-issue">
                 <h3>
                   <span class="step-number">11</span> Hand over the first issue
                 </h3>
@@ -1808,164 +1842,163 @@ pnpm sandbox:build claude   <span class="comment"># or only those your Agents' A
       </section>
 
       <section id="docs" class="section" aria-labelledby="docs-title">
-        <div class="container">
+        <div class="container docs-grid">
           <div class="section-head">
-            <p class="kicker">Go deeper</p>
-            <h2 id="docs-title">Documentation</h2>
-            <p class="section-intro">
+            <h2 class="tape-heading" id="docs-title">Documentation</h2>
+            <p class="section-intro card">
               How AI Office works, part by part, is in the guide in the
               repository.
             </p>
           </div>
-          <ul class="doc-links">
-            <li>
-              <a
-                class="doc-card"
-                href="{{REPO_URL}}/blob/main/docs/guide/running.md"
+          <div class="card-file card pinned">
+            <ul class="doc-links">
+              <li>
+                <a href="{{REPO_URL}}/blob/main/docs/guide/running.md">
+                  <span class="doc-title">Running AI Office</span>
+                  <span class="doc-text"
+                    >Development, docker compose, first run and sign-in, storage
+                    and configuration export.</span
+                  >
+                  <svg class="icon doc-arrow" aria-hidden="true">
+                    <use href="#i-arrow-up-right" />
+                  </svg>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="{{REPO_URL}}/blob/main/docs/processes/setting-up-a-floor.md"
+                >
+                  <span class="doc-title"
+                    >Setting up the GitHub App and your Floors</span
+                  >
+                  <span class="doc-text"
+                    >Everything GitHub needs, from the App to branch
+                    protection.</span
+                  >
+                  <svg class="icon doc-arrow" aria-hidden="true">
+                    <use href="#i-arrow-up-right" />
+                  </svg>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="{{REPO_URL}}/blob/main/docs/processes/deploying-to-ec2.md"
+                >
+                  <span class="doc-title">Deploying to EC2</span>
+                  <span class="doc-text"
+                    >HTTPS with Caddy, access, backups and upgrades.</span
+                  >
+                  <svg class="icon doc-arrow" aria-hidden="true">
+                    <use href="#i-arrow-up-right" />
+                  </svg>
+                </a>
+              </li>
+              <li>
+                <a href="{{REPO_URL}}/blob/main/docs/guide/ai-gateway.md">
+                  <span class="doc-title">The AI Gateway</span>
+                  <span class="doc-text"
+                    >Endpoints, Gateway Keys, AI Accounts, load balancing and
+                    Analytics.</span
+                  >
+                  <svg class="icon doc-arrow" aria-hidden="true">
+                    <use href="#i-arrow-up-right" />
+                  </svg>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="{{REPO_URL}}/blob/main/docs/guide/floors-and-agents.md"
+                >
+                  <span class="doc-title">Floors and Agents</span>
+                  <span class="doc-text"
+                    >Floor Templates, the Role library and Token Caps.</span
+                  >
+                  <svg class="icon doc-arrow" aria-hidden="true">
+                    <use href="#i-arrow-up-right" />
+                  </svg>
+                </a>
+              </li>
+              <li>
+                <a href="{{REPO_URL}}/blob/main/docs/guide/issue-pipeline.md">
+                  <span class="doc-title">The issue pipeline</span>
+                  <span class="doc-text"
+                    >Intake, triage, sandboxes, reviews and the Merge
+                    Policy.</span
+                  >
+                  <svg class="icon doc-arrow" aria-hidden="true">
+                    <use href="#i-arrow-up-right" />
+                  </svg>
+                </a>
+              </li>
+            </ul>
+            <p class="doc-more">
+              <a href="{{REPO_URL}}/blob/main/docs/guide/README.md"
+                >The whole guide</a
               >
-                <span class="doc-title">Running AI Office</span>
-                <span class="doc-text"
-                  >Development, docker compose, first run and sign-in, storage
-                  and configuration export.</span
-                >
-                <svg class="icon doc-arrow" aria-hidden="true">
-                  <use href="#i-arrow-up-right" />
-                </svg>
-              </a>
-            </li>
-            <li>
-              <a
-                class="doc-card"
-                href="{{REPO_URL}}/blob/main/docs/processes/setting-up-a-floor.md"
-              >
-                <span class="doc-title"
-                  >Setting up the GitHub App and your Floors</span
-                >
-                <span class="doc-text"
-                  >Everything GitHub needs, from the App to branch
-                  protection.</span
-                >
-                <svg class="icon doc-arrow" aria-hidden="true">
-                  <use href="#i-arrow-up-right" />
-                </svg>
-              </a>
-            </li>
-            <li>
-              <a
-                class="doc-card"
-                href="{{REPO_URL}}/blob/main/docs/processes/deploying-to-ec2.md"
-              >
-                <span class="doc-title">Deploying to EC2</span>
-                <span class="doc-text"
-                  >HTTPS with Caddy, access, backups and upgrades.</span
-                >
-                <svg class="icon doc-arrow" aria-hidden="true">
-                  <use href="#i-arrow-up-right" />
-                </svg>
-              </a>
-            </li>
-            <li>
-              <a
-                class="doc-card"
-                href="{{REPO_URL}}/blob/main/docs/guide/ai-gateway.md"
-              >
-                <span class="doc-title">The AI Gateway</span>
-                <span class="doc-text"
-                  >Endpoints, Gateway Keys, AI Accounts, load balancing and
-                  Analytics.</span
-                >
-                <svg class="icon doc-arrow" aria-hidden="true">
-                  <use href="#i-arrow-up-right" />
-                </svg>
-              </a>
-            </li>
-            <li>
-              <a
-                class="doc-card"
-                href="{{REPO_URL}}/blob/main/docs/guide/floors-and-agents.md"
-              >
-                <span class="doc-title">Floors and Agents</span>
-                <span class="doc-text"
-                  >Floor Templates, the Role library and Token Caps.</span
-                >
-                <svg class="icon doc-arrow" aria-hidden="true">
-                  <use href="#i-arrow-up-right" />
-                </svg>
-              </a>
-            </li>
-            <li>
-              <a
-                class="doc-card"
-                href="{{REPO_URL}}/blob/main/docs/guide/issue-pipeline.md"
-              >
-                <span class="doc-title">The issue pipeline</span>
-                <span class="doc-text"
-                  >Intake, triage, sandboxes, reviews and the Merge
-                  Policy.</span
-                >
-                <svg class="icon doc-arrow" aria-hidden="true">
-                  <use href="#i-arrow-up-right" />
-                </svg>
-              </a>
-            </li>
-          </ul>
-          <p class="doc-more">
-            <a href="{{REPO_URL}}/blob/main/docs/guide/README.md"
-              >The whole guide</a
-            >
-            and the
-            <a href="{{REPO_URL}}/blob/main/GLOSSARY.md">glossary</a>.
-          </p>
+              and the
+              <a href="{{REPO_URL}}/blob/main/GLOSSARY.md">glossary</a>.
+            </p>
+          </div>
         </div>
       </section>
 
       <section
         id="licence"
-        class="section section-alt section-compact"
+        class="section section-compact"
         aria-labelledby="licence-title"
       >
-        <div class="container narrow licence">
-          <span class="card-icon">
-            <svg class="icon" aria-hidden="true"><use href="#i-scale" /></svg>
-          </span>
-          <div>
-            <h2 id="licence-title">Licence</h2>
-            <p>
-              AI Office has not chosen its licence yet: one will be picked when
-              it is released, and until then no licence is granted. The
-              third-party assets it includes, such as 3D models and the Inter
-              typeface in its logo, are listed with their own licences (CC0-1.0,
-              OFL-1.1 and Apache-2.0) in
-              <a href="{{REPO_URL}}/blob/main/THIRD-PARTY-NOTICES.md"
-                ><code>THIRD-PARTY-NOTICES.md</code></a
-              >.
-            </p>
-            <p>
-              Claude and ChatGPT subscriptions are used under their providers'
-              terms: AI Office shows each one's terms before you sign in.
-            </p>
+        <div class="container">
+          <div class="licence card">
+            <span class="card-icon">
+              <svg class="icon" aria-hidden="true">
+                <use href="#i-scale" />
+              </svg>
+            </span>
+            <div>
+              <h2 id="licence-title">Licence</h2>
+              <p>
+                AI Office has not chosen its licence yet: one will be picked
+                when it is released, and until then no licence is granted. The
+                third-party assets it includes, such as 3D models and the Inter
+                typeface in its logo, are listed with their own licences
+                (CC0-1.0, OFL-1.1 and Apache-2.0) in
+                <a href="{{REPO_URL}}/blob/main/THIRD-PARTY-NOTICES.md"
+                  ><code>THIRD-PARTY-NOTICES.md</code></a
+                >.
+              </p>
+              <p>
+                Claude and ChatGPT subscriptions are used under their providers'
+                terms: AI Office shows each one's terms before you sign in.
+              </p>
+            </div>
           </div>
         </div>
       </section>
 
       <section class="cta" aria-labelledby="cta-title">
         <div class="container">
-          <div class="cta-inner">
+          <div class="cta-ticket card pinned pinned-pair">
+            <span
+              class="dot cta-sticker"
+              data-stage="ok"
+              aria-hidden="true"
+            ></span>
             <h2 id="cta-title">Get AI Office</h2>
             <p>The code, the issues and the full guide are on GitHub.</p>
             <div class="cta-actions">
-              <a class="button button-inverse button-large" href="{{REPO_URL}}">
+              <a class="button button-large" href="{{REPO_URL}}">
                 <svg class="icon" aria-hidden="true">
                   <use href="#i-github-mark" />
                 </svg>
                 View on GitHub
               </a>
               <a
-                class="button button-ghost-inverse button-large"
+                class="button button-secondary button-large"
                 href="#quick-start"
                 >Quick start</a
               >
             </div>
+            <span class="stamp" aria-hidden="true">Yours to merge</span>
           </div>
         </div>
       </section>
@@ -2242,94 +2275,100 @@ pnpm sandbox:build claude   <span class="comment"># or only those your Agents' A
     </main>
 
     <footer class="site-footer">
-      <div class="container footer-grid">
-        <div class="footer-brand">
-          <img
-            src="brand/icon.svg"
-            alt=""
-            width="40"
-            height="40"
-            loading="lazy"
-          />
-          <p>
-            <strong>AI Office</strong><br />
-            A 3D office where AI Agents work your GitHub issues.
-          </p>
-        </div>
-        <nav class="footer-nav" aria-label="This page">
-          <h2 class="footer-heading">On this page</h2>
-          <ul>
-            <li><a href="#about">How it works</a></li>
-            <li><a href="#features">Features</a></li>
-            <li><a href="#screenshots">Screenshots</a></li>
-            <li><a href="#quick-start">Quick start</a></li>
-            <li><a href="#setup">Full setup</a></li>
-          </ul>
-        </nav>
-        <nav class="footer-nav" aria-label="The project">
-          <h2 class="footer-heading">The project</h2>
-          <ul>
-            <li><a href="{{REPO_URL}}">GitHub</a></li>
-            <li><a href="{{REPO_URL}}/issues">Issues</a></li>
-            <li>
-              <a href="{{REPO_URL}}/blob/main/docs/guide/README.md">Guide</a>
-            </li>
-            <li><a href="{{REPO_URL}}/blob/main/GLOSSARY.md">Glossary</a></li>
-          </ul>
-        </nav>
-      </div>
-      <div class="footer-bar">
-        <nav class="container" aria-label="About AI Office">
-          <ul class="footer-legal">
-            <li>
-              <a
-                class="footer-link footer-credit"
-                href="{{REPO_URL}}"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <svg class="icon" aria-hidden="true">
-                  <use href="#i-github-mark" />
-                </svg>
-                Website design<span class="visually-hidden"
-                  >, source on GitHub, opens in a new tab</span
+      <div class="container">
+        <div class="footer-card card">
+          <div class="footer-grid">
+            <div class="footer-brand">
+              <img
+                src="brand/icon.svg"
+                alt=""
+                width="40"
+                height="40"
+                loading="lazy"
+              />
+              <p>
+                <strong>AI Office</strong><br />
+                A 3D office where AI Agents work your GitHub issues.
+              </p>
+            </div>
+            <nav class="footer-nav" aria-label="This page">
+              <h2 class="footer-heading">On this page</h2>
+              <ul>
+                <li><a href="#about">How it works</a></li>
+                <li><a href="#features">Features</a></li>
+                <li><a href="#screenshots">Screenshots</a></li>
+                <li><a href="#quick-start">Quick start</a></li>
+                <li><a href="#setup">Full setup</a></li>
+              </ul>
+            </nav>
+            <nav class="footer-nav" aria-label="The project">
+              <h2 class="footer-heading">The project</h2>
+              <ul>
+                <li><a href="{{REPO_URL}}">GitHub</a></li>
+                <li><a href="{{REPO_URL}}/issues">Issues</a></li>
+                <li>
+                  <a href="{{REPO_URL}}/blob/main/docs/guide/README.md"
+                    >Guide</a
+                  >
+                </li>
+                <li>
+                  <a href="{{REPO_URL}}/blob/main/GLOSSARY.md">Glossary</a>
+                </li>
+              </ul>
+            </nav>
+          </div>
+          <nav class="footer-bar" aria-label="About AI Office">
+            <ul class="footer-legal">
+              <li>
+                <a
+                  class="footer-link footer-credit"
+                  href="{{REPO_URL}}"
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
-              </a>
-            </li>
-            <li>
-              <a
-                class="footer-link"
-                href="#privacy-policy"
-                data-policy="privacy-policy"
-                >Privacy Policy</a
-              >
-            </li>
-            <li>
-              <a
-                class="footer-link"
-                href="#terms-and-conditions"
-                data-policy="terms-and-conditions"
-                >Terms and Conditions</a
-              >
-            </li>
-            <li>
-              <a
-                class="footer-link"
-                href="#cookie-policy"
-                data-policy="cookie-policy"
-                >Cookie Policy</a
-              >
-            </li>
-            <li>
-              <a
-                class="footer-link"
-                href="#accessibility"
-                data-policy="accessibility"
-                >Accessibility</a
-              >
-            </li>
-          </ul>
-        </nav>
+                  <svg class="icon" aria-hidden="true">
+                    <use href="#i-github-mark" />
+                  </svg>
+                  Website design<span class="visually-hidden"
+                    >, source on GitHub, opens in a new tab</span
+                  >
+                </a>
+              </li>
+              <li>
+                <a
+                  class="footer-link"
+                  href="#privacy-policy"
+                  data-policy="privacy-policy"
+                  >Privacy Policy</a
+                >
+              </li>
+              <li>
+                <a
+                  class="footer-link"
+                  href="#terms-and-conditions"
+                  data-policy="terms-and-conditions"
+                  >Terms and Conditions</a
+                >
+              </li>
+              <li>
+                <a
+                  class="footer-link"
+                  href="#cookie-policy"
+                  data-policy="cookie-policy"
+                  >Cookie Policy</a
+                >
+              </li>
+              <li>
+                <a
+                  class="footer-link"
+                  href="#accessibility"
+                  data-policy="accessibility"
+                  >Accessibility</a
+                >
+              </li>
+            </ul>
+          </nav>
+        </div>
       </div>
     </footer>
 

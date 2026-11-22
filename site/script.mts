@@ -3,8 +3,8 @@
 // show one after another, screenshots open as plain links, and the policies
 // are read at the foot of the page. With them, there are a menu button on
 // phones, the Quick start's system tabs, copy buttons on every command, a
-// screenshot viewer, the setup guide's progress, and the policies in
-// dialogs, as in the app's footer. Nothing is stored: the page sets no
+// screenshot viewer, the setup guide's progress, the Stage rail under the
+// header, and the policies in dialogs, as in the app's footer. Nothing is stored: the page sets no
 // cookies and uses no browser storage (its Cookie Policy says so).
 
 const icon = (name: string): string =>
@@ -384,6 +384,38 @@ const progress = new IntersectionObserver(
   { rootMargin: "-20% 0px -55% 0px" },
 );
 for (const { step } of steps) progress.observe(step);
+
+/* ---------- The Stage rail ---------- */
+
+// The page read as an issue's journey: under the header, the five Stages
+// fill one after another as the reader scrolls, and reach ready-to-merge
+// at the foot of the page. A picture only (aria-hidden).
+const railStages = [
+  ...document.querySelectorAll<HTMLElement>(".stage-rail li"),
+];
+if (railStages.length > 0) {
+  let queued = false;
+  const fill = () => {
+    queued = false;
+    const room = document.documentElement.scrollHeight - innerHeight;
+    const progress = room > 0 ? Math.min(1, Math.max(0, scrollY / room)) : 1;
+    railStages.forEach((stage, index) => {
+      const amount = progress * railStages.length - index;
+      stage.style.setProperty(
+        "--fill",
+        String(Math.min(1, Math.max(0, amount))),
+      );
+    });
+  };
+  const queue = () => {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(fill);
+  };
+  addEventListener("scroll", queue, { passive: true });
+  addEventListener("resize", queue);
+  fill();
+}
 
 /* ---------- The policies, in dialogs ---------- */
 

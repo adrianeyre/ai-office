@@ -1,0 +1,676 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-22T19:58:22+00:00",
+  "title": "Design System: AI Office",
+  "extensions": {
+    "colorMeta": {
+      "felt": {
+        "role": "primary",
+        "displayName": "Chair-Teal Felt",
+        "canonical": "#24494d",
+        "tonalRamp": [
+          "oklch(15% 0.032 205)",
+          "oklch(26% 0.037 205)",
+          "oklch(38% 0.043 205)",
+          "oklch(49% 0.038 205)",
+          "oklch(61% 0.032 205)",
+          "oklch(72% 0.027 205)",
+          "oklch(84% 0.021 205)",
+          "oklch(95% 0.016 205)"
+        ],
+        "dark": "#173235"
+      },
+      "felt-deep": {
+        "role": "primary",
+        "displayName": "Deep Felt",
+        "canonical": "#1a3739",
+        "tonalRamp": [
+          "oklch(15% 0.029 201)",
+          "oklch(26% 0.033 201)",
+          "oklch(38% 0.033 201)",
+          "oklch(49% 0.028 201)",
+          "oklch(61% 0.024 201)",
+          "oklch(72% 0.019 201)",
+          "oklch(84% 0.015 201)",
+          "oklch(95% 0.011 201)"
+        ],
+        "dark": "#102627"
+      },
+      "felt-high": {
+        "role": "primary",
+        "displayName": "Lit Felt",
+        "canonical": "#2d585c",
+        "tonalRamp": [
+          "oklch(15% 0.033 203)",
+          "oklch(26% 0.039 203)",
+          "oklch(38% 0.045 203)",
+          "oklch(49% 0.045 203)",
+          "oklch(61% 0.039 203)",
+          "oklch(72% 0.033 203)",
+          "oklch(84% 0.027 203)",
+          "oklch(95% 0.021 203)"
+        ],
+        "dark": "#1f3f42"
+      },
+      "ink": {
+        "role": "primary",
+        "displayName": "Card-Stock Ink",
+        "canonical": "#23272c",
+        "tonalRamp": [
+          "oklch(15% 0.009 254)",
+          "oklch(26% 0.011 254)",
+          "oklch(38% 0.010 254)",
+          "oklch(49% 0.008 254)",
+          "oklch(61% 0.007 254)",
+          "oklch(72% 0.006 254)",
+          "oklch(84% 0.004 254)",
+          "oklch(95% 0.004 254)"
+        ]
+      },
+      "stage-work": {
+        "role": "secondary",
+        "displayName": "Stage Work Blue",
+        "canonical": "#2f6fc4",
+        "tonalRamp": [
+          "oklch(15% 0.084 257)",
+          "oklch(26% 0.102 257)",
+          "oklch(38% 0.121 257)",
+          "oklch(49% 0.139 257)",
+          "oklch(61% 0.138 257)",
+          "oklch(72% 0.119 257)",
+          "oklch(84% 0.101 257)",
+          "oklch(95% 0.082 257)"
+        ]
+      },
+      "stage-review": {
+        "role": "secondary",
+        "displayName": "Stage Review Violet",
+        "canonical": "#7a4fc4",
+        "tonalRamp": [
+          "oklch(15% 0.101 297)",
+          "oklch(26% 0.123 297)",
+          "oklch(38% 0.145 297)",
+          "oklch(49% 0.167 297)",
+          "oklch(61% 0.161 297)",
+          "oklch(72% 0.139 297)",
+          "oklch(84% 0.117 297)",
+          "oklch(95% 0.095 297)"
+        ]
+      },
+      "stage-qa": {
+        "role": "secondary",
+        "displayName": "Stage QA Teal",
+        "canonical": "#137576",
+        "tonalRamp": [
+          "oklch(15% 0.050 196)",
+          "oklch(26% 0.060 196)",
+          "oklch(38% 0.071 196)",
+          "oklch(49% 0.081 196)",
+          "oklch(61% 0.074 196)",
+          "oklch(72% 0.064 196)",
+          "oklch(84% 0.053 196)",
+          "oklch(95% 0.043 196)"
+        ]
+      },
+      "stage-docs": {
+        "role": "secondary",
+        "displayName": "Stage Docs Magenta",
+        "canonical": "#b04a78",
+        "tonalRamp": [
+          "oklch(15% 0.079 355)",
+          "oklch(26% 0.096 355)",
+          "oklch(38% 0.114 355)",
+          "oklch(49% 0.132 355)",
+          "oklch(61% 0.134 355)",
+          "oklch(72% 0.116 355)",
+          "oklch(84% 0.098 355)",
+          "oklch(95% 0.080 355)"
+        ]
+      },
+      "stage-ok": {
+        "role": "secondary",
+        "displayName": "Merged Green",
+        "canonical": "#2b8150",
+        "tonalRamp": [
+          "oklch(15% 0.064 155)",
+          "oklch(26% 0.078 155)",
+          "oklch(38% 0.093 155)",
+          "oklch(49% 0.107 155)",
+          "oklch(61% 0.104 155)",
+          "oklch(72% 0.090 155)",
+          "oklch(84% 0.076 155)",
+          "oklch(95% 0.062 155)"
+        ],
+        "dark": "#236b42"
+      },
+      "stage-neutral": {
+        "role": "secondary",
+        "displayName": "Unstaged Grey",
+        "canonical": "#8b9096",
+        "tonalRamp": [
+          "oklch(15% 0.005 253)",
+          "oklch(26% 0.006 253)",
+          "oklch(38% 0.007 253)",
+          "oklch(49% 0.009 253)",
+          "oklch(61% 0.010 253)",
+          "oklch(72% 0.010 253)",
+          "oklch(84% 0.008 253)",
+          "oklch(95% 0.007 253)"
+        ]
+      },
+      "tape": {
+        "role": "tertiary",
+        "displayName": "Masking Tape",
+        "canonical": "rgb(238 222 170 / 94%)",
+        "tonalRamp": [
+          "oklch(15% 0.012 93)",
+          "oklch(26% 0.021 93)",
+          "oklch(38% 0.030 93)",
+          "oklch(49% 0.038 93)",
+          "oklch(61% 0.047 93)",
+          "oklch(72% 0.056 93)",
+          "oklch(84% 0.065 93)",
+          "oklch(95% 0.066 93)"
+        ],
+        "dark": "rgb(214 198 150 / 94%)"
+      },
+      "pin": {
+        "role": "tertiary",
+        "displayName": "Pin Red",
+        "canonical": "#d03b3b",
+        "tonalRamp": [
+          "oklch(15% 0.099 25)",
+          "oklch(26% 0.123 25)",
+          "oklch(38% 0.146 25)",
+          "oklch(49% 0.169 25)",
+          "oklch(61% 0.180 25)",
+          "oklch(72% 0.156 25)",
+          "oklch(84% 0.133 25)",
+          "oklch(95% 0.109 25)"
+        ]
+      },
+      "rule-red": {
+        "role": "tertiary",
+        "displayName": "Index Rule Red",
+        "canonical": "#d98a76",
+        "tonalRamp": [
+          "oklch(15% 0.039 35)",
+          "oklch(26% 0.052 35)",
+          "oklch(38% 0.065 35)",
+          "oklch(49% 0.077 35)",
+          "oklch(61% 0.090 35)",
+          "oklch(72% 0.100 35)",
+          "oklch(84% 0.088 35)",
+          "oklch(95% 0.075 35)"
+        ]
+      },
+      "rule-blue": {
+        "role": "tertiary",
+        "displayName": "Index Rule Blue",
+        "canonical": "#cddcea",
+        "tonalRamp": [
+          "oklch(15% 0.005 246)",
+          "oklch(26% 0.008 246)",
+          "oklch(38% 0.011 246)",
+          "oklch(49% 0.014 246)",
+          "oklch(61% 0.017 246)",
+          "oklch(72% 0.021 246)",
+          "oklch(84% 0.024 246)",
+          "oklch(95% 0.023 246)"
+        ],
+        "dark": "#bfcedb"
+      },
+      "sticky-yellow": {
+        "role": "tertiary",
+        "displayName": "Sticky Yellow",
+        "canonical": "#f6e58d",
+        "tonalRamp": [
+          "oklch(15% 0.017 99)",
+          "oklch(26% 0.031 99)",
+          "oklch(38% 0.045 99)",
+          "oklch(49% 0.059 99)",
+          "oklch(61% 0.073 99)",
+          "oklch(72% 0.087 99)",
+          "oklch(84% 0.100 99)",
+          "oklch(95% 0.106 99)"
+        ],
+        "dark": "#e3d27c"
+      },
+      "sticky-blue": {
+        "role": "tertiary",
+        "displayName": "Sticky Blue",
+        "canonical": "#c9e1ec",
+        "tonalRamp": [
+          "oklch(15% 0.005 227)",
+          "oklch(26% 0.009 227)",
+          "oklch(38% 0.013 227)",
+          "oklch(49% 0.017 227)",
+          "oklch(61% 0.020 227)",
+          "oklch(72% 0.024 227)",
+          "oklch(84% 0.028 227)",
+          "oklch(95% 0.028 227)"
+        ],
+        "dark": "#b6cfda"
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Card Stock",
+        "canonical": "#fbf8f2",
+        "tonalRamp": [
+          "oklch(15% 0.004 85)",
+          "oklch(26% 0.004 85)",
+          "oklch(38% 0.004 85)",
+          "oklch(49% 0.004 85)",
+          "oklch(61% 0.005 85)",
+          "oklch(72% 0.006 85)",
+          "oklch(84% 0.007 85)",
+          "oklch(95% 0.008 85)"
+        ],
+        "dark": "#ebe5d9"
+      },
+      "paper-2": {
+        "role": "neutral",
+        "displayName": "Card Stock Shade",
+        "canonical": "#f4eee3",
+        "tonalRamp": [
+          "oklch(15% 0.004 83)",
+          "oklch(26% 0.004 83)",
+          "oklch(38% 0.006 83)",
+          "oklch(49% 0.008 83)",
+          "oklch(61% 0.010 83)",
+          "oklch(72% 0.012 83)",
+          "oklch(84% 0.014 83)",
+          "oklch(95% 0.016 83)"
+        ],
+        "dark": "#e2dbcd"
+      },
+      "paper-3": {
+        "role": "neutral",
+        "displayName": "Card Stock Well",
+        "canonical": "#e9e1d2",
+        "tonalRamp": [
+          "oklch(15% 0.004 83)",
+          "oklch(26% 0.006 83)",
+          "oklch(38% 0.009 83)",
+          "oklch(49% 0.012 83)",
+          "oklch(61% 0.015 83)",
+          "oklch(72% 0.017 83)",
+          "oklch(84% 0.020 83)",
+          "oklch(95% 0.021 83)"
+        ],
+        "dark": "#d6cebd"
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Ink, Supporting",
+        "canonical": "#474e56",
+        "tonalRamp": [
+          "oklch(15% 0.011 252)",
+          "oklch(26% 0.013 252)",
+          "oklch(38% 0.015 252)",
+          "oklch(49% 0.015 252)",
+          "oklch(61% 0.013 252)",
+          "oklch(72% 0.011 252)",
+          "oklch(84% 0.009 252)",
+          "oklch(95% 0.007 252)"
+        ]
+      },
+      "ink-3": {
+        "role": "neutral",
+        "displayName": "Ink, Quiet",
+        "canonical": "#626a72",
+        "tonalRamp": [
+          "oklch(15% 0.009 248)",
+          "oklch(26% 0.011 248)",
+          "oklch(38% 0.014 248)",
+          "oklch(49% 0.016 248)",
+          "oklch(61% 0.014 248)",
+          "oklch(72% 0.012 248)",
+          "oklch(84% 0.010 248)",
+          "oklch(95% 0.008 248)"
+        ],
+        "dark": "#555c64"
+      },
+      "link": {
+        "role": "neutral",
+        "displayName": "Link Blue",
+        "canonical": "#255da8",
+        "tonalRamp": [
+          "oklch(15% 0.085 257)",
+          "oklch(26% 0.102 257)",
+          "oklch(38% 0.119 257)",
+          "oklch(49% 0.132 257)",
+          "oklch(61% 0.116 257)",
+          "oklch(72% 0.099 257)",
+          "oklch(84% 0.082 257)",
+          "oklch(95% 0.065 257)"
+        ],
+        "dark": "#1d4c8c"
+      },
+      "on-stage": {
+        "role": "neutral",
+        "displayName": "Paper On Stage",
+        "canonical": "#fdfbf7",
+        "tonalRamp": [
+          "oklch(15% 0.004 85)",
+          "oklch(26% 0.004 85)",
+          "oklch(38% 0.004 85)",
+          "oklch(49% 0.004 85)",
+          "oklch(61% 0.004 85)",
+          "oklch(72% 0.004 85)",
+          "oklch(84% 0.005 85)",
+          "oklch(95% 0.005 85)"
+        ]
+      },
+      "screen": {
+        "role": "neutral",
+        "displayName": "Monitor",
+        "canonical": "#2a3037",
+        "tonalRamp": [
+          "oklch(15% 0.013 252)",
+          "oklch(26% 0.014 252)",
+          "oklch(38% 0.014 252)",
+          "oklch(49% 0.012 252)",
+          "oklch(61% 0.010 252)",
+          "oklch(72% 0.008 252)",
+          "oklch(84% 0.006 252)",
+          "oklch(95% 0.004 252)"
+        ]
+      },
+      "screen-2": {
+        "role": "neutral",
+        "displayName": "Monitor Band",
+        "canonical": "#343b44",
+        "tonalRamp": [
+          "oklch(15% 0.014 255)",
+          "oklch(26% 0.017 255)",
+          "oklch(38% 0.018 255)",
+          "oklch(49% 0.015 255)",
+          "oklch(61% 0.013 255)",
+          "oklch(72% 0.011 255)",
+          "oklch(84% 0.009 255)",
+          "oklch(95% 0.006 255)"
+        ]
+      },
+      "screen-text": {
+        "role": "neutral",
+        "displayName": "Monitor Text",
+        "canonical": "#ece7dd",
+        "tonalRamp": [
+          "oklch(15% 0.004 85)",
+          "oklch(26% 0.004 85)",
+          "oklch(38% 0.006 85)",
+          "oklch(49% 0.008 85)",
+          "oklch(61% 0.009 85)",
+          "oklch(72% 0.011 85)",
+          "oklch(84% 0.013 85)",
+          "oklch(95% 0.014 85)"
+        ]
+      },
+      "screen-dim": {
+        "role": "neutral",
+        "displayName": "Monitor Dim",
+        "canonical": "#a5aeb8",
+        "tonalRamp": [
+          "oklch(15% 0.006 251)",
+          "oklch(26% 0.008 251)",
+          "oklch(38% 0.010 251)",
+          "oklch(49% 0.013 251)",
+          "oklch(61% 0.015 251)",
+          "oklch(72% 0.017 251)",
+          "oklch(84% 0.016 251)",
+          "oklch(95% 0.014 251)"
+        ]
+      },
+      "screen-glow": {
+        "role": "neutral",
+        "displayName": "Monitor Glow",
+        "canonical": "#9fd3ff",
+        "tonalRamp": [
+          "oklch(15% 0.019 245)",
+          "oklch(26% 0.030 245)",
+          "oklch(38% 0.040 245)",
+          "oklch(49% 0.050 245)",
+          "oklch(61% 0.061 245)",
+          "oklch(72% 0.071 245)",
+          "oklch(84% 0.081 245)",
+          "oklch(95% 0.073 245)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The hero card's headline; the closing ticket runs it up to 4rem."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Statements on sticky notes."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Every h3, card titles, doc links and table heads (Archivo 700 to 800)."
+      },
+      "marker": {
+        "displayName": "Marker",
+        "purpose": "Kalam on tape: section headings, Stage column heads, captions, step marks."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "All running copy on card stock."
+      },
+      "lead": {
+        "displayName": "Lead",
+        "purpose": "Opening paragraph under a headline, in ink-2, about 34em wide."
+      },
+      "label": {
+        "displayName": "Mono",
+        "purpose": "Commands on screens, issue numbers, Stage chips, inline code."
+      }
+    },
+    "shadows": [
+      {
+        "name": "flat",
+        "value": "0 1px 1px rgb(8 24 26 / 22%), 0 3px 8px -2px rgb(8 24 26 / 30%)",
+        "purpose": "Small things lying close to the wall."
+      },
+      {
+        "name": "pinned",
+        "value": "0 1px 1px rgb(8 24 26 / 24%), 0 10px 22px -8px rgb(8 24 26 / 55%)",
+        "purpose": "Default for every card, print, note and mount.",
+        "dark": "0 1px 1px rgb(0 0 0 / 35%), 0 12px 26px -8px rgb(0 0 0 / 70%)"
+      },
+      {
+        "name": "lifted",
+        "value": "0 2px 3px rgb(8 24 26 / 20%), 0 24px 40px -14px rgb(8 24 26 / 65%)",
+        "purpose": "A card in the hand: wall tickets mid-travel, dialogs, the mobile nav.",
+        "dark": "0 2px 3px rgb(0 0 0 / 30%), 0 26px 44px -14px rgb(0 0 0 / 80%)"
+      },
+      {
+        "name": "tape",
+        "value": "0 1px 1px rgb(8 24 26 / 18%), inset 0 0 0 1px rgb(150 128 70 / 18%)",
+        "purpose": "Masking tape lies almost flat."
+      },
+      {
+        "name": "focus",
+        "value": "outline: 3px solid var(--ink); outline-offset: 3px; box-shadow: 0 0 0 6px var(--sticky-yellow)",
+        "purpose": "Every focus-visible state on card stock; screens use a screen-glow outline."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Page state transitions: buttons 160ms, prints 240ms."
+      },
+      {
+        "name": "wall-carry",
+        "value": "900ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "A ticket lifts (to the Lifted shadow, -6px, scale 1.04), travels between Stage columns and settles."
+      },
+      {
+        "name": "stamp-thunk",
+        "value": "240ms cubic-bezier(0.2, 0.9, 0.3, 1)",
+        "purpose": "The MERGED stamp lands once, from scale 1.8 to 1."
+      },
+      {
+        "name": "notice-slip",
+        "value": "500ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "The Notice slip rises 6px into place under the wall."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "prefers-reduced-motion: reduce",
+        "purpose": "The wall is still; transitions and animations are removed; smooth scroll is off."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "desktop-collapse",
+        "value": "64rem"
+      },
+      {
+        "name": "nav",
+        "value": "52rem"
+      },
+      {
+        "name": "phone",
+        "value": "36rem"
+      },
+      {
+        "name": "wall-rows (container)",
+        "value": "560px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The page's main action: ink on paper, printed-tab weight.",
+      "html": "<a class=\"ds-btn\" href=\"#\">Get started <svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14M13 6l6 6-6 6\"/></svg></a>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;gap:.55em;min-height:44px;padding:.6em 1.15em;border:2px solid var(--ink, #23272c);border-radius:3px;background:var(--ink, #23272c);color:var(--paper, #fbf8f2);font:700 1rem/1.1 Archivo,Inter,sans-serif;text-decoration:none;cursor:pointer;box-shadow:0 2px 4px -1px rgb(8 24 26 / 40%);transition:transform 160ms cubic-bezier(.16,1,.3,1),box-shadow 160ms cubic-bezier(.16,1,.3,1),background-color 160ms cubic-bezier(.16,1,.3,1)}.ds-btn:hover{background:#34393f;transform:translateY(-1px);box-shadow:0 8px 14px -6px rgb(8 24 26 / 45%)}.ds-btn:active{transform:translateY(1px);box-shadow:0 1px 2px rgb(8 24 26 / 40%)}.ds-btn:focus-visible{outline:3px solid var(--ink, #23272c);outline-offset:3px;box-shadow:0 0 0 6px var(--sticky-yellow, #f6e58d)}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "The alternative action: ink outline on the card.",
+      "html": "<a class=\"ds-btn-secondary\" href=\"#\">View on GitHub</a>",
+      "css": ".ds-btn-secondary{display:inline-flex;align-items:center;gap:.55em;min-height:44px;padding:.6em 1.15em;border:2px solid var(--ink, #23272c);border-radius:3px;background:transparent;color:var(--ink, #23272c);font:700 1rem/1.1 Archivo,Inter,sans-serif;text-decoration:none;cursor:pointer;transition:transform 160ms cubic-bezier(.16,1,.3,1),background-color 160ms cubic-bezier(.16,1,.3,1)}.ds-btn-secondary:hover{background:var(--paper-2, #f4eee3);transform:translateY(-1px)}.ds-btn-secondary:focus-visible{outline:3px solid var(--ink, #23272c);outline-offset:3px;box-shadow:0 0 0 6px var(--sticky-yellow, #f6e58d)}"
+    },
+    {
+      "name": "Navigation Strip",
+      "kind": "nav",
+      "refersTo": "nav-strip",
+      "description": "The sticky paper strip along the top of the wall, with the Stage rail under it.",
+      "html": "<nav class=\"ds-nav\"><strong class=\"ds-nav-brand\">AI Office</strong><a href=\"#\">How it works</a><a href=\"#\">Features</a><a href=\"#\">Docs</a></nav><div class=\"ds-rail\"><i style=\"--c:#2f6fc4\"></i><i style=\"--c:#7a4fc4\"></i><i style=\"--c:#137576\"></i><i style=\"--c:#b04a78\"></i><i style=\"--c:#2b8150\"></i></div>",
+      "css": ".ds-nav{display:flex;align-items:center;gap:4px;min-height:64px;padding:0 20px;background:var(--paper, #fbf8f2)}.ds-nav-brand{margin-right:auto;font:800 1.2rem/1 Archivo,Inter,sans-serif;color:var(--ink, #23272c)}.ds-nav a{display:inline-flex;align-items:center;min-height:40px;padding:0 12px;border-radius:3px;color:var(--ink, #23272c);font:560 .95rem/1 Inter,sans-serif;text-decoration:none}.ds-nav a:hover{background:var(--paper-2, #f4eee3);text-decoration:underline;text-decoration-thickness:2px}.ds-nav a:focus-visible{outline:3px solid var(--ink, #23272c);outline-offset:3px}.ds-rail{display:grid;grid-template-columns:repeat(5,1fr);height:12px;background:var(--paper-2, #f4eee3)}.ds-rail i{margin:4px 2px;border-radius:2px;background:var(--c)}"
+    },
+    {
+      "name": "Pinned Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Card stock pinned to the felt: every block of copy sits on one.",
+      "html": "<div class=\"ds-felt\"><div class=\"ds-card\"><h3>Self-hosted</h3><p>On your machine or one server, on the AI Accounts you already pay for.</p></div></div>",
+      "css": ".ds-felt{padding:32px;background:var(--felt, #24494d)}.ds-card{position:relative;max-width:340px;padding:28px;background:var(--paper, #fbf8f2);color:var(--ink, #23272c);border-radius:3px;box-shadow:0 1px 1px rgb(8 24 26 / 24%),0 10px 22px -8px rgb(8 24 26 / 55%);transform:rotate(-.5deg);font:400 1rem/1.6 Inter,sans-serif}.ds-card::before{content:'';position:absolute;top:-7px;left:calc(50% - 8px);width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f5a39a 0 16%,var(--pin, #d03b3b) 42%,#8f2323 100%);box-shadow:0 2px 2px rgb(8 24 26 / 35%)}.ds-card h3{margin:0 0 8px;font:800 1.3rem/1.2 Archivo,Inter,sans-serif;letter-spacing:-.01em}.ds-card p{margin:0;color:var(--ink-2, #474e56)}"
+    },
+    {
+      "name": "Index Card Ticket",
+      "kind": "custom",
+      "refersTo": "index-card",
+      "description": "The wall's one card format: issue number, Stage dot, red header rule, title and Agent.",
+      "html": "<div class=\"ds-felt-t\"><div class=\"ds-ticket\" data-c=\"review\"><div class=\"ds-ticket-n\">#48<span class=\"ds-dot\"></span></div><p class=\"ds-ticket-t\">Alt text on product images</p><div class=\"ds-ticket-who\"><span class=\"ds-av\">R</span>Rex</div></div></div>",
+      "css": ".ds-felt-t{padding:28px;background:var(--felt, #24494d)}.ds-ticket{--sc:var(--stage-review, #7a4fc4);display:grid;grid-template-rows:auto 1fr auto;gap:6px;width:130px;height:140px;padding:11px;background:linear-gradient(var(--rule-red, #d98a76),var(--rule-red, #d98a76)) 0 34px/100% 1px no-repeat,var(--paper, #fbf8f2);border-radius:2px;box-shadow:0 1px 1px rgb(8 24 26 / 24%),0 10px 22px -8px rgb(8 24 26 / 55%);transform:rotate(.6deg);color:var(--ink, #23272c);transition:transform 900ms cubic-bezier(.22,1,.36,1),box-shadow 900ms cubic-bezier(.22,1,.36,1)}.ds-ticket:hover{transform:translateY(-6px) scale(1.04);box-shadow:0 2px 3px rgb(8 24 26 / 20%),0 24px 40px -14px rgb(8 24 26 / 65%)}.ds-ticket-n{display:flex;justify-content:space-between;align-items:center;font:600 .8rem/1 'JetBrains Mono',monospace;color:var(--ink-2, #474e56)}.ds-dot{width:10px;height:10px;border-radius:50%;background:var(--sc)}.ds-ticket-t{margin:0;padding-top:4px;font:700 .86rem/1.25 Archivo,Inter,sans-serif}.ds-ticket-who{display:flex;align-items:center;gap:6px;font:600 .78rem/1 Inter,sans-serif;color:var(--ink-2, #474e56)}.ds-av{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--sc);color:var(--on-stage, #fdfbf7);font:800 .7rem/1 Archivo,sans-serif}"
+    },
+    {
+      "name": "Tape Label",
+      "kind": "chip",
+      "refersTo": "tape-label",
+      "description": "Masking tape written in marker: section headings, Stage column heads, captions.",
+      "html": "<div class=\"ds-felt-l\"><h2 class=\"ds-tape\">Quick start</h2></div>",
+      "css": ".ds-felt-l{padding:28px;background:var(--felt, #24494d)}.ds-tape{display:inline-block;margin:0;padding:.18em .75em .12em;background:var(--tape, rgb(238 222 170 / 94%));color:var(--ink, #23272c);box-shadow:0 1px 1px rgb(8 24 26 / 18%),inset 0 0 0 1px rgb(150 128 70 / 18%);font:700 2.2rem/1.15 Kalam,'Segoe Print',cursive;transform:rotate(-1.2deg);transform-origin:left bottom}"
+    },
+    {
+      "name": "Stage Chips",
+      "kind": "chip",
+      "refersTo": "stage-chip",
+      "description": "A Stage's label named in code, on a pill of its colour.",
+      "html": "<ul class=\"ds-chips\"><li style=\"--sc:#2f6fc4\">needs-work</li><li style=\"--sc:#7a4fc4\">needs-review</li><li style=\"--sc:#137576\">needs-qa</li><li style=\"--sc:#b04a78\">needs-docs</li><li style=\"--sc:#2b8150\">ready-to-merge</li></ul>",
+      "css": ".ds-chips{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}.ds-chips li{padding:.28em .75em;border-radius:999px;background:var(--sc);color:var(--on-stage, #fdfbf7);font:600 .84rem/1.4 'JetBrains Mono',monospace}"
+    },
+    {
+      "name": "Screen",
+      "kind": "custom",
+      "refersTo": "screen",
+      "description": "Commands shown on a monitor, with a title band for the copy button.",
+      "html": "<div class=\"ds-screen\"><button class=\"ds-copy\" aria-label=\"Copy\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"9\" y=\"9\" width=\"11\" height=\"11\" rx=\"2\"/><path d=\"M5 15V5a1 1 0 0 1 1-1h10\"/></svg></button><pre><span class=\"ds-p\">$ </span>pnpm install\n<span class=\"ds-p\">$ </span>pnpm dev</pre></div>",
+      "css": ".ds-screen{position:relative}.ds-screen pre{margin:0;padding:48px 18px 16px;border-radius:3px;background:linear-gradient(var(--screen-2, #343b44),var(--screen-2, #343b44)) 0 0/100% 36px no-repeat,var(--screen, #2a3037);color:var(--screen-text, #ece7dd);font:400 .85rem/1.75 'JetBrains Mono',monospace;box-shadow:inset 0 0 0 1px rgb(255 255 255 / 6%),inset 0 10px 24px -16px rgb(159 211 255 / 35%)}.ds-p{color:var(--screen-glow, #9fd3ff)}.ds-copy{position:absolute;top:3px;right:4px;display:grid;place-items:center;width:30px;height:30px;padding:0;border:1px solid rgb(255 255 255 / 14%);border-radius:3px;background:var(--screen-2, #343b44);color:var(--screen-text, #ece7dd);cursor:pointer}.ds-copy:hover{background:#424a54}.ds-copy:focus-visible{outline:3px solid var(--screen-glow, #9fd3ff);outline-offset:3px}"
+    },
+    {
+      "name": "Merged Stamp",
+      "kind": "custom",
+      "refersTo": "stamp",
+      "description": "A rubber-stamp impression in merged green, for merged work only.",
+      "html": "<div class=\"ds-stamp-card\"><span class=\"ds-stamp\">Merged</span></div>",
+      "css": ".ds-stamp-card{position:relative;width:220px;height:110px;background:var(--paper, #fbf8f2);border-radius:3px}.ds-stamp{position:absolute;right:20px;bottom:24px;padding:6px 12px 4px;border:3px solid var(--stage-ok, #2b8150);border-radius:6px;color:var(--stage-ok, #2b8150);font:900 1rem/1 Archivo,sans-serif;letter-spacing:.08em;text-transform:uppercase;transform:rotate(-11deg);mix-blend-mode:multiply}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Planning Wall",
+    "overview": "The site is the Floor's planning wall: a full-bleed ground of deep teal acoustic felt, and everything a visitor reads is pinned to it. Card stock carries the copy, masking tape carries the labels in marker, monitors carry the commands, taped prints carry the screenshots, and a rubber stamp marks what has merged. The felt itself never carries a word. Colour comes from the 3D Office's own palette: ink and paper for nearly everything, the felt taken from the chairs' teal, and the four Stage colours kept for what means a Stage.\n\nThe wall is calm and handmade but exact. Cards sit at small, varied tilts (between about -1.2deg and 0.8deg), take a push pin or a strip of tape, and cast a felt-tinted shadow; nothing is glossy, gradient-filled or glowing. One card format repeats like an edition: the index card with its red header rule, where only the sticker, the stamp and the column change. Density is generous on the felt and tight on the cards, the way a real board is read: sweep across, then lean in.\n\nDark mode dims the room's lights rather than inverting the wall. The felt goes deeper, the paper goes a shade warmer and greyer, shadows turn neutral and heavier; ink stays ink and text never goes light-on-dark except on a screen.",
+    "keyCharacteristics": [
+      "Full-bleed felt ground with a static fibre-noise texture and a soft overhead light.",
+      "Every word sits on a pinned material: card, tape, sticky note, print or screen.",
+      "Ink buttons and ink text; colour is reserved for Stages and states.",
+      "Small hand-placed tilts, push pins and tape corners; felt-tinted shadows.",
+      "Three voices: Archivo for print, Kalam marker for tape, Inter for reading, plus JetBrains Mono on screens.",
+      "Motion is physical: cards lift, travel and settle; stamps thunk once."
+    ],
+    "rules": [
+      {
+        "name": "The Text-On-Card Rule",
+        "body": "No copy sits directly on the felt. If something must be read, it is on paper, tape or a screen.",
+        "section": "colors"
+      },
+      {
+        "name": "The Stage Colour Rule",
+        "body": "A Stage colour appears only where it means that Stage or state, and never as decoration or as a brand accent. Colour never carries meaning alone: every dot or chip sits beside its Stage label.",
+        "section": "colors"
+      },
+      {
+        "name": "The Dimmed Lights Rule",
+        "body": "Dark mode lowers the room's light: felt deepens to #173235, paper drops to #ebe5d9, shadows go neutral. Ink is unchanged; the wall is never inverted.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Material, One Voice Rule",
+        "body": "Archivo is printed on card, Kalam is written on tape, Mono is shown on a screen. Marker never sets body copy, and Archivo never appears on tape.",
+        "section": "typography"
+      },
+      {
+        "name": "The Felt-Tinted Shadow Rule",
+        "body": "Shadows are soft, offset downward, and tinted by the felt. In dark mode they turn neutral black and heavier, as the room's light drops.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do put every word on a pinned material (card, tape, sticky note, print or screen), never on the felt.",
+      "Do reuse the index-card format as an edition: change only the sticker, stamp or column, not the card.",
+      "Do give each pinned element its own small tilt (within about -1.2deg to 0.8deg) and a fixing: a pin, tape or taped corners.",
+      "Do use the Pinned shadow at rest and the Lifted shadow only for a card in the hand.",
+      "Do keep the primary action in ink on paper; let Stage colours mean Stages.",
+      "Do write labels in Kalam on tape, and set headlines in Archivo 800 to 900.",
+      "Do honour reduced motion with a still wall, and pair every Stage colour with its label."
+    ],
+    "donts": [
+      "Don't set copy directly on the felt.",
+      "Don't use a Stage colour as decoration, a brand accent or a button fill.",
+      "Don't use grey or black drop shadows in light mode; shadows are felt-tinted.",
+      "Don't round cards past paper corners (4px); only pins, dots, avatars and chips are round.",
+      "Don't invert the wall for dark mode; dim the felt and the paper, and keep ink as ink.",
+      "Don't use the stamp for anything but merged work."
+    ]
+  }
+}

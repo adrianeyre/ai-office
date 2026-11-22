@@ -4,8 +4,8 @@
 // only one with words. Each card carries its template's own icon, as the
 // app's template picker does (the `icon` in each templates/*/template.yaml).
 //
-// Real strings: the Local template's name, its AI Provider, one line and
-// its Roles.
+// Real strings: every built-in template's name, and the Local template's
+// AI Provider, one line and its Roles.
 import {
   BookOpen,
   ChartColumn,
@@ -20,7 +20,7 @@ import {
   Square,
   type LucideIcon,
 } from "lucide-react";
-import { Badge, Bar, Stage, Text } from "../stageshow/kit";
+import { Badge, Stage, Text } from "../stageshow/kit";
 import { usePageTheme } from "./theme";
 import "./templates.css";
 
@@ -28,26 +28,18 @@ const COLS = 5;
 const ROWS = 3;
 const FOCUS = { col: 2, row: 1 };
 
-/** The other templates' icons, in the grid's reading order. */
-const ICONS: LucideIcon[] = [
-  Code,
-  ShoppingBag,
-  Megaphone,
-  PenLine,
-  BookOpen,
-  Palette,
-  ChartColumn,
-  Server,
-  Smartphone,
-  Square,
-];
-
-const WIDTHS = [
-  [84, 120],
-  [70, 104],
-  [96, 128],
-  [62, 96],
-  [78, 116],
+/** The other built-in templates, in the grid's reading order, with icons. */
+const TEMPLATES: { name: string; icon: LucideIcon }[] = [
+  { name: "Development", icon: Code },
+  { name: "Online store", icon: ShoppingBag },
+  { name: "Website & marketing", icon: Megaphone },
+  { name: "Content & blog", icon: PenLine },
+  { name: "Documentation", icon: BookOpen },
+  { name: "Design system", icon: Palette },
+  { name: "Data & analytics", icon: ChartColumn },
+  { name: "Infrastructure", icon: Server },
+  { name: "Mobile app", icon: Smartphone },
+  { name: "Blank", icon: Square },
 ];
 
 export default function TemplatesDemo() {
@@ -86,8 +78,8 @@ export default function TemplatesDemo() {
                 </div>
               );
             }
-            const Icon = ICONS[i % ICONS.length] ?? Square;
-            const [name, line] = WIDTHS[(i * 3) % WIDTHS.length] ?? [80, 110];
+            const template = TEMPLATES[i % TEMPLATES.length];
+            const Icon = template.icon;
             return (
               <div key={i} className="ft-card">
                 <div className="ft-top">
@@ -95,12 +87,7 @@ export default function TemplatesDemo() {
                     <Icon size={18} strokeWidth={2} />
                   </span>
                 </div>
-                <Bar w={name} h={8} r={4} tone={3} />
-                <Bar w={line} h={6} r={3} tone={2} />
-                <div className="ft-roles">
-                  <Bar w={40} h={18} r={9} tone={1} />
-                  <Bar w={48} h={18} r={9} tone={1} />
-                </div>
+                <Text className="ft-name ft-name-other">{template.name}</Text>
               </div>
             );
           })}

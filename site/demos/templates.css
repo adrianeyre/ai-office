@@ -94,3 +94,9 @@
     left: -321px;
   }
 }
+
+/* The other templates: their names only, quieter than the one in focus */
+.ft .ft-name-other {
+  color: var(--ss-text);
+  font-size: 13px;
+}

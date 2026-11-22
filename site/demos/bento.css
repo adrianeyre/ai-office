@@ -100,11 +100,7 @@
 
 .bt-stage .bt-button[data-on] {
   background: var(--ss-success);
-  color: #fff;
-}
-
-.bt-stage .ss-stage[data-theme="dark"] .bt-button[data-on] {
-  color: #052e16;
+  color: var(--aio-on-accent);
 }
 
 .bt-stage .bt-done {

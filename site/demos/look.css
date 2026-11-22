@@ -1,9 +1,9 @@
 /* AI Office's look for every demo on the page (stageshow/kit's tokens,
-   references/looks.md in the Stageshow skill). The values are the app's
-   own: apps/web/src/styles.css's ink neutrals (hue 275, a trace of the
-   logo's indigo), its Indigo theme's primary, its 0.75rem card radius, and
-   the page's Inter. Light and dark follow the page, which passes the
-   system's preference to each Stage as its theme. */
+   references/looks.md in the Stageshow skill), as screens pinned to the
+   planning wall: card stock for surfaces, the palette's ink for text, the
+   Stages' colours for status, and the 3D Office's own `screen-off` for the
+   Agent's live view (packages/shared/src/palette.ts). Dark mode only dims
+   the paper, as the page's lights dim; the screens stay what they are. */
 
 .aio .ss-stage {
   --ss-font:
@@ -12,116 +12,76 @@
   --ss-mono:
     "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* Surfaces: --background, --card and the page's tinted wells */
-  --ss-canvas: #f6f6fb;
-  --ss-surface: #ffffff;
-  --ss-chrome: #ffffff;
-  --ss-raised: #ffffff;
-  --ss-well: #e7e9f8;
+  /* Surfaces: card stock and its wells */
+  --ss-canvas: #f4eee3;
+  --ss-surface: #fbf8f2;
+  --ss-chrome: #f4eee3;
+  --ss-raised: #fffdf8;
+  --ss-well: #e9e1d2;
 
-  /* Ink: --foreground and --muted-foreground */
-  --ss-text-strong: #14142b;
-  --ss-text: #5b5d78;
-  --ss-text-faint: #8c8ea8;
-  --ss-icon: #5b5d78;
-  --ss-icon-faint: #b9bbd0;
-  --ss-line: rgb(20 20 80 / 9%);
-  --ss-line-faint: rgb(20 20 80 / 5%);
-  --ss-ink-1: rgb(30 30 90 / 4%);
-  --ss-ink-2: rgb(30 30 90 / 6%);
-  --ss-ink-3: rgb(30 30 90 / 9%);
-  --ss-ink-4: rgb(30 30 90 / 11%);
-  --ss-ink-5: rgb(30 30 90 / 16%);
+  /* Ink: the palette's `ink`, in strengths */
+  --ss-text-strong: #23272c;
+  --ss-text: #4f565e;
+  --ss-text-faint: #6b7279;
+  --ss-icon: #4f565e;
+  --ss-icon-faint: #a9a291;
+  --ss-line: rgb(35 39 44 / 12%);
+  --ss-line-faint: rgb(35 39 44 / 7%);
+  --ss-ink-1: rgb(35 39 44 / 4%);
+  --ss-ink-2: rgb(35 39 44 / 6%);
+  --ss-ink-3: rgb(35 39 44 / 9%);
+  --ss-ink-4: rgb(35 39 44 / 12%);
+  --ss-ink-5: rgb(35 39 44 / 17%);
 
-  /* The Indigo theme's primary and accent */
-  --ss-accent: #4338ca;
-  --ss-accent-2: #7c3aed;
-  --ss-accent-soft: #eef2ff;
-  --ss-accent-text: #3730a3;
-  --aio-on-accent: #ffffff;
+  /* The primary is ink, as the page's buttons; needs-work's blue leads */
+  --ss-accent: #23272c;
+  --ss-accent-2: #2f6fc4;
+  --ss-accent-soft: #dfe9f6;
+  --ss-accent-text: #1f4f8f;
+  --aio-on-accent: #fbf8f2;
 
-  /* The app's tones, for status */
-  --ss-success: #16a34a;
-  --ss-success-soft: #dcfce7;
-  --ss-success-text: #166534;
-  --ss-warning: #d97706;
-  --ss-warning-soft: #fef3c7;
-  --ss-warning-text: #92400e;
-  --ss-danger: #dc2626;
-  --ss-danger-soft: #fee2e2;
-  --ss-danger-text: #991b1b;
-  --aio-info-soft: #e0f2fe;
-  --aio-info-text: #075985;
-  --aio-violet-soft: #ede9fe;
-  --aio-violet-text: #5b21b6;
+  /* Status, from the palette's states */
+  --ss-success: #2b8150;
+  --ss-success-soft: #dcefe1;
+  --ss-success-text: #1f5f3a;
+  --ss-warning: #b7790c;
+  --ss-warning-soft: #f8e9c4;
+  --ss-warning-text: #7a4f05;
+  --ss-danger: #d03b3b;
+  --ss-danger-soft: #f6dcd8;
+  --ss-danger-text: #8f2323;
+  --aio-info-soft: #dfe9f6;
+  --aio-info-text: #1f4f8f;
+  --aio-violet-soft: #ebe2f7;
+  --aio-violet-text: #57349a;
 
-  /* Shape: the app's --radius (12px) and the steps shadcn/ui takes off it */
-  --ss-radius-sm: 6px;
-  --ss-radius-md: 8px;
-  --ss-radius-lg: 10px;
-  --ss-radius-window: 14px;
+  /* Shape: paper corners, not app pills */
+  --ss-radius-sm: 4px;
+  --ss-radius-md: 5px;
+  --ss-radius-lg: 6px;
+  --ss-radius-window: 6px;
 
+  /* Shadows tinted by the felt */
   --ss-shadow-hero:
-    0 0 0 1px rgb(20 20 80 / 7%), 0 30px 60px -12px rgb(67 56 202 / 22%),
-    0 18px 36px -18px rgb(20 20 43 / 28%);
+    0 0 0 1px rgb(35 39 44 / 8%), 0 22px 40px -16px rgb(8 24 26 / 45%);
   --ss-shadow-satellite:
-    0 0 0 1px rgb(20 20 80 / 6%), 0 14px 32px -8px rgb(67 56 202 / 24%),
-    0 4px 10px -4px rgb(20 20 43 / 10%);
-  --ss-shadow-card: 0 0 0 1px rgb(20 20 80 / 6%), 0 1px 2px rgb(20 20 43 / 4%);
+    0 0 0 1px rgb(35 39 44 / 8%), 0 14px 26px -10px rgb(8 24 26 / 45%);
+  --ss-shadow-card: 0 0 0 1px rgb(35 39 44 / 8%), 0 1px 2px rgb(8 24 26 / 8%);
 
-  /* The Agent's live view is the app's dark terminal */
-  --ss-term-bg: #0f1024;
-  --ss-term-path: #a5b4fc;
-  --ss-term-sigil: #818cf8;
-  --ss-term-ok: #4ade80;
-  --ss-term-dim: #8b8fb8;
+  /* The Agent's live view is a monitor: the palette's screen */
+  --ss-term-bg: #2a3037;
+  --ss-term-path: #9fd3ff;
+  --ss-term-sigil: #9fd3ff;
+  --ss-term-ok: #8fe0ad;
+  --ss-term-dim: #a5aeb8;
 }
 
 .aio .ss-stage[data-theme="dark"] {
-  --ss-canvas: #13141f;
-  --ss-surface: #191a26;
-  --ss-chrome: #1c1d2b;
-  --ss-raised: #23243a;
-  --ss-well: #0f1019;
-
-  --ss-text-strong: #eeeef8;
-  --ss-text: #a6a8c2;
-  --ss-text-faint: #7a7c98;
-  --ss-icon: #a6a8c2;
-  --ss-icon-faint: #4b4d68;
-  --ss-line: rgb(200 200 255 / 10%);
-  --ss-line-faint: rgb(200 200 255 / 6%);
-  --ss-ink-1: rgb(200 200 255 / 5%);
-  --ss-ink-2: rgb(200 200 255 / 8%);
-  --ss-ink-3: rgb(200 200 255 / 11%);
-  --ss-ink-4: rgb(200 200 255 / 14%);
-  --ss-ink-5: rgb(200 200 255 / 20%);
-
-  --ss-accent: #a5b4fc;
-  --ss-accent-2: #c4b5fd;
-  --ss-accent-soft: #272463;
-  --ss-accent-text: #c7d2fe;
-  --aio-on-accent: #1e1b4b;
-
-  --ss-success: #4ade80;
-  --ss-success-soft: #0b3a22;
-  --ss-success-text: #bbf7d0;
-  --ss-warning: #fbbf24;
-  --ss-warning-soft: #4a2a06;
-  --ss-warning-text: #fde68a;
-  --ss-danger-soft: #4c1414;
-  --ss-danger-text: #fecaca;
-  --aio-info-soft: #0c3a57;
-  --aio-info-text: #bae6fd;
-  --aio-violet-soft: #33195e;
-  --aio-violet-text: #ddd6fe;
-
-  --ss-shadow-hero:
-    0 0 0 1px rgb(200 200 255 / 10%), 0 30px 60px -12px rgb(0 0 0 / 60%);
-  --ss-shadow-satellite:
-    0 0 0 1px rgb(200 200 255 / 12%), 0 14px 32px -8px rgb(0 0 0 / 60%);
-  --ss-shadow-card: 0 0 0 1px rgb(200 200 255 / 8%);
-  --ss-term-bg: #08091a;
+  --ss-canvas: #e2dbcd;
+  --ss-surface: #ebe5d9;
+  --ss-chrome: #e2dbcd;
+  --ss-raised: #f0eadf;
+  --ss-well: #d6cebd;
 }
 
 /* The fade crop (the `fade-crop` gold): a window a full gutter in from

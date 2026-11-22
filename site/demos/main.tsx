@@ -7,7 +7,7 @@ import { StrictMode, type ComponentType } from "react";
 import { createRoot } from "react-dom/client";
 import "../script.mts";
 import "./look.css";
-import HeroDemo from "./hero";
+import WallDemo from "./wall";
 import GatewayDemo from "./gateway";
 import ChatDemo from "./chat";
 import TemplatesDemo from "./templates";
@@ -20,7 +20,7 @@ import {
 
 /** Each `data-demo` name in index.html, and what it mounts. */
 const demos: Record<string, ComponentType> = {
-  hero: HeroDemo,
+  wall: WallDemo,
   gateway: GatewayDemo,
   chat: ChatDemo,
   templates: TemplatesDemo,

@@ -185,11 +185,7 @@
 
   .mc-button[data-on] {
     background: var(--ss-success);
-    color: #fff;
-  }
-
-  .ss-stage[data-theme="dark"] .mc-button[data-on] {
-    color: #052e16;
+    color: var(--aio-on-accent);
   }
 
   /* An even box, so the 14px tick sits on whole pixels */
