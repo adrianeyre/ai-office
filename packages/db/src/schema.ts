@@ -2443,6 +2443,134 @@ export const guidelineProposals = pgTable(
   ],
 );
 
+// Hooks (Guidelines, Specs and Hooks PRD, FR-118 to FR-121; ADR 0016): the
+// Owner's own rules on a Floor, kept here and made and changed only by the
+// Owner. When `trigger` happens (narrowed by `labels` and `file_patterns`),
+// the Agent `agent_id`, or any Agent in `role`, runs `skill_name`, at most
+// `runs_per_hour` times an hour. `failures` counts its failed runs in a
+// row; at three it is turned off (`enabled`). Its name is unique on its
+// Floor, whatever its case.
+export const hooks = pgTable(
+  "hooks",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
+    floorId: text("floor_id")
+      .notNull()
+      .references(() => floors.id),
+    name: text("name").notNull(),
+    trigger: text("trigger").notNull(),
+    /** The Stage label watched, for a `stage` Hook. */
+    stage: text("stage"),
+    labels: text("labels").array().notNull(),
+    filePatterns: text("file_patterns").array().notNull(),
+    agentId: text("agent_id"),
+    role: text("role"),
+    skillName: text("skill_name").notNull(),
+    runsPerHour: integer("runs_per_hour").notNull(),
+    enabled: boolean("enabled").notNull(),
+    failures: integer("failures").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("hooks_name_unique").on(
+      table.floorId,
+      sql`lower(${table.name})`,
+    ),
+    check(
+      "hooks_name",
+      sql`length(${table.name}) BETWEEN 1 AND 60 AND ${table.name} = btrim(${table.name})`,
+    ),
+    check(
+      "hooks_trigger",
+      sql`${table.trigger} IN ('stage', 'pull_request_opened', 'push', 'wrap_up', 'spec_filed', 'run_now') AND (${table.trigger} = 'stage') = (${table.stage} IS NOT NULL)`,
+    ),
+    check(
+      "hooks_stage",
+      sql`${table.stage} IS NULL OR ${table.stage} IN ('needs-work', 'needs-review', 'needs-qa', 'needs-docs')`,
+    ),
+    check(
+      "hooks_filters",
+      sql`cardinality(${table.labels}) <= 20 AND cardinality(${table.filePatterns}) <= 20`,
+    ),
+    check(
+      "hooks_action",
+      sql`(${table.agentId} IS NULL) <> (${table.role} IS NULL) AND ${table.role} IS DISTINCT FROM 'manager'`,
+    ),
+    check(
+      "hooks_skill_name",
+      sql`${table.skillName} ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND length(${table.skillName}) <= 64`,
+    ),
+    check(
+      "hooks_runs_per_hour",
+      sql`${table.runsPerHour} BETWEEN 1 AND 60`,
+    ),
+    check("hooks_failures", sql`${table.failures} >= 0`),
+  ],
+);
+
+// Each run of a Hook (FR-119, FR-120): the Agent that ran it, what the
+// event was about, and how it ended, with the Agent's answer (redacted,
+// cut short) and the comment the GitHub App posted it as. A run is
+// `running` until it ends. Deleting a Hook deletes its runs.
+export const hookRuns = pgTable(
+  "hook_runs",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
+    hookId: bigint("hook_id", { mode: "number" })
+      .notNull()
+      .references(() => hooks.id, { onDelete: "cascade" }),
+    floorId: text("floor_id")
+      .notNull()
+      .references(() => floors.id),
+    agentId: text("agent_id"),
+    trigger: text("trigger").notNull(),
+    issue: integer("issue"),
+    pullRequest: integer("pull_request"),
+    status: text("status").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    error: text("error"),
+    result: text("result"),
+    commentUrl: text("comment_url"),
+  },
+  (table) => [
+    index("hook_runs_hook").on(table.hookId, table.startedAt),
+    check(
+      "hook_runs_status",
+      sql`${table.status} IN ('running', 'succeeded', 'failed') AND (${table.status} = 'running') = (${table.finishedAt} IS NULL)`,
+    ),
+    check(
+      "hook_runs_subject",
+      sql`(${table.issue} IS NULL OR ${table.issue} > 0) AND (${table.pullRequest} IS NULL OR ${table.pullRequest} > 0)`,
+    ),
+    check(
+      "hook_runs_result",
+      sql`${table.result} IS NULL OR length(${table.result}) <= 8000`,
+    ),
+  ],
+);
+
+// The default branch's head each Floor's push Hooks last saw (FR-118): a
+// push is the files changed from there to its head now.
+export const hookPushHeads = pgTable(
+  "hook_push_heads",
+  {
+    floorId: text("floor_id")
+      .primaryKey()
+      .references(() => floors.id),
+    sha: text("sha").notNull(),
+    seenAt: timestamp("seen_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    check("hook_push_heads_sha", sql`${table.sha} ~ '^[0-9a-f]{40,64}$'`),
+  ],
+);
+
 // Batches (PRD FR-25, §5 scenario 1): the issues the Owner handed a
 // Floor's Manager in one command, such as "complete issues 1 to 5", in the
 // order named (1 to 50 of them), or those the Manager filed for one of the

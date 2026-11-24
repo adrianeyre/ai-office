@@ -568,6 +568,58 @@ CREATE TABLE "handoffs" (
 	CONSTRAINT "handoffs_issue" CHECK ("handoffs"."issue" > 0)
 );
 
+CREATE TABLE "hook_push_heads" (
+	"floor_id" text PRIMARY KEY NOT NULL,
+	"sha" text NOT NULL,
+	"seen_at" timestamp with time zone NOT NULL,
+	CONSTRAINT "hook_push_heads_sha" CHECK ("hook_push_heads"."sha" ~ '^[0-9a-f]{40,64}$')
+);
+
+CREATE TABLE "hook_runs" (
+	"id" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "hook_runs_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1),
+	"hook_id" bigint NOT NULL,
+	"floor_id" text NOT NULL,
+	"agent_id" text,
+	"trigger" text NOT NULL,
+	"issue" integer,
+	"pull_request" integer,
+	"status" text NOT NULL,
+	"started_at" timestamp with time zone NOT NULL,
+	"finished_at" timestamp with time zone,
+	"error" text,
+	"result" text,
+	"comment_url" text,
+	CONSTRAINT "hook_runs_status" CHECK ("hook_runs"."status" IN ('running', 'succeeded', 'failed') AND ("hook_runs"."status" = 'running') = ("hook_runs"."finished_at" IS NULL)),
+	CONSTRAINT "hook_runs_subject" CHECK (("hook_runs"."issue" IS NULL OR "hook_runs"."issue" > 0) AND ("hook_runs"."pull_request" IS NULL OR "hook_runs"."pull_request" > 0)),
+	CONSTRAINT "hook_runs_result" CHECK ("hook_runs"."result" IS NULL OR length("hook_runs"."result") <= 8000)
+);
+
+CREATE TABLE "hooks" (
+	"id" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "hooks_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1),
+	"floor_id" text NOT NULL,
+	"name" text NOT NULL,
+	"trigger" text NOT NULL,
+	"stage" text,
+	"labels" text[] NOT NULL,
+	"file_patterns" text[] NOT NULL,
+	"agent_id" text,
+	"role" text,
+	"skill_name" text NOT NULL,
+	"runs_per_hour" integer NOT NULL,
+	"enabled" boolean NOT NULL,
+	"failures" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	CONSTRAINT "hooks_name" CHECK (length("hooks"."name") BETWEEN 1 AND 60 AND "hooks"."name" = btrim("hooks"."name")),
+	CONSTRAINT "hooks_trigger" CHECK ("hooks"."trigger" IN ('stage', 'pull_request_opened', 'push', 'wrap_up', 'spec_filed', 'run_now') AND ("hooks"."trigger" = 'stage') = ("hooks"."stage" IS NOT NULL)),
+	CONSTRAINT "hooks_stage" CHECK ("hooks"."stage" IS NULL OR "hooks"."stage" IN ('needs-work', 'needs-review', 'needs-qa', 'needs-docs')),
+	CONSTRAINT "hooks_filters" CHECK (cardinality("hooks"."labels") <= 20 AND cardinality("hooks"."file_patterns") <= 20),
+	CONSTRAINT "hooks_action" CHECK (("hooks"."agent_id" IS NULL) <> ("hooks"."role" IS NULL) AND "hooks"."role" IS DISTINCT FROM 'manager'),
+	CONSTRAINT "hooks_skill_name" CHECK ("hooks"."skill_name" ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND length("hooks"."skill_name") <= 64),
+	CONSTRAINT "hooks_runs_per_hour" CHECK ("hooks"."runs_per_hour" BETWEEN 1 AND 60),
+	CONSTRAINT "hooks_failures" CHECK ("hooks"."failures" >= 0)
+);
+
 CREATE TABLE "issue_token_caps" (
 	"floor_id" text NOT NULL,
 	"issue" integer NOT NULL,
@@ -1073,6 +1125,10 @@ ALTER TABLE "guideline_changes" ADD CONSTRAINT "guideline_changes_floor_id_floor
 ALTER TABLE "guideline_proposals" ADD CONSTRAINT "guideline_proposals_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "guideline_suggestions" ADD CONSTRAINT "guideline_suggestions_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "handoffs" ADD CONSTRAINT "handoffs_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "hook_push_heads" ADD CONSTRAINT "hook_push_heads_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "hook_runs" ADD CONSTRAINT "hook_runs_hook_id_hooks_id_fk" FOREIGN KEY ("hook_id") REFERENCES "public"."hooks"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "hook_runs" ADD CONSTRAINT "hook_runs_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "hooks" ADD CONSTRAINT "hooks_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "issue_token_caps" ADD CONSTRAINT "issue_token_caps_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "issue_triage" ADD CONSTRAINT "issue_triage_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "issue_work_turns" ADD CONSTRAINT "issue_work_turns_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
@@ -1135,6 +1191,8 @@ CREATE UNIQUE INDEX "grilling_sessions_one_active" ON "grilling_sessions" USING 
 CREATE INDEX "guideline_proposals_floor" ON "guideline_proposals" USING btree ("floor_id","status");
 CREATE UNIQUE INDEX "guideline_proposals_waiting" ON "guideline_proposals" USING btree ("floor_id","name","content_hash") WHERE "guideline_proposals"."status" = 'proposed';
 CREATE INDEX "handoffs_issue_idx" ON "handoffs" USING btree ("floor_id","issue","stage","created_at");
+CREATE INDEX "hook_runs_hook" ON "hook_runs" USING btree ("hook_id","started_at");
+CREATE UNIQUE INDEX "hooks_name_unique" ON "hooks" USING btree ("floor_id",lower("name"));
 CREATE INDEX "manager_chat_attachments_message_idx" ON "manager_chat_attachments" USING btree ("message_id");
 CREATE INDEX "manager_chat_attachments_unsent_idx" ON "manager_chat_attachments" USING btree ("created_at") WHERE "manager_chat_attachments"."message_id" IS NULL;
 CREATE INDEX "manager_chat_messages_floor_idx" ON "manager_chat_messages" USING btree ("floor_id","id");
