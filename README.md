@@ -53,6 +53,20 @@ walks through the first run step by step, and through running it all with
 - **The issue pipeline.** Intake, triage, sandboxes, review, QA, the
   designer, docs, the Merge Policy and the Manager's watchdog. See
   [The issue pipeline](docs/guide/issue-pipeline.md).
+- **Guidelines, Specs and Hooks.** Steer Agents up front rather than
+  only in review. **Guidelines** are your rules for a repository, kept in
+  its `.agents/guidelines/`; Agents follow only the versions you approved,
+  each task gets those that apply to its Stage, files and labels, and
+  Agents can propose new ones but never change them. **Specs**, written
+  with `/spec`, agree a feature's requirements (numbered Acceptance
+  Criteria), design and tasks with the Manager phase by phase; the tasks
+  become issues and an approved Batch, reviewers and QA work to the Spec,
+  QA proves each criterion with a test, and the Wrap-up says where the
+  work departed from the design (`/spec amend` brings it up to date).
+  **Hooks** have an Agent run one of the Floor's Skills when an event you
+  chose happens, such as a pull request touching `**/*.sql`, bounded by
+  runs an hour. See
+  [Guidelines, Specs and Hooks](docs/guide/guidelines-specs-and-hooks.md).
 
 ## Screenshots
 

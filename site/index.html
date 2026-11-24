@@ -527,7 +527,8 @@
                 </li>
                 <li>
                   Session, session affinity, drain soonest and least used
-                  strategies, with priorities, retries and a circuit breaker
+                  strategies, weighted by priority and each account's real
+                  5-hour usage, with retries and a circuit breaker
                 </li>
                 <li>
                   Combos, model mappings and prompt-cache keep-alive; your own
@@ -570,7 +571,8 @@
               <ul class="checks">
                 <li>
                   Grilling Sessions interview you until a feature is understood,
-                  then write the issues
+                  then write the issues; <code>/spec</code> agrees its
+                  requirements, design and tasks first
                 </li>
                 <li>
                   Contractors join the team for one Batch, in a Role the Manager
@@ -642,6 +644,56 @@
                 QA Roles.
               </figcaption>
             </figure>
+          </article>
+
+          <article
+            class="feature feature-flip feature-steer"
+            aria-labelledby="feature-steer-title"
+          >
+            <div class="feature-text">
+              <span class="card-icon">
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-git-branch" />
+                </svg>
+              </span>
+              <h3 id="feature-steer-title">
+                Steer Agents up front: Guidelines, Specs and Hooks
+              </h3>
+              <p>
+                Tell Agents how you want the work done before they start, rather
+                than only correcting them in review.
+              </p>
+              <ul class="checks">
+                <li>
+                  <strong>Guidelines</strong>: your rules for a repository, in
+                  its <code>.agents/guidelines/</code>. Agents follow only the
+                  versions you approved, each task gets those for its Stage,
+                  files and labels, and Agents may propose a Guideline but never
+                  change one. <code>/guidelines</code> drafts the first ones
+                  with the Manager
+                </li>
+                <li>
+                  <strong>Specs</strong>: <code>/spec</code> agrees a feature's
+                  requirements, with numbered Acceptance Criteria, then its
+                  design and tasks. The tasks become issues and an approved
+                  Batch, QA proves each criterion with a test, and the Wrap-up
+                  says where the work departed from the design
+                </li>
+                <li>
+                  <strong>Hooks</strong>: an Agent runs one of the Floor's
+                  Skills when an event you chose happens, such as a pull request
+                  touching <code>**/*.sql</code>, and posts its answer as a
+                  comment; limited runs an hour, never on its own events
+                </li>
+              </ul>
+              <p>
+                <a
+                  href="{{REPO_URL}}/blob/main/docs/guide/guidelines-specs-and-hooks.md"
+                  >Guidelines, Specs and Hooks</a
+                >
+                in the guide.
+              </p>
+            </div>
           </article>
         </div>
       </section>
@@ -1801,6 +1853,18 @@ pnpm sandbox:build claude   <span class="comment"># or only those your Agents' A
                   and type <code>complete issues 1 to 5</code> for a Batch with
                   a Plan on the whiteboard.
                 </p>
+                <p>
+                  To steer the work up front, type <code>/guidelines</code> in
+                  the Manager chat to draft the repository's Guidelines and
+                  approve them in the Floor admin's
+                  <strong>Guidelines</strong> card, or <code>/spec</code> to
+                  agree a feature's requirements, design and tasks before any
+                  issue is filed. See
+                  <a
+                    href="{{REPO_URL}}/blob/main/docs/guide/guidelines-specs-and-hooks.md"
+                    >Guidelines, Specs and Hooks</a
+                  >.
+                </p>
               </article>
             </div>
           </div>
@@ -1902,6 +1966,21 @@ pnpm sandbox:build claude   <span class="comment"># or only those your Agents' A
                 <span class="doc-text"
                   >Intake, triage, sandboxes, reviews and the Merge
                   Policy.</span
+                >
+                <svg class="icon doc-arrow" aria-hidden="true">
+                  <use href="#i-arrow-up-right" />
+                </svg>
+              </a>
+            </li>
+            <li>
+              <a
+                class="doc-card"
+                href="{{REPO_URL}}/blob/main/docs/guide/guidelines-specs-and-hooks.md"
+              >
+                <span class="doc-title">Guidelines, Specs and Hooks</span>
+                <span class="doc-text"
+                  >Your approved rules, agreed Specs and event-driven
+                  Skills.</span
                 >
                 <svg class="icon doc-arrow" aria-hidden="true">
                   <use href="#i-arrow-up-right" />

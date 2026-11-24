@@ -559,7 +559,7 @@ How the Gateway answers a page:
 ### AI Accounts
 
 The Owner adds AI Accounts in AI Settings' **AI Accounts** card (PRD FR-35,
-FR-36); none come from the environment. So far an account is one of:
+FR-36), the first card on the page; none come from the environment. So far an account is one of:
 
 - an **Anthropic Console API key**, with an optional custom endpoint URL in
   place of `https://api.anthropic.com`;

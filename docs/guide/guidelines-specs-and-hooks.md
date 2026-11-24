@@ -7,29 +7,38 @@ tasks agreed one step at a time; and **Hooks**, the Owner's own rules
 that have an Agent run a Skill when an event happens. Part of the
 [AI Office guide](README.md); back to the [README](../../README.md).
 
-They ship in that order, each useful on its own, as the
+Each is useful on its own, as the
 [Guidelines, Specs and Hooks PRD](../product-requirements-document/guidelines-specs-and-hooks.md)
-sets out. **Guidelines are being built now**, and this page describes
-them as specified (PRD FR-102 to FR-112). AI Office already reads each
-Floor's `.agents/guidelines/` and settles which versions the Owner
-approved, with the Notice and events described below, the Floor admin's
-[Guidelines card](#seeing-them) shows them with **Approve** and
-**Dismiss**, each task gets the Guidelines that apply to it, within
-its budget, Agents' [proposals](#proposing-a-guideline) wait there
-for the Owner, and [`/guidelines`](#writing-them-guidelines) drafts a
-Floor's Guidelines with its Manager. **Specs are being built next**:
-[`/spec`](#specs) already agrees a feature's requirements, design and
-tasks with the Manager, phase by phase (PRD FR-113), its issues are filed
-and start their Batch, and the coder, reviewers and QA
-[get the Spec as the Owner approved it](#what-agents-get-of-a-spec),
-QA proving each Acceptance Criterion with a test (FR-116), and
-[a Spec is kept current](#keeping-a-spec-current): a Spec's Wrap-up says
-where the merged work departs from its design, and `/spec amend <slug>`
-brings it up to date (FR-117). **Hooks are built** too: the Floor admin's
-[Hooks card](#the-hooks-card) has an Agent run one of the Floor's Skills
-when an event the Owner chose happens (FR-118 to FR-121). A Floor without
-Guidelines, Specs or Hooks behaves exactly as before: every prompt is
-byte for byte what it was.
+sets out:
+
+- **[Guidelines](#guidelines)** (PRD FR-102 to FR-112). AI Office reads
+  each Floor's `.agents/guidelines/` from its default branch and settles
+  which versions the Owner approved, raising a Notice for any that wait.
+  The Floor admin's [Guidelines card](#seeing-them) shows them with
+  **Approve** and **Dismiss**. Each task gets the approved Guidelines
+  that apply to its Stage, its files and its labels, within its prompt
+  budget. Agents cannot change a Guideline themselves: their
+  [proposals](#proposing-a-guideline) wait for the Owner, and
+  [`/guidelines`](#writing-them-guidelines) drafts a Floor's first
+  Guidelines with its Manager.
+- **[Specs](#specs)** (FR-113 to FR-117, [ADR 0015](../architectural-decision-record/0015-a-spec-is-a-grilling-session.md)).
+  [`/spec`](#writing-one-spec) agrees a feature's requirements, design and
+  tasks with the Manager, one phase at a time, with numbered
+  [Acceptance Criteria](#acceptance-criteria-are-checked) checked before
+  the requirements are confirmed. Its tasks
+  [become issues and an approved Batch](#filing-a-specs-issues). The
+  coder, reviewers and QA [get the Spec as the Owner approved it](#what-agents-get-of-a-spec),
+  QA proving each Acceptance Criterion with a test. A Spec's Wrap-up says
+  where the merged work departs from its design, and `/spec amend <slug>`
+  [keeps it current](#keeping-a-spec-current).
+- **[Hooks](#hooks)** (FR-118 to FR-121, [ADR 0016](../architectural-decision-record/0016-hooks-are-the-owners-and-live-in-ai-office.md)).
+  The Floor admin's [Hooks card](#the-hooks-card) has an Agent run one of
+  the Floor's Skills when an event the Owner chose happens.
+
+The decision behind Guidelines is
+[ADR 0014](../architectural-decision-record/0014-agents-follow-only-guidelines-the-owner-approved.md).
+A Floor without Guidelines, Specs or Hooks behaves exactly as before:
+every prompt is byte for byte what it was.
 
 ## Guidelines
 
