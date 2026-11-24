@@ -428,15 +428,29 @@ export function createGrillingDocuments(
         ? branch
         : floor.defaultBranch;
     const files = await filesOf(input, from);
-    // A Spec's documents no longer approved leave the branch.
-    const remove = grillingWritesSpec(session.skill)
+    // A Spec's documents no longer approved leave the branch; an
+    // amendment's go back to the version on the default branch (FR-117).
+    const unapproved = grillingWritesSpec(session.skill)
       ? (session.documents?.files ?? []).filter(
           (path) =>
             inSpecFolder(specOf(session), path) &&
             !files.some((file) => file.path === path),
         )
       : [];
-    if (files.length === 0 && remove.length === 0) {
+    const restored: FileToCommit[] = [];
+    const remove: string[] = [];
+    for (const path of unapproved) {
+      const before =
+        session.spec?.amends === undefined
+          ? undefined
+          : await client.getFileContent(path, floor.defaultBranch);
+      if (before === undefined) {
+        remove.push(path);
+      } else {
+        restored.push({ path, content: before });
+      }
+    }
+    if (files.length === 0 && remove.length === 0 && restored.length === 0) {
       // Nothing settled to write yet (`/guidelines` before its first,
       // `/spec` before its requirements are confirmed).
       return {
@@ -460,7 +474,7 @@ export function createGrillingDocuments(
       token: writable.token,
       from,
       to: branch,
-      files,
+      files: [...files, ...restored],
       remove,
       message: `docs: ${sessionTitle(session)}, as settled${session.round === 0 ? "" : ` in round ${String(session.round)}`}\n\n${grillingWritesSpec(session.skill) ? "The Spec's documents the Owner confirmed so far." : grillingWritesGuidelines(session.skill) ? "The Guidelines settled so far." : "The PRD, ADRs, glossary terms and process docs settled so far."}`,
       identity: await options.gitIdentity(floor.id),
@@ -507,6 +521,12 @@ export function createGrillingDocuments(
     return [
       `${manager.name}, the Floor's Manager, wrote ${guidelines ? "these Guidelines" : spec !== null ? "this Spec" : "these documents"} in ${sessionTitle(session)} with the Owner, as its decisions settled.`,
       "",
+      ...(spec?.amends === undefined
+        ? []
+        : [
+            `It amends the Spec in \`${specFolder(spec.slug)}/\` that the Owner approved in Grilling Session ${String(spec.amends.sessionId)}: each document here replaces that one, and a document not confirmed again is left as it was.`,
+            "",
+          ]),
       "**Files**",
       "",
       ...files.map((path) => `- \`${path}\``),
@@ -550,7 +570,9 @@ export function createGrillingDocuments(
                 ? `- ${path}: confirmed by the Owner in the session.`
                 : phase === "design" && spec.designSkipped
                   ? `- ${path}: skipped by the Owner.`
-                  : `- ${path}: not confirmed, so not written.`;
+                  : spec.amends === undefined
+                    ? `- ${path}: not confirmed, so not written.`
+                    : `- ${path}: not confirmed again, so left as it was.`;
             }),
             "",
             "Each document is as the Owner confirmed it in the session, phase by phase; Agents are given that approved copy, never the file as it stands. The tasks become the session's issue drafts. Merging is yours: a Manager never merges.",
@@ -629,7 +651,9 @@ export function createGrillingDocuments(
             grillingWritesGuidelines(session.skill)
               ? `docs: the Guidelines of ${sessionTitle(session)}`
               : grillingWritesSpec(session.skill)
-                ? `docs: the Spec of ${sessionTitle(session)}`
+                ? session.spec?.amends === undefined
+                  ? `docs: the Spec of ${sessionTitle(session)}`
+                  : `docs: amend the Spec in ${specFolder(session.spec.slug)}/, in ${sessionTitle(session)}`
                 : `docs: ${sessionTitle(session)}`,
             200,
           ),

@@ -19,6 +19,9 @@ import {
   maxGrillingTopicLength,
   mentionedFiles,
   newGrillingSpec,
+  amendSpecText,
+  readSpecAmend,
+  resumeGrillingText,
   readGrillingAnswers,
   readChatControl,
   readGoalCommand,
@@ -104,6 +107,7 @@ import {
   specDraftsEdited,
   specHasApproved,
   specIssueDrafts,
+  amendedSpec,
   specOf,
   specStanding,
 } from "../grilling/spec.ts";
@@ -713,6 +717,12 @@ type GrillingRoute =
   | { readonly kind: "start"; readonly session: GrillingSessionRecord }
   /** "/grilling" while this session runs. */
   | { readonly kind: "running"; readonly session: GrillingSessionRecord }
+  /** "/spec amend <slug>" with no Spec there to amend: why not. */
+  | {
+      readonly kind: "refused";
+      readonly text: string;
+      readonly session?: undefined;
+    }
   /**
    * "pause the session" and "confirm" (the running session's) or "resume
    * the session" (the paused one named, or the latest).
@@ -2890,6 +2900,79 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
       : options.grilling.save({ ...session, spec: { ...spec, slug } });
   };
 
+  /**
+   * "/spec amend <slug>" (FR-117): a new `/spec` session on the Spec in
+   * `.agents/specs/<slug>/`, back at the requirements, with the documents
+   * its latest session approved loaded as its drafts; refused, saying
+   * why, when the Floor has no such Spec or its latest session is paused.
+   */
+  const amendRoute = async (
+    floorId: string,
+    slug: string,
+    grilling: GrillingStore,
+  ): Promise<GrillingRoute> => {
+    const sessions = (await grilling.list(floorId)).filter(
+      ({ spec }) => spec?.slug === slug,
+    );
+    const [latest] = sessions;
+    if (latest?.status === "paused") {
+      return {
+        kind: "refused",
+        text: `The Spec in \`${specFolder(slug)}/\` is being written in the ${sessionName(latest)}, which is paused: say "${resumeGrillingText(latest.id)}" to carry on with it.`,
+      };
+    }
+    const earlier = sessions.find(
+      (session) =>
+        session.status === "ended" &&
+        session.spec !== null &&
+        specHasApproved(session.spec),
+    );
+    if (earlier === undefined) {
+      const specs = [
+        ...new Set(
+          (await grilling.list(floorId)).flatMap(({ spec }) =>
+            spec !== null && specHasApproved(spec) ? [spec.slug] : [],
+          ),
+        ),
+      ];
+      return {
+        kind: "refused",
+        text: [
+          `There is no Spec in \`${specFolder(slug)}/\` with documents you approved on this Floor, so there is nothing to amend.`,
+          specs.length === 0
+            ? `Start a Spec with "/${specSkillName} <what it is for>".`
+            : `Specs you can amend: ${specs.map((each) => `"${amendSpecText(each)}"`).join(", ")}.`,
+        ].join(" "),
+      };
+    }
+    const at = now();
+    const session = await grilling.create({
+      floorId,
+      topic: earlier.topic,
+      skill: specSkillName,
+      status: "active",
+      round: 0,
+      awaitingConfirmation: false,
+      questions: [],
+      decisions: [],
+      terms: [],
+      facts: [],
+      outline: [],
+      adrs: [],
+      processes: [],
+      documents: null,
+      issues: null,
+      sources: [],
+      guidelines: [],
+      spec: amendedSpec(earlier),
+      startedAt: at,
+      updatedAt: at,
+      pausedAt: null,
+      endedAt: null,
+    });
+    return { kind: "start", session };
+  };
+
   /** Where a message stands with the Floor's Grilling Sessions. */
   const routeGrilling = async (
     floor: FloorRecord,
@@ -2909,6 +2992,11 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
       }
       const skill = skillCommand.name;
       const given = skillCommand.arguments ?? "";
+      // "/spec amend <slug>": the Spec as approved last, reopened (FR-117).
+      const amend = skill === specSkillName ? readSpecAmend(given) : undefined;
+      if (amend !== undefined) {
+        return amendRoute(floorId, amend, grilling);
+      }
       const sources =
         skill === toTicketsSkillName ? await sourcesOf(floor, given) : [];
       const at = now();
@@ -3169,6 +3257,9 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
         model: null,
         grilling: ref,
       });
+    if (route.kind === "refused") {
+      return say("hint", route.text, null);
+    }
     const { session } = route;
     if (route.kind === "running") {
       return say(
@@ -3381,7 +3472,11 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
         route = await routeGrilling(floor, text, skillCommand);
         if (route?.kind === "start") {
           ran = sessionStarter(route.session.skill);
-        } else if (skillCommand !== undefined && route?.kind !== "running") {
+        } else if (
+          skillCommand !== undefined &&
+          route?.kind !== "running" &&
+          route?.kind !== "refused"
+        ) {
           const found = await skillsOf(floorId).catch(
             (error: unknown): ChatSkills => ({
               skills: [],

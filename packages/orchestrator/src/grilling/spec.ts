@@ -7,6 +7,7 @@ import {
   maxSpecCriteria,
   maxSpecRequirements,
   maxSpecTasks,
+  newGrillingSpec,
   nextSpecPhase,
   reopenSpecPhaseText,
   skipSpecDesignText,
@@ -22,6 +23,7 @@ import {
   type GrillingSpec,
   type SpecPhase,
   type SpecRequirements,
+  type SpecTask,
   type SpecTaskIssue,
 } from "@ai-office/shared";
 
@@ -51,6 +53,13 @@ import type { GrillingStore } from "./store.ts";
 // phase's documents leave the branch until confirmed again. The approved
 // tasks become the session's issue drafts (`specIssueDrafts`), one each,
 // in their order, with no model asked.
+//
+// `/spec amend <slug>` (FR-117) starts a session that amends the Spec as
+// the Owner approved it last (`amendedSpec`): back at the requirements,
+// with each approved document loaded as its phase's draft, so the Owner
+// changes what moved on and confirms each phase again. A task the amended
+// tasks keep unchanged keeps the issue filed for it: `tasks.md` links it,
+// and it is not drafted again (`carriedIssues`).
 
 /** The Spec of a `/spec` session; an error for any other. */
 export function specOf(
@@ -284,18 +293,85 @@ export function specFiles(
 
 /**
  * The issue filed for each approved task, by its place (FR-117): the
- * draft of its number (1 for the first task), once filed. A task whose
- * draft the Owner dropped has none.
+ * draft of its number (1 for the first task), once filed; or, in a
+ * session amending a Spec, the issue a task the amendment kept unchanged
+ * had already. A task whose draft the Owner dropped has none.
  */
 export function specTaskIssues(
   session: Pick<GrillingSessionRecord, "spec" | "issues">,
 ): (SpecTaskIssue | undefined)[] {
   const tasks = session.spec?.approved.tasks ?? [];
   const drafts = session.issues?.drafts ?? [];
+  const carried =
+    session.spec === null ? [] : carriedIssues(session.spec, tasks);
   return tasks.map((_task, index) => {
     const filed = drafts.find(({ id }) => id === index + 1)?.filed;
-    return filed == null ? undefined : { number: filed.number, url: filed.url };
+    return filed == null
+      ? carried[index]
+      : { number: filed.number, url: filed.url };
   });
+}
+
+/** Whether two tasks say the same: title, description and criteria met. */
+const sameTask = (
+  task: Pick<SpecTask, "title" | "description" | "meets">,
+  other: Pick<SpecTask, "title" | "description" | "meets">,
+): boolean =>
+  task.title.trim() === other.title.trim() &&
+  task.description.trim() === other.description.trim() &&
+  task.meets.join(",") === other.meets.join(",");
+
+/**
+ * In a session amending a Spec (FR-117), the issue each of `tasks` keeps
+ * from the Spec it amends, by place: a task the amendment left as it was
+ * (its title, description and criteria) keeps the issue filed for it,
+ * each issue once. None for a new or changed task, or a new Spec.
+ */
+export function carriedIssues(
+  spec: GrillingSpec,
+  tasks: readonly SpecTask[],
+): (SpecTaskIssue | undefined)[] {
+  const earlier = [...(spec.amends?.tasks ?? [])];
+  return tasks.map((task) => {
+    const index = earlier.findIndex((before) => sameTask(task, before));
+    if (index < 0) {
+      return undefined;
+    }
+    const [kept] = earlier.splice(index, 1);
+    return kept?.issue;
+  });
+}
+
+/**
+ * The Spec of a session amending the one `earlier` approved (FR-117): in
+ * the same folder, back at the requirements, with each document `earlier`
+ * approved loaded as its phase's draft and nothing approved yet, and the
+ * issues its tasks had, which tasks kept unchanged keep.
+ */
+export function amendedSpec(
+  earlier: Pick<GrillingSessionRecord, "id" | "spec" | "issues">,
+): GrillingSpec {
+  const spec = specOf(earlier);
+  const issues = specTaskIssues(earlier);
+  return {
+    ...newGrillingSpec(spec.slug),
+    drafts: {
+      requirements: spec.approved.requirements,
+      design: spec.approved.design,
+      tasks: spec.approved.tasks,
+    },
+    amends: {
+      sessionId: earlier.id,
+      tasks: (spec.approved.tasks ?? []).flatMap(
+        ({ title, description, meets }, index) => {
+          const issue = issues[index];
+          return issue === undefined
+            ? []
+            : [{ title, description, meets: [...meets], issue: { ...issue } }];
+        },
+      ),
+    },
+  };
 }
 
 /** Whether `path` is one of a Spec's documents in its folder. */
@@ -319,23 +395,40 @@ export function specIssueDrafts(
     return undefined;
   }
   const folder = specFolder(spec.slug);
+  // An amendment's unchanged tasks keep their issues (FR-117).
+  const carried = carriedIssues(spec, tasks);
   return {
-    drafts: tasks.map((task, index) => ({
-      id: index + 1,
-      title: task.title,
-      whatToBuild: [
-        task.description.trim(),
-        "",
-        `Task ${String(index + 1)} of the Spec in \`${folder}/\`${spec.designSkipped || spec.approved.design === null ? "" : ", built as its design.md says"}.`,
-      ].join("\n"),
-      acceptanceCriteria: task.meets.map(
-        (id) => specCriterion(spec.approved.requirements, id) ?? id,
-      ),
-      blockedBy: task.dependsOn.filter((other) => other <= index),
-      prdSections: [],
-      adrs: [],
-      filed: null,
-    })),
+    drafts: tasks.flatMap((task, index) => {
+      if (carried[index] !== undefined) {
+        return [];
+      }
+      const built = task.dependsOn.flatMap((other) => {
+        const issue = other <= index ? carried[other - 1] : undefined;
+        return issue === undefined
+          ? []
+          : [`task ${String(other)} (#${String(issue.number)})`];
+      });
+      return [
+        {
+          id: index + 1,
+          title: task.title,
+          whatToBuild: [
+            task.description.trim(),
+            "",
+            `Task ${String(index + 1)} of the Spec in \`${folder}/\`${spec.designSkipped || spec.approved.design === null ? "" : ", built as its design.md says"}.${built.length === 0 ? "" : ` It builds on ${built.join(" and ")}, filed before the Spec was amended.`}`,
+          ].join("\n"),
+          acceptanceCriteria: task.meets.map(
+            (id) => specCriterion(spec.approved.requirements, id) ?? id,
+          ),
+          blockedBy: task.dependsOn.filter(
+            (other) => other <= index && carried[other - 1] === undefined,
+          ),
+          prdSections: [],
+          adrs: [],
+          filed: null,
+        },
+      ];
+    }),
     draftedAt: at.toISOString(),
     approvedAt: null,
     problem: null,
@@ -455,6 +548,7 @@ export function specSection(session: GrillingSessionRecord): string[] {
     "",
     `The Spec is on ${phaseName(spec.phase)}.${spec.designSkipped ? " The Owner skipped the design: there is no design.md." : ""} Only the Owner moves it on, by saying ${specConfirmWords(spec.phase)}; they may reopen an earlier phase, whose later phases are then drafted again.`,
     "",
+    ...amendSection(spec),
     ...(approved.length === 0
       ? ["Nothing is approved yet.", ""]
       : [
@@ -466,6 +560,21 @@ export function specSection(session: GrillingSessionRecord): string[] {
     "",
     draft === undefined ? "None yet." : draft.trimEnd(),
     ...draftCriteriaSection(spec),
+  ];
+}
+
+/**
+ * What the session section says of an amendment (FR-117): the Spec was
+ * approved before, and code has moved on since; each draft starts as the
+ * approved document. None for a new Spec.
+ */
+function amendSection(spec: GrillingSpec): string[] {
+  if (spec.amends === undefined) {
+    return [];
+  }
+  return [
+    `This session amends the Spec the Owner approved in Grilling Session ${String(spec.amends.sessionId)}, as the code has moved on since. Each phase's draft starts as that session's approved document: ask the Owner what has changed, keep what still holds, and give the whole draft again with their changes. The Owner confirms each phase again, changed or not, and the pull request updates the Spec's files. Once the requirements change, bring the design and the tasks in line with them. A task kept exactly as it was keeps the issue filed for it; a new or changed task becomes a new issue.`,
+    "",
   ];
 }
 

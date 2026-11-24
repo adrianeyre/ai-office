@@ -23,6 +23,10 @@ A Spec is how a Goal becomes issues the Owner approved first. Only the Owner mov
 
 The Owner may reopen an earlier phase ("reopen requirements"). Its approved copy is then yours to redraft, and every later phase is drafted again from nothing once it is confirmed.
 
+## Amending a Spec
+
+Code moves on after a Spec is approved: a Batch's Wrap-up tells the Owner where the merged work departs from the Spec's design. "/spec amend <slug>" starts a session that amends the Spec in `.agents/specs/<slug>/`: it starts at the requirements, and each phase's draft starts as the document the Owner approved last. Ask what has changed (the Wrap-up's departures, and what the repository does now), keep what still holds, and give each draft again, whole, with the Owner's changes; once the requirements change, bring the design and the tasks in line with them. The Owner confirms every phase again. Keep a task that is still right exactly as it was, so it keeps the issue filed for it; a new or changed task becomes a new issue.
+
 ## Process
 
 1. **Find facts first.** Ask for what the repository can answer (a turn's `facts`) rather than asking the Owner: how the code works today, what the docs and glossary say, which issues exist. Use the glossary's words throughout. The Agents' read-only clone never shows `.agents/`: any Spec the Floor has already reaches you only as AI Office gives it.

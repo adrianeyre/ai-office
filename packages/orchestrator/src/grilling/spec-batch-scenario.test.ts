@@ -12,10 +12,12 @@ import {
 } from "@ai-office/events";
 import { createFakeGitHub } from "@ai-office/github/testing";
 import {
+  amendSpecText,
   confirmSpecPhaseText,
   createRedactor,
   defaultIntakeSettings,
   fileGrillingIssuesText,
+  reopenSpecPhaseText,
   skipSpecDesignText,
   specSkillName,
   specTasksDocument,
@@ -62,8 +64,11 @@ import { specIssues } from "./spec.ts";
 // whose Plan is the tasks' order and dependencies, approved by the tasks
 // the Owner confirmed, its triage asking no model. Drafts the Owner edited
 // after confirming the tasks follow the Floor's plan approval instead;
-// "… in one PR" makes it a One-pull-request Batch. Each case runs in
-// memory and in Postgres 18.
+// "… in one PR" makes it a One-pull-request Batch. Code moves on after a
+// Spec is approved (FR-117): "/spec amend <slug>" reopens it at its
+// requirements with the documents approved last loaded, and its pull
+// request updates the Spec's files, tasks kept as they were keeping their
+// issues. Each case runs in memory and in Postgres 18.
 
 const exec = promisify(execFile);
 const repository = "adrianeyre/web-shop";
@@ -80,9 +85,11 @@ type Answer = (
 /** The Manager chat's model, whose turns the test writes. */
 function scriptedModel() {
   const answers: Answer[] = [];
+  const asked: ModelRequest[] = [];
   const client: ModelClient = {
     complete: () => Promise.reject(new Error("The chat streams its calls.")),
     stream(_request, options) {
+      asked.push(_request);
       const answer = answers.shift();
       return answer === undefined
         ? Promise.reject(new Error("No answer was scripted."))
@@ -91,6 +98,7 @@ function scriptedModel() {
   };
   return {
     client,
+    asked,
     turn(value: unknown): void {
       const text = `\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``;
       answers.push((_request, { onText }) => {
@@ -323,6 +331,7 @@ async function setUp(
 
   const client = fake.repository(repository);
   return {
+    model,
     remote,
     fake,
     chat,
@@ -569,6 +578,206 @@ const cases: Case[] = [
       expect(
         s.published.filter(({ type }) => type === "batch.approved"),
       ).toEqual([expect.objectContaining({ specSessionId: 1 })]);
+    },
+  ],
+  [
+    "/spec amend reopens an approved Spec at its requirements with the documents approved last loaded, and its pull request updates the Spec's files",
+    async (s) => {
+      // Session 1 agrees the Spec, design and all, and files its issues;
+      // its pull request merges.
+      s.model.turn({ message: "The requirements.", spec: { requirements } });
+      await s.say(`/${specSkillName} ${topic}`);
+      s.model.turn({ message: "The design.", spec: { design } });
+      await s.say(confirmSpecPhaseText("requirements"));
+      s.model.turn({ message: "The tasks.", spec: { tasks } });
+      await s.say(confirmSpecPhaseText("design"));
+      await s.say(confirmSpecPhaseText("tasks"));
+      await s.say(fileGrillingIssuesText(1));
+      const [first, second, third] = await s.filed();
+      if (first == null || second == null || third == null) {
+        throw new Error("Not every task was filed.");
+      }
+      await gitIn(
+        s.remote,
+        "update-ref",
+        "refs/heads/main",
+        `refs/heads/${branch}`,
+      );
+      const approved = (await s.session()).spec?.approved;
+      const mainDesign = await s.fileOn("main", `${folder}/design.md`);
+
+      // 1. "/spec amend <slug>" starts session 2 on the same folder, back
+      //    at the requirements, each document approved in session 1
+      //    loaded as its draft, nothing approved yet.
+      s.model.turn({
+        message: "The Spec as you approved it is loaded. What has changed?",
+      });
+      await s.say(amendSpecText(slug));
+      const amending = (await s.chat.grillingSession("web-shop", 2)).session;
+      expect(amending).toMatchObject({
+        skill: specSkillName,
+        topic,
+        status: "active",
+      });
+      expect(amending.spec).toEqual({
+        slug,
+        phase: "requirements",
+        drafts: {
+          requirements: approved?.requirements,
+          design: approved?.design,
+          tasks: approved?.tasks,
+        },
+        approved: { requirements: null, design: null, tasks: null },
+        designSkipped: false,
+        confirmedAt: { requirements: null, design: null, tasks: null },
+        amends: {
+          sessionId: 1,
+          tasks: [first, second, third].map((issue, index) => ({
+            title: tasks[index]?.title,
+            description: tasks[index]?.description,
+            meets: tasks[index]?.meets,
+            issue: { number: issue.number, url: issue.url },
+          })),
+        },
+      });
+      // The Manager is told it amends session 1's Spec, its draft the
+      // requirements approved then.
+      const prompt = JSON.stringify(s.model.asked.at(-1));
+      expect(prompt).toContain(
+        "This session amends the Spec the Owner approved in Grilling Session 1",
+      );
+      expect(prompt).toContain("#### Your draft of the requirements");
+      expect(prompt).toContain(requirements.requirements[0]?.criteria[0] ?? "");
+
+      // 2. The Owner changes the requirements; the design holds; the
+      //    tasks keep #1 and #2 as they were, change the third and add a
+      //    fourth.
+      const amended = {
+        ...requirements,
+        requirements: [
+          {
+            ...requirements.requirements[0],
+            criteria: [
+              ...(requirements.requirements[0]?.criteria ?? []),
+              "R1.3 WHEN a shopper names a saved card THE SYSTEM SHALL show its name.",
+            ],
+          },
+          requirements.requirements[1],
+        ],
+      };
+      s.model.turn({ message: "Updated.", spec: { requirements: amended } });
+      await s.say("Shoppers can name their saved cards too.");
+      s.model.turn({ message: "The design still holds." });
+      await s.say(confirmSpecPhaseText("requirements"));
+      const amendedTasks = [
+        tasks[0],
+        tasks[1],
+        {
+          ...tasks[2],
+          description: "A declined saved card asks for another, naming it.",
+        },
+        {
+          title: "Name a saved card",
+          description: "A name field beside each saved card.",
+          meets: ["R1.3"],
+          dependsOn: [1],
+        },
+      ];
+      s.model.turn({ message: "The tasks.", spec: { tasks: amendedTasks } });
+      await s.say(confirmSpecPhaseText("design"));
+      const ended = await s.say(confirmSpecPhaseText("tasks"));
+      expect(ended).not.toMatch(/could not/i);
+
+      // 3. Its pull request updates the Spec's files on main.
+      const pulls = await s.fake
+        .repository(repository)
+        .listPullRequests({ state: "all" });
+      const pull = pulls.find(
+        ({ head }) => head.name === "ai-office/grilling-2",
+      );
+      expect(pull?.title).toBe(
+        `docs: amend the Spec in ${folder}/, in Grilling Session 2 on ${topic}`,
+      );
+      expect(pull?.body).toContain(
+        `It amends the Spec in \`${folder}/\` that the Owner approved in Grilling Session 1`,
+      );
+      const amendedBranch = "ai-office/grilling-2";
+      expect(
+        await s.fileOn(amendedBranch, `${folder}/requirements.md`),
+      ).toContain("R1.3 WHEN a shopper names a saved card");
+      expect(await s.fileOn(amendedBranch, `${folder}/design.md`)).toBe(
+        mainDesign,
+      );
+      // tasks.md keeps the issues of the tasks left as they were.
+      const tasksMd = await s.fileOn(amendedBranch, `${folder}/tasks.md`);
+      expect(tasksMd).toContain(
+        `## 1. ${tasks[0]?.title ?? ""}\n\n${tasks[0]?.description ?? ""}\n\n- **Meets:** R1.1, R1.2\n- **Depends on:** none\n- **Issue:** [#${String(first.number)}](${first.url})`,
+      );
+      expect(tasksMd).toContain(
+        `- **Issue:** [#${String(second.number)}](${second.url})`,
+      );
+      expect(tasksMd).not.toContain(`[#${String(third.number)}]`);
+
+      // 4. Only the changed and the new task become issue drafts.
+      const drafts = (await s.chat.grillingSession("web-shop", 2)).session
+        .issues?.drafts;
+      expect(
+        drafts?.map(({ id, title, blockedBy }) => ({ id, title, blockedBy })),
+      ).toEqual([
+        { id: 3, title: tasks[2]?.title, blockedBy: [] },
+        { id: 4, title: "Name a saved card", blockedBy: [] },
+      ]);
+      expect(drafts?.[1]?.whatToBuild).toContain(
+        `It builds on task 1 (#${String(first.number)}), filed before the Spec was amended.`,
+      );
+      expect(drafts?.[1]?.acceptanceCriteria).toEqual([
+        "R1.3 WHEN a shopper names a saved card THE SYSTEM SHALL show its name.",
+      ]);
+    },
+  ],
+  [
+    "a reopened phase of an amendment goes back to the Spec's file on the default branch, never deleted",
+    async (s) => {
+      await s.agreeSpec();
+      await gitIn(
+        s.remote,
+        "update-ref",
+        "refs/heads/main",
+        `refs/heads/${branch}`,
+      );
+      const before = await s.fileOn("main", `${folder}/requirements.md`);
+      s.model.turn({ message: "What has changed?" });
+      await s.say(amendSpecText(slug));
+      const amended = {
+        ...requirements,
+        introduction: "Shoppers keep and name their cards to pay faster.",
+      };
+      s.model.turn({ message: "Updated.", spec: { requirements: amended } });
+      await s.say("Shoppers name their cards too.");
+      s.model.turn({ message: "The design.", spec: { design } });
+      await s.say(confirmSpecPhaseText("requirements"));
+      const amendedBranch = "ai-office/grilling-2";
+      expect(
+        await s.fileOn(amendedBranch, `${folder}/requirements.md`),
+      ).toContain("keep and name their cards");
+      s.model.turn({ message: "The requirements again." });
+      await s.say(reopenSpecPhaseText("requirements"));
+      expect(await s.fileOn(amendedBranch, `${folder}/requirements.md`)).toBe(
+        before,
+      );
+    },
+  ],
+  [
+    "/spec amend of a Spec the Floor does not have is refused, naming those it can amend, and starts nothing",
+    async (s) => {
+      expect(await s.say(amendSpecText("saved-cards"))).toBe(
+        `There is no Spec in \`.agents/specs/saved-cards/\` with documents you approved on this Floor, so there is nothing to amend. Start a Spec with "/${specSkillName} <what it is for>".`,
+      );
+      await s.agreeSpec();
+      expect(await s.say(amendSpecText("saved-cards"))).toBe(
+        `There is no Spec in \`.agents/specs/saved-cards/\` with documents you approved on this Floor, so there is nothing to amend. Specs you can amend: "${amendSpecText(slug)}".`,
+      );
+      expect(await s.chat.grillingSessions("web-shop")).toHaveLength(1);
     },
   ],
 ];
