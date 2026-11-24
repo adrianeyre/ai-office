@@ -20,9 +20,9 @@ for the Owner, and [`/guidelines`](#writing-them-guidelines) drafts a
 Floor's Guidelines with its Manager. **Specs are being built next**:
 [`/spec`](#specs) already agrees a feature's requirements, design and
 tasks with the Manager, phase by phase (PRD FR-113), its issues are filed
-and start their Batch, and the coder and reviewers
-[get the Spec as the Owner approved it](#what-agents-get-of-a-spec)
-(FR-116). Hooks get their
+and start their Batch, and the coder, reviewers and QA
+[get the Spec as the Owner approved it](#what-agents-get-of-a-spec),
+QA proving each Acceptance Criterion with a test (FR-116). Hooks get their
 section here as they ship. A Floor without Guidelines,
 Specs or Hooks behaves exactly as before: every prompt is byte for byte
 what it was.
@@ -624,7 +624,30 @@ Owner approved, not only its own text (FR-116;
   names every one not met ("Not met: R1.2, R2.1"). They approve only when
   it meets every one. The design is the coder's; reviewers are not given
   it.
-- **As approved in the session, never as the file stands.** Both come
+- **QA** gets the issue's Acceptance Criteria, quoted the same way after
+  the issue, and proves each with a test of its own, its id in the test's
+  name: **one property-based test per criterion**, with the repository's
+  property-testing library, or fast-check, added as a dev dependency, in
+  a TypeScript repository with none; an **example test** where a property
+  does not fit the criterion, or in a repository in another language with
+  no such library. Its `<qa-report>` gains a `Criteria:` part listing
+  every criterion's id with pass or fail, a line each ("R1.1 pass"), and
+  it passes only when every criterion passes its test
+  (`packages/orchestrator/src/qa/report.ts`). Plain code reads the list:
+  - a criterion listed as failed fails; one not listed, or listed with
+    neither pass nor fail, has **no test, so fails** too; a failure said
+    anywhere in the list outweighs a pass, and ids the issue does not
+    have are ignored;
+  - any criterion failed **fails the round**, whatever its `Result:`
+    says, and the issue goes back to the coder, as any QA failure does,
+    its Handoff naming the criteria failing their tests and those with no
+    test ("Acceptance Criteria with no test: R1.2; each needs a test of
+    its own that passes");
+  - QA's comment on the pull request lists each criterion, "R1.1 passed",
+    "R1.2 failed" or "R1.2 failed: no test reported".
+
+  The design is the coder's; QA is not given it.
+- **As approved in the session, never as the file stands.** All three come
   from the approved copy kept with the `/spec` session in AI Office's
   database: each criterion as the approved requirements word it (a
   criterion the Owner wrote in a draft, with no id the requirements have,
@@ -642,5 +665,6 @@ Owner approved, not only its own text (FR-116;
   criteria, it is longer than the 12,000 characters a prompt carries of a
   Spec)", or which criteria were left out, by id.
 
-An issue filed from no Spec gets none of this: the coder's and the
-reviewers' prompts are byte for byte as before.
+An issue filed from no Spec gets none of this: the coder's, the
+reviewers' and QA's prompts are byte for byte as before, and QA's report
+is read as before, with no `Criteria:` part.

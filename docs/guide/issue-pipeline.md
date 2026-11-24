@@ -740,10 +740,14 @@ Floor without a QA Agent skips the stage: approval moves the issue on to
    (`qaPrompt`) that asks it to run the Floor's test command, add tests
    where the change has none (committing them, never changing the code
    under test), and exercise a web UI with Playwright when the repository
-   has one. The issue and the Handoff are quoted, as for the coder.
+   has one. The issue and the Handoff are quoted, as for the coder. For
+   an issue filed from a Spec, it also proves each of the issue's
+   Acceptance Criteria with a test of its own, property-based where a
+   property fits ([how](guidelines-specs-and-hooks.md#what-agents-get-of-a-spec)).
 2. **Its report.** It ends with a `<qa-report>` block: `Result: pass` or
    `fail`, a summary, and for a failure the steps that reproduce it
-   (`parseQaReport`). A run without a valid one is asked for it once
+   (`parseQaReport`); for an issue filed from a Spec, every criterion's
+   id with pass or fail, where one failed or left out fails the round. A run without a valid one is asked for it once
    more, as a reviewer's answer that is not a verdict is: one model call
    through the AI Gateway with the Agent's own Gateway Key, quoting its
    last message and asking for the block alone, in its form (`askAgain`).
