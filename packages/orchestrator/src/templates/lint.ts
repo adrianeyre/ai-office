@@ -63,9 +63,18 @@ export const readGlossary = async (
  * Words the glossary avoids for one of its terms that a template's
  * instructions need in another sense: an Agent runs a check; a Floor has a
  * setup and a check command; QA ends with its report, as its Stage's
- * prompt names it; and a title's length is counted in characters.
+ * prompt names it; a title's length is counted in characters; and a
+ * linter, a style guide or a data test has rules. "Check" and "rule" are
+ * avoided only as names for an Acceptance Criterion and a Guideline.
  */
-const everydayWords = new Set(["run", "command", "report", "character"]);
+const everydayWords = new Set([
+  "run",
+  "command",
+  "report",
+  "character",
+  "check",
+  "rule",
+]);
 
 /**
  * Glossary terms whose lowercase form is an everyday word too (to notice
