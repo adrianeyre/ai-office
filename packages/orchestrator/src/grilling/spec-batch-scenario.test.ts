@@ -446,6 +446,16 @@ const cases: Case[] = [
           specSessionId: 1,
         }),
       ]);
+      // The filing shows on the bus as the Spec's, for a Hook to watch.
+      expect(
+        s.published.filter(({ type }) => type === "batch.planned"),
+      ).toEqual([
+        expect.objectContaining({
+          batchId: batch.id,
+          planVersion: 1,
+          specSessionId: 1,
+        }),
+      ]);
       // Work started on the first and the third; the second waits.
       expect(
         s.published
@@ -508,6 +518,10 @@ const cases: Case[] = [
       expect(s.published.map(({ type }) => type)).not.toContain(
         "batch.approved",
       );
+      // Still a Spec's issues filed, approved or not.
+      expect(
+        s.published.filter(({ type }) => type === "batch.planned"),
+      ).toEqual([expect.objectContaining({ specSessionId: 1 })]);
       expect(s.published.map(({ type }) => type)).not.toContain(
         "batch.started",
       );

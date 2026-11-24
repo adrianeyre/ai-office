@@ -2113,6 +2113,9 @@ export function createBatches(options: BatchesOptions): Batches {
       agentId: manager.id,
       draftedBy: plan.draftedBy,
       issues: plan.items.map(({ issue }) => issue),
+      // A Spec's issues filed (Guidelines, Specs and Hooks PRD, FR-115),
+      // which a Hook may watch (FR-118), approved already or not.
+      ...(spec === undefined ? {} : { specSessionId: spec.sessionId }),
     });
     // The chat request is the Plan's approval, recorded as the Owner's
     // (ADR 0012), as the whiteboard's is.
