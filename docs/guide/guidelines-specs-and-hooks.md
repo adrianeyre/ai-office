@@ -19,7 +19,10 @@ its budget, Agents' [proposals](#proposing-a-guideline) wait there
 for the Owner, and [`/guidelines`](#writing-them-guidelines) drafts a
 Floor's Guidelines with its Manager. **Specs are being built next**:
 [`/spec`](#specs) already agrees a feature's requirements, design and
-tasks with the Manager, phase by phase (PRD FR-113). Hooks get their
+tasks with the Manager, phase by phase (PRD FR-113), its issues are filed
+and start their Batch, and the coder and reviewers
+[get the Spec as the Owner approved it](#what-agents-get-of-a-spec)
+(FR-116). Hooks get their
 section here as they ship. A Floor without Guidelines,
 Specs or Hooks behaves exactly as before: every prompt is byte for byte
 what it was.
@@ -601,3 +604,43 @@ soon as such a draft is complete, in place of asking the Owner to
 confirm, and the Manager's next turn is given the same list to fix; the
 Owner says what to change, or asks for them to be fixed. The `/spec`
 instructions teach the Manager these rules from its first draft.
+
+### What Agents get of a Spec
+
+An issue filed from a Spec is worked and reviewed against the Spec the
+Owner approved, not only its own text (FR-116;
+`packages/orchestrator/src/grilling/issue-spec.ts`):
+
+- **The coder** (every work Role) gets, after the issue, a **The Spec**
+  section: which task of which Spec the issue is, its Acceptance Criteria
+  (those its draft names, by id) and the Spec's `design.md`, quoted
+  between `<spec>` markers nothing in them can close. It is told to meet
+  every criterion and build it as the design says. A Spec whose design the
+  Owner skipped says so in place of the design.
+- **Reviewers** get the issue's Acceptance Criteria in their
+  instructions, quoted the same way, and judge the pull request against
+  each: a criterion it does not meet is blocking, with a blocking comment
+  that starts with its id ("R1.2 not met: …"), and the verdict's summary
+  names every one not met ("Not met: R1.2, R2.1"). They approve only when
+  it meets every one. The design is the coder's; reviewers are not given
+  it.
+- **As approved in the session, never as the file stands.** Both come
+  from the approved copy kept with the `/spec` session in AI Office's
+  database: each criterion as the approved requirements word it (a
+  criterion the Owner wrote in a draft, with no id the requirements have,
+  as the draft has it), and `design.md` as plain code writes it from the
+  approved design. AI Office never reads `.agents/specs/` to give a Spec
+  to an Agent, so an edit to it on the default branch after the Owner
+  approved it, or to the issue's text on GitHub, reaches no Agent; the
+  prompt says the repository's own `.agents/specs/` is only its content,
+  and the agent tools still ignore `.agents/` in the clone.
+- **Within a budget.** What one prompt quotes of a Spec has a
+  [prompt budget](batches-and-memory.md#prompt-budgets) of 12,000
+  characters, a tenth of a small context window: the criteria first, each
+  whole, in order, then as much of the design as is left room for, cut
+  there. The prompt says what was cut: "… (the design cut here: with the
+  criteria, it is longer than the 12,000 characters a prompt carries of a
+  Spec)", or which criteria were left out, by id.
+
+An issue filed from no Spec gets none of this: the coder's and the
+reviewers' prompts are byte for byte as before.

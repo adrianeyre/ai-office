@@ -575,8 +575,9 @@ full Role memory `409 role_memory_full`.
 ## Prompt budgets
 
 Prompts quote the repository's memory, the office-wide memory, the
-Role's memory and the Owner's [Guidelines](guidelines-specs-and-hooks.md),
-and agent tools list the Floor's Skills. On a Model with a
+Role's memory, the Owner's [Guidelines](guidelines-specs-and-hooks.md)
+and the [Spec](guidelines-specs-and-hooks.md#what-agents-get-of-a-spec) an
+issue was filed from, and agent tools list the Floor's Skills. On a Model with a
 32K or 64K context window these could crowd out the issue and the diff,
 so each has a **prompt budget**, in characters (`@ai-office/orchestrator`'s
 `promptBudgetFor`):
@@ -588,9 +589,11 @@ so each has a **prompt budget**, in characters (`@ai-office/orchestrator`'s
 | Role memory        | 12,000  | its newest entries that fit (each entry's text counts)        |
 | Skills listing     | 40,000  | the first Skills that fit (each one's name and description)   |
 | Guidelines         | 12,000  | `always` ones first, then `manual`, then `fileMatch`, each whole, the largest left out first ([how](guidelines-specs-and-hooks.md#how-they-reach-agents)) |
+| A Spec             | 12,000  | the issue's Acceptance Criteria first, each whole, in order; then the design, cut there ([how](guidelines-specs-and-hooks.md#what-agents-get-of-a-spec)) |
 
-The Guidelines' budget is AI Office's, not one of the Owner's settings:
-as long as one Guideline may be, so one always fits.
+The Guidelines' and the Spec's budgets are AI Office's, not the Owner's
+settings: the Guidelines' as long as one Guideline may be, so one always
+fits.
 
 - **The defaults change nothing.** They hold all of each memory AI Office
   keeps (12,000 characters of office-wide memory, 40 Role memory entries
@@ -600,12 +603,12 @@ as long as one Guideline may be, so one always fits.
 - **A small window lowers them.** When an Agent's Model's effective
   context window is known (the catalogue's, or the **Context window** set
   on an AI Account: see [the AI Gateway](ai-gateway.md#context-windows)),
-  each memory gets at most a twentieth of it and the Skills and the
-  Guidelines a tenth, at 3.5 characters a token. A 32,768-token window
-  carries 5,734 characters of each memory and 11,468 of Skills and of
-  Guidelines; from about 69,000 tokens (memory), 35,000 (Guidelines) and
-  115,000 (Skills) up, the budgets are the Owner's (and 12,000 for
-  Guidelines).
+  each memory gets at most a twentieth of it and the Skills, the
+  Guidelines and a Spec a tenth, at 3.5 characters a token. A 32,768-token
+  window carries 5,734 characters of each memory and 11,468 of Skills, of
+  Guidelines and of a Spec; from about 69,000 tokens (memory), 35,000
+  (Guidelines, a Spec) and 115,000 (Skills) up, the budgets are the
+  Owner's (and 12,000 for Guidelines and for a Spec).
 - **Truncated, and said so.** A memory over its budget is cut, and its
   quote (or `OFFICE.md`) ends "… (the office-wide memory cut here: it is
   longer than the 5,734 characters a prompt carries)"; the Role's oldest
