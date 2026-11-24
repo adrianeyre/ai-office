@@ -15,6 +15,8 @@ import type {
   IssueComment,
   IssueVersion,
   LabelEvent,
+  MergedPullRequest,
+  MergeMethod,
   PullRequest,
   PullRequestFile,
   Repository,
@@ -50,6 +52,22 @@ export interface FakeTokenScope {
   /** What it may do; all the App may do if absent. */
   readonly permissions?: TokenPermissions;
   readonly expiresAt: Date;
+}
+
+/**
+ * A change to a branch, as GitHub's record of a repository's activity
+ * keeps it: who moved the branch from `before` to `after`, and how.
+ */
+export interface FakeActivity {
+  readonly id: number;
+  readonly branch: string;
+  /** The branch's commit before; forty zeros for a branch made by it. */
+  readonly before: string;
+  readonly after: string;
+  /** The login of whoever pushed or merged. */
+  readonly actor: string;
+  readonly type: "push" | "pr_merge";
+  readonly at: string;
 }
 
 export interface FakeLabel {
@@ -128,7 +146,9 @@ export interface FakeGitHub extends GitHubApp {
    * `files` are what it changes: each path's new text, or null to remove
    * it; every other file is as it was on the branch. Its parent is the
    * branch's head; its message, author (the repository's owner, as AI
-   * Office authors commits, ADR 0002) and time may be given.
+   * Office authors commits, ADR 0002) and time may be given. GitHub
+   * records who pushed it (`pusher`, the repository's owner unless it
+   * says), whatever the commit's author.
    */
   pushCommit(
     fullName: string,
@@ -139,6 +159,31 @@ export interface FakeGitHub extends GitHubApp {
       readonly message?: string;
       readonly author?: string;
       readonly authoredAt?: Date;
+      readonly pusher?: string;
+    },
+  ): string;
+  /**
+   * Someone (the repository's owner unless `pusher` says) pushes `branch`
+   * to a commit the repository has, such as another branch's head: one
+   * push of every commit it brings, as `git push origin topic:main` makes.
+   */
+  pushBranch(
+    fullName: string,
+    branch: string,
+    sha: string,
+    options?: { readonly pusher?: string },
+  ): void;
+  /**
+   * Someone (the repository's owner unless `actor` says) merges a pull
+   * request on GitHub, by `method` (`merge` unless it says). Returns the
+   * merge commit's sha.
+   */
+  mergePullRequest(
+    fullName: string,
+    pullRequest: number,
+    options?: {
+      readonly actor?: string;
+      readonly method?: MergeMethod;
     },
   ): string;
   /** The inline comments of a pull request's reviews, oldest first. */
@@ -189,6 +234,13 @@ export interface FakeGitHub extends GitHubApp {
    * one of `head`'s own commits, oldest first.
    */
   compare(fullName: string, base: string, head: string): BranchComparison;
+  /**
+   * GitHub's record of who moved `fullName`'s branches, and how: newest
+   * first, as GitHub lists a repository's activity.
+   */
+  activity(fullName: string): FakeActivity[];
+  /** Who merged a pull request, as GitHub records it; null until merged. */
+  mergerOf(fullName: string, pullRequest: number): string | null;
   /** What an installation was granted: a token minted with none has these. */
   installationPermissions(installationId: number): TokenPermissions;
   /** The repositories an installation covers. */
@@ -217,6 +269,10 @@ interface PullState {
   readonly base: string;
   readonly draft: boolean;
   merged: boolean;
+  /** Who merged it, as GitHub records it; null until merged. */
+  mergedBy: string | null;
+  /** The commits its merge brought into its base, the merge's own too. */
+  brought: ReadonlySet<string>;
   readonly reviews: (Review & { readonly comments: ReviewComment[] })[];
 }
 
@@ -259,6 +315,13 @@ interface RepositoryState {
   readonly checkRuns: CheckRun[];
   /** Each protected branch's required checks, by branch. */
   readonly requiredChecks: Map<string, readonly string[]>;
+  /**
+   * Who moved each branch, and how, oldest first, with the commits each
+   * change brought to it.
+   */
+  readonly activity: (FakeActivity & {
+    readonly brought: ReadonlySet<string>;
+  })[];
   nextNumber: number;
 }
 
@@ -605,6 +668,100 @@ export function createFakeGitHub(options: FakeGitHubOptions = {}): FakeGitHub {
       base: pull.base,
       htmlUrl: htmlUrl(state, `pull/${String(issue.number)}`),
     };
+  };
+
+  /** No commit: the `before` of a push that made its branch. */
+  const noCommit = "0".repeat(40);
+
+  /** Records who moved `branch` from `before` to `after`, and how. */
+  const recordActivity = (
+    state: RepositoryState,
+    change: Omit<FakeActivity, "id" | "at">,
+  ): void => {
+    // A push that makes its branch is known to bring only its own commit,
+    // as nothing says where the branch split off.
+    const before =
+      change.before === noCommit ? undefined : ancestry(state, change.before);
+    state.activity.push({
+      ...change,
+      id: id(),
+      at: stamp(),
+      brought: new Set(
+        before === undefined
+          ? [change.after]
+          : [...ancestry(state, change.after)].filter(
+              (sha) => !before.has(sha),
+            ),
+      ),
+    });
+  };
+
+  /**
+   * Merges a pull request, as `actor`: GitHub's merge, by the App or by
+   * someone on GitHub. Returns the merge commit's sha.
+   */
+  const merge = (
+    repo: RepositoryState,
+    pullRequest: number,
+    options: {
+      readonly method: MergeMethod;
+      readonly sha?: string;
+      readonly title?: string;
+      readonly actor: string;
+    },
+  ): string => {
+    const { method, sha, title, actor } = options;
+    const issue = pullOf(repo, pullRequest);
+    const current = toPullRequest(repo, issue);
+    if (current.state !== "open") {
+      throw new GitHubError(405, "Pull Request is not mergeable");
+    }
+    if (sha !== undefined && sha !== current.head.sha) {
+      throw new GitHubError(
+        409,
+        "Head branch was modified. Review and try the merge again.",
+      );
+    }
+    const merged = newSha();
+    const baseSha = resolveRef(repo, current.base);
+    addCommit(
+      repo,
+      merged,
+      {
+        // A squash or a rebase leaves one parent; a merge, two.
+        parents: method === "merge" ? [baseSha, current.head.sha] : [baseSha],
+        message:
+          title ??
+          `Merge pull request #${String(pullRequest)} from ${current.head.name}`,
+        author: repo.repository.owner,
+        authoredAt: stamp(),
+      },
+      treeOf(repo, current.head.sha),
+    );
+    repo.branches.set(current.base, merged);
+    const onBase = ancestry(repo, baseSha);
+    issue.pull.merged = true;
+    issue.pull.mergedBy = actor;
+    issue.pull.brought = new Set(
+      [...ancestry(repo, merged)].filter((each) => !onBase.has(each)),
+    );
+    issue.state = "closed";
+    recordActivity(repo, {
+      branch: current.base,
+      before: baseSha,
+      after: merged,
+      actor,
+      type: "pr_merge",
+    });
+    if (current.base === repo.repository.defaultBranch) {
+      for (const number of closingReferences(issue.body)) {
+        const referenced = repo.issues.get(number);
+        if (referenced !== undefined && referenced.pull === undefined) {
+          referenced.state = "closed";
+        }
+      }
+    }
+    return merged;
   };
 
   const openIssue = (
@@ -962,6 +1119,8 @@ export function createFakeGitHub(options: FakeGitHubOptions = {}): FakeGitHub {
               base,
               draft: draft ?? false,
               merged: false,
+              mergedBy: null,
+              brought: new Set(),
               reviews: [],
             },
           });
@@ -1104,49 +1263,73 @@ export function createFakeGitHub(options: FakeGitHubOptions = {}): FakeGitHub {
         ),
 
       mergePullRequest: (pullRequest, { method, sha, title }) =>
+        run(() => ({
+          sha: merge(state(), pullRequest, {
+            method,
+            ...(sha === undefined ? {} : { sha }),
+            ...(title === undefined ? {} : { title }),
+            actor: botLogin,
+          }),
+        })),
+
+      lastCommitChanging: (path, ref) =>
         run(() => {
           const repo = state();
-          const issue = pullOf(repo, pullRequest);
-          const current = toPullRequest(repo, issue);
-          if (current.state !== "open") {
-            throw new GitHubError(405, "Pull Request is not mergeable");
-          }
-          if (sha !== undefined && sha !== current.head.sha) {
-            throw new GitHubError(
-              409,
-              "Head branch was modified. Review and try the merge again.",
-            );
-          }
-          const merge = newSha();
-          const baseSha = resolveRef(repo, current.base);
-          addCommit(
-            repo,
-            merge,
-            {
-              // A squash or a rebase leaves one parent; a merge, two.
-              parents:
-                method === "merge" ? [baseSha, current.head.sha] : [baseSha],
-              message:
-                title ??
-                `Merge pull request #${String(pullRequest)} from ${current.head.name}`,
-              author: repo.repository.owner,
-              authoredAt: stamp(),
-            },
-            treeOf(repo, current.head.sha),
-          );
-          repo.branches.set(current.base, merge);
-          issue.pull.merged = true;
-          issue.state = "closed";
-          if (current.base === repo.repository.defaultBranch) {
-            for (const number of closingReferences(issue.body)) {
-              const referenced = repo.issues.get(number);
-              if (referenced !== undefined && referenced.pull === undefined) {
-                referenced.state = "closed";
-              }
+          const at = (sha: string): string | undefined =>
+            repo.trees.get(sha)?.get(path);
+          // As `git log -1 -- <path>` simplifies history: from a commit
+          // whose file is as one of its parents', go on from that parent.
+          let sha = commitOf(repo, ref);
+          for (;;) {
+            const here = at(sha);
+            const parents = repo.history.get(sha)?.parents ?? [];
+            if (parents.length === 0) {
+              return here === undefined ? undefined : toCommit(repo, sha);
             }
+            const same = parents.find((parent) => at(parent) === here);
+            if (same === undefined) {
+              return toCommit(repo, sha);
+            }
+            sha = same;
           }
-          return { sha: merge };
         }),
+
+      mergedPullRequestOf: (sha) =>
+        run((): MergedPullRequest | undefined => {
+          const repo = state();
+          if (!repo.commits.has(sha)) {
+            throw unprocessable(`No commit found for SHA: ${sha}`);
+          }
+          const issue = [...repo.issues.values()]
+            .sort((a, b) => a.number - b.number)
+            .find(
+              ({ pull }) =>
+                pull?.merged === true &&
+                pull.base === repo.repository.defaultBranch &&
+                pull.brought.has(sha),
+            );
+          return issue?.pull === undefined
+            ? undefined
+            : {
+                number: issue.number,
+                base: issue.pull.base,
+                mergedBy: issue.pull.mergedBy,
+                htmlUrl: htmlUrl(repo, `pull/${String(issue.number)}`),
+              };
+        }),
+
+      pusherOf: (sha, branch) =>
+        run(
+          () =>
+            state()
+              .activity.filter(
+                (change) =>
+                  change.type === "push" &&
+                  change.branch === branch &&
+                  change.brought.has(sha),
+              )
+              .at(-1)?.actor,
+        ),
 
       listCheckRuns: (ref) =>
         run(() => {
@@ -1219,6 +1402,7 @@ export function createFakeGitHub(options: FakeGitHubOptions = {}): FakeGitHub {
         issues: new Map(),
         checkRuns: [],
         requiredChecks: new Map(),
+        activity: [],
         nextNumber: 1,
       };
       addCommit(
@@ -1304,12 +1488,12 @@ export function createFakeGitHub(options: FakeGitHubOptions = {}): FakeGitHub {
     pushCommit(
       fullName,
       branch,
-      { sha = newSha(), files = {}, message, author, authoredAt } = {},
+      { sha = newSha(), files = {}, message, author, authoredAt, pusher } = {},
     ) {
       const state = stateOf(fullName);
+      const previous = state.branches.get(branch);
       const parent =
-        state.branches.get(branch) ??
-        state.branches.get(state.repository.defaultBranch);
+        previous ?? state.branches.get(state.repository.defaultBranch);
       const tree = new Map(
         parent === undefined ? [] : (state.trees.get(parent) ?? []),
       );
@@ -1332,7 +1516,38 @@ export function createFakeGitHub(options: FakeGitHubOptions = {}): FakeGitHub {
         tree,
       );
       state.branches.set(branch, sha);
+      recordActivity(state, {
+        branch,
+        before: previous ?? noCommit,
+        after: sha,
+        actor: pusher ?? state.repository.owner,
+        type: "push",
+      });
       return sha;
+    },
+
+    pushBranch(fullName, branch, sha, { pusher } = {}) {
+      const state = stateOf(fullName);
+      if (!state.commits.has(sha)) {
+        throw unprocessable(`No commit found for SHA: ${sha}`);
+      }
+      const previous = state.branches.get(branch);
+      state.branches.set(branch, sha);
+      recordActivity(state, {
+        branch,
+        before: previous ?? noCommit,
+        after: sha,
+        actor: pusher ?? state.repository.owner,
+        type: "push",
+      });
+    },
+
+    mergePullRequest(fullName, pullRequest, { actor, method = "merge" } = {}) {
+      const state = stateOf(fullName);
+      return merge(state, pullRequest, {
+        method,
+        actor: actor ?? state.repository.owner,
+      });
     },
 
     reviewComments(fullName, pullRequest) {
@@ -1372,6 +1587,26 @@ export function createFakeGitHub(options: FakeGitHubOptions = {}): FakeGitHub {
 
     compare(fullName, base, head) {
       return compare(stateOf(fullName), base, head);
+    },
+
+    activity(fullName) {
+      return stateOf(fullName)
+        .activity.map(
+          ({ id, branch, before, after, actor, type, at }): FakeActivity => ({
+            id,
+            branch,
+            before,
+            after,
+            actor,
+            type,
+            at,
+          }),
+        )
+        .reverse();
+    },
+
+    mergerOf(fullName, pullRequest) {
+      return pullOf(stateOf(fullName), pullRequest).pull.mergedBy;
     },
 
     installationPermissions: grantedTo,

@@ -1,6 +1,6 @@
 import { Octokit } from "@octokit/rest";
 
-import { GitHubError } from "./errors.ts";
+import { GitHubError, isGitHubError } from "./errors.ts";
 import { appJwt } from "./jwt.ts";
 import { createTokenCache } from "./tokens.ts";
 import type {
@@ -55,6 +55,8 @@ export interface GitHubAppOptions {
 export const defaultGitHubApiUrl = "https://api.github.com";
 
 const perPage = 100;
+/** The most pushes `pusherOf` compares to find a commit among several. */
+const maxComparedPushes = 20;
 
 /** Turns whatever Octokit threw into a `GitHubError` (without credentials). */
 const toGitHubError = (error: unknown): GitHubError => {
@@ -797,6 +799,90 @@ function connection(octokit: OctokitFor, credentials: Credentials): GitHubApp {
           mergeBase: toCommit(data.merge_base_commit),
           commits: commits.map(toCommit),
         };
+      },
+
+      lastCommitChanging: async (path, ref) => {
+        const { data } = await call(() =>
+          rest.repos.listCommits({ owner, repo, sha: ref, path, per_page: 1 }),
+        );
+        const [commit] = data;
+        return commit === undefined ? undefined : toCommit(commit);
+      },
+      mergedPullRequestOf: async (sha) => {
+        const { data } = await call(() =>
+          rest.repos.listPullRequestsAssociatedWithCommit({
+            owner,
+            repo,
+            commit_sha: sha,
+            per_page: perPage,
+          }),
+        );
+        // For a commit on the default branch, GitHub lists the merged pull
+        // request that brought it there; the list leaves out who merged.
+        const [merged] = data
+          .filter(({ merged_at }) => merged_at !== null)
+          .sort((a, b) => a.number - b.number);
+        if (merged === undefined) {
+          return undefined;
+        }
+        const pull = (
+          await call(() =>
+            rest.pulls.get({ owner, repo, pull_number: merged.number }),
+          )
+        ).data;
+        return {
+          number: pull.number,
+          base: pull.base.ref,
+          mergedBy: pull.merged_by?.login ?? null,
+          htmlUrl: pull.html_url,
+        };
+      },
+      pusherOf: async (sha, branch) => {
+        // The branch's newest pushes, newest first.
+        const pushes = (
+          await call(() =>
+            rest.repos.listActivities({
+              owner,
+              repo,
+              ref: `refs/heads/${branch}`,
+              per_page: perPage,
+            }),
+          )
+        ).data.filter(
+          ({ activity_type }) =>
+            activity_type === "push" || activity_type === "force_push",
+        );
+        const exact = pushes.find(({ after }) => after === sha);
+        if (exact !== undefined) {
+          return exact.actor?.login;
+        }
+        // A push of several commits: the one whose commits include it.
+        // Only so many are compared; one that made the branch says nothing
+        // of where it split off.
+        for (const push of pushes.slice(0, maxComparedPushes)) {
+          if (/^0+$/.test(push.before)) {
+            continue;
+          }
+          try {
+            const { data } = await call(() =>
+              rest.repos.compareCommitsWithBasehead({
+                owner,
+                repo,
+                basehead: `${push.before}...${push.after}`,
+                per_page: maxComparedCommits,
+              }),
+            );
+            if (data.commits.some((commit) => commit.sha === sha)) {
+              return push.actor?.login;
+            }
+          } catch (error) {
+            // A force push's old commit GitHub no longer has.
+            if (!isGitHubError(error, 404)) {
+              throw error;
+            }
+          }
+        }
+        return undefined;
       },
 
       createPullRequest: async ({ title, body, head, base, draft }) =>
