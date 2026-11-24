@@ -30,6 +30,7 @@ describe("officeEventSchema", () => {
         "grilling",
         "guideline",
         "handoff",
+        "hook",
         "issue",
         "manager",
         "memory",

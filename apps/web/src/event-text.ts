@@ -4,6 +4,8 @@ import {
   connectionTypeNames,
   contextUsageText,
   dayName,
+  hookFailuresToTurnOff,
+  hookTriggerText,
   issuePriorityLabels,
   reviewVerdictLabels,
   roleName,
@@ -14,6 +16,17 @@ import {
 
 // How events read to the Owner: in the Activity Feed (PRD FR-52) and an
 // Agent's live view. Text only; links are `sourceLinks`.
+
+/** What a Hook's run was for: " on PR #14", " on #4", or nothing. */
+const hookSubject = (event: {
+  readonly issue?: number | undefined;
+  readonly pullRequest?: number | undefined;
+}): string =>
+  event.pullRequest !== undefined
+    ? ` on PR #${String(event.pullRequest)}`
+    : event.issue !== undefined
+      ? ` on #${String(event.issue)}`
+      : "";
 
 /** Each event type, as a short label. */
 export const eventTypeLabels: Record<EventType, string> = {
@@ -57,6 +70,12 @@ export const eventTypeLabels: Record<EventType, string> = {
   "guideline.dismissed": "Guideline change dismissed",
   "guideline.proposed": "Guideline proposed",
   "guideline.over_budget": "Guidelines over budget",
+  "hook.added": "Hook added",
+  "hook.changed": "Hook changed",
+  "hook.removed": "Hook deleted",
+  "hook.run_started": "Hook run started",
+  "hook.run_finished": "Hook run finished",
+  "hook.run_skipped": "Hook run skipped",
   "sandbox.started": "Sandbox started",
   "sandbox.stopped": "Sandbox stopped",
   "sandbox.text": "Agent output",
@@ -193,6 +212,17 @@ export const eventTypeGroups: readonly {
       "guideline.dismissed",
       "guideline.proposed",
       "guideline.over_budget",
+    ],
+  },
+  {
+    label: "Hooks",
+    types: [
+      "hook.added",
+      "hook.changed",
+      "hook.removed",
+      "hook.run_started",
+      "hook.run_finished",
+      "hook.run_skipped",
     ],
   },
   {
@@ -479,6 +509,10 @@ export function describeEvent(
           : `replanned the Owner's edits to version ${String(event.editedFrom)} as`
       } version ${String(event.planVersion)} of Batch ${String(event.batchId)}'s Plan${
         event.draftedBy === "rules" ? ", by AI Office's rules" : ""
+      }${
+        event.specSessionId === undefined
+          ? ""
+          : `, for the issues filed from the Spec of Grilling Session ${String(event.specSessionId)}`
       }: ${issueList(event.issues)}.`;
     case "batch.approved":
       return event.specSessionId !== undefined
@@ -617,6 +651,55 @@ export function describeEvent(
         event.issue === undefined ? "" : ` of #${String(event.issue)}`
       } left out Guideline${event.leftOut.length === 1 ? "" : "s"} ${list}: the Guidelines it was to follow have ${event.characters.toLocaleString("en-GB")} characters, over the ${event.budget.toLocaleString("en-GB")} a prompt carries.`;
     }
+    case "hook.added":
+      return `The Owner added the Hook "${event.name}": ${hookTriggerText({
+        trigger: event.trigger,
+        stage: null,
+        labels: [],
+        filePatterns: [],
+      })}.`;
+    case "hook.changed":
+      return event.by === "failures"
+        ? `The Hook "${event.name}" turned itself off after ${String(hookFailuresToTurnOff)} failed runs in a row: the Owner can turn it on again in the Floor admin.`
+        : `The Owner changed the Hook "${event.name}" (${event.fields.join(", ")})${
+            event.fields.includes("enabled")
+              ? event.enabled
+                ? ": it is on"
+                : ": it is off"
+              : ""
+          }.`;
+    case "hook.removed":
+      return `The Owner deleted the Hook "${event.name}".`;
+    case "hook.run_started":
+      return `${
+        event.agentId === undefined ? "No Agent" : agent(event.agentId)
+      } started running /${event.skillName} for the Hook "${event.name}"${hookSubject(event)}.`;
+    case "hook.run_finished":
+      return event.outcome === "succeeded"
+        ? `${
+            event.agentId === undefined ? "The" : `${agent(event.agentId)}'s`
+          } run of the Hook "${event.name}"${hookSubject(event)} finished${
+            event.url === undefined
+              ? ""
+              : ", and its answer is posted on GitHub"
+          }.`
+        : `${
+            event.agentId === undefined ? "A" : `${agent(event.agentId)}'s`
+          } run of the Hook "${event.name}"${hookSubject(event)} failed${
+            event.error === undefined
+              ? ""
+              : `: ${event.error.replace(/[.!?]+$/, "")}`
+          }${
+            event.turnedOff
+              ? `. That is ${String(event.failures)} in a row, so the Hook is off now.`
+              : "."
+          }`;
+    case "hook.run_skipped":
+      return `The Hook "${event.name}" did not run${hookSubject(event)}: ${
+        event.reason === "rate_limited"
+          ? "it has made all the runs it may this hour"
+          : "a run of it is going on the same issue or pull request"
+      }.`;
     case "sandbox.started":
       return `${agent(event.agentId)} started a sandbox for #${String(event.issue)} on ${event.branch}.`;
     case "sandbox.stopped":

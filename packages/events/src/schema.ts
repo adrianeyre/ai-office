@@ -34,6 +34,8 @@ import {
   guidelineApprovals,
   guidelineNamePattern,
   guidelineTasks,
+  hookSkipReasons,
+  hookTriggers,
   contractorKinds,
   daySchema,
   statusUpdateTriggers,
@@ -299,6 +301,11 @@ const batchPlanned = event("batch.planned", {
   issues: batchIssues,
   /** The version the Owner edited on the whiteboard, which this replans. */
   editedFrom: z.number().int().positive().optional(),
+  /**
+   * The `/spec` Grilling Session whose issues the Batch was made for, as
+   * they were filed (FR-115); absent for any other Batch, and on replans.
+   */
+  specSessionId: z.number().int().positive().optional(),
 });
 // The Owner approves a Batch's Plan on the whiteboard (FR-25.3), or by
 // asking for its work in the Manager chat (ADR 0004, ADR 0012), or by
@@ -495,6 +502,78 @@ const guidelineOverBudget = event("guideline.over_budget", {
   characters: count,
   /** The Guidelines left out, largest first. */
   leftOut: z.array(guidelineName).min(1),
+});
+// Hooks (Guidelines, Specs and Hooks PRD, FR-118 to FR-121; ADR 0016): the
+// Owner's own rules on a Floor, each having an Agent run a Skill when a
+// chosen event happens. Every change and every run is an event; each
+// names the Hook by its id and its name as it was then, never what its
+// Skill or the Agent's answer said.
+const hookId = z.number().int().positive();
+const hookName = z.string().min(1).max(60);
+const hookRunShape = {
+  floorId,
+  hookId,
+  name: hookName,
+  trigger: z.enum(hookTriggers),
+  /** The issue the event was about, if one. */
+  issue: issue.optional(),
+  /** The pull request the event was about, if one. */
+  pullRequest: issue.optional(),
+};
+/** The Owner added a Hook in the Floor admin, or by importing configuration. */
+const hookAdded = event("hook.added", {
+  floorId,
+  hookId,
+  name: hookName,
+  trigger: z.enum(hookTriggers),
+});
+/**
+ * A Hook changed: by the Owner, or turned off by its own failed runs
+ * (`failures`, FR-120). `enabled` is whether it is on now.
+ */
+const hookChanged = event("hook.changed", {
+  floorId,
+  hookId,
+  name: hookName,
+  /** Which of its fields changed, such as `enabled` or `filePatterns`. */
+  fields: z.array(z.string().min(1).max(40)).min(1).max(20),
+  by: z.enum(["owner", "failures"]),
+  enabled: z.boolean(),
+});
+const hookRemoved = event("hook.removed", { floorId, hookId, name: hookName });
+/** An Agent started a Hook's run: the Skill it follows. */
+const hookRunStarted = event("hook.run_started", {
+  ...hookRunShape,
+  runId: z.number().int().positive(),
+  /** The Agent running it; absent when none could be found to. */
+  agentId: agentId.optional(),
+  skillName: z.string().min(1).max(64),
+});
+/**
+ * A Hook's run ended. A failed one raises an info Notice; the
+ * `hookFailuresToTurnOff`th in a row turns the Hook off (`turnedOff`).
+ */
+const hookRunFinished = event("hook.run_finished", {
+  ...hookRunShape,
+  runId: z.number().int().positive(),
+  agentId: agentId.optional(),
+  outcome: z.enum(["succeeded", "failed"]),
+  /** Why it failed, for a failed run. */
+  error: z.string().min(1).max(500).optional(),
+  /** Its failed runs in a row, this one included; 0 after a success. */
+  failures: count,
+  turnedOff: z.boolean(),
+  /** The comment the GitHub App posted its answer as, if one. */
+  url: z.url().optional(),
+});
+/**
+ * An event matched a Hook that did not run for it (FR-120): it had made
+ * its runs for the hour, or a run of it was going on the same issue or
+ * pull request.
+ */
+const hookRunSkipped = event("hook.run_skipped", {
+  ...hookRunShape,
+  reason: z.enum(hookSkipReasons),
 });
 // Office-wide and Role memory (PRD FR-54, FR-55, FR-56): the Owner edits
 // the office-wide memory; Agents propose Role memory in their Handoffs, the
@@ -1147,6 +1226,12 @@ export const officeEventSchema = z.discriminatedUnion("type", [
   guidelineDismissed,
   guidelineProposed,
   guidelineOverBudget,
+  hookAdded,
+  hookChanged,
+  hookRemoved,
+  hookRunStarted,
+  hookRunFinished,
+  hookRunSkipped,
   sandboxStarted,
   sandboxStopped,
   sandboxText,

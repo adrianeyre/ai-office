@@ -1028,6 +1028,137 @@ describe("event text", () => {
     );
   });
 
+  it("says what became of each Hook and each of its runs, and links the answer", () => {
+    const names = { agent: (id: string) => (id === "linus" ? "Linus" : id) };
+    const run = {
+      version: 1,
+      floorId: "web-shop",
+      hookId: 1,
+      name: "Migration check",
+      trigger: "pull_request_opened",
+      issue: 4,
+      pullRequest: 14,
+    } as const;
+    expect(
+      describeEvent(
+        {
+          type: "hook.added",
+          version: 1,
+          floorId: "web-shop",
+          hookId: 1,
+          name: "Migration check",
+          trigger: "pull_request_opened",
+        },
+        names,
+      ),
+    ).toBe(
+      'The Owner added the Hook "Migration check": A pull request is opened.',
+    );
+    expect(
+      describeEvent(
+        {
+          type: "hook.changed",
+          version: 1,
+          floorId: "web-shop",
+          hookId: 1,
+          name: "Migration check",
+          fields: ["enabled"],
+          by: "owner",
+          enabled: false,
+        },
+        names,
+      ),
+    ).toBe(
+      'The Owner changed the Hook "Migration check" (enabled): it is off.',
+    );
+    expect(
+      describeEvent(
+        {
+          type: "hook.changed",
+          version: 1,
+          floorId: "web-shop",
+          hookId: 1,
+          name: "Migration check",
+          fields: ["enabled"],
+          by: "failures",
+          enabled: false,
+        },
+        names,
+      ),
+    ).toBe(
+      'The Hook "Migration check" turned itself off after 3 failed runs in a row: the Owner can turn it on again in the Floor admin.',
+    );
+    expect(
+      describeEvent(
+        {
+          type: "hook.removed",
+          version: 1,
+          floorId: "web-shop",
+          hookId: 1,
+          name: "Migration check",
+        },
+        names,
+      ),
+    ).toBe('The Owner deleted the Hook "Migration check".');
+    expect(
+      describeEvent(
+        {
+          ...run,
+          type: "hook.run_started",
+          runId: 7,
+          agentId: "linus",
+          skillName: "migration-check",
+        },
+        names,
+      ),
+    ).toBe(
+      'Linus started running /migration-check for the Hook "Migration check" on PR #14.',
+    );
+    const finished: OfficeEvent = {
+      ...run,
+      type: "hook.run_finished",
+      runId: 7,
+      agentId: "linus",
+      outcome: "succeeded",
+      failures: 0,
+      turnedOff: false,
+      url: "https://github.com/adrianeyre/web-shop/pull/14#issuecomment-1",
+    };
+    expect(describeEvent(finished, names)).toBe(
+      'Linus\'s run of the Hook "Migration check" on PR #14 finished, and its answer is posted on GitHub.',
+    );
+    expect(sourceLinks(finished, [])).toContainEqual({
+      kind: "github",
+      href: "https://github.com/adrianeyre/web-shop/pull/14#issuecomment-1",
+      label: "Answer on GitHub",
+    });
+    expect(
+      describeEvent(
+        {
+          ...run,
+          type: "hook.run_finished",
+          runId: 9,
+          agentId: "linus",
+          outcome: "failed",
+          error: "Linus's daily Token Cap is reached.",
+          failures: 3,
+          turnedOff: true,
+        },
+        names,
+      ),
+    ).toBe(
+      "Linus's run of the Hook \"Migration check\" on PR #14 failed: Linus's daily Token Cap is reached. That is 3 in a row, so the Hook is off now.",
+    );
+    expect(
+      describeEvent(
+        { ...run, type: "hook.run_skipped", reason: "rate_limited" },
+        names,
+      ),
+    ).toBe(
+      'The Hook "Migration check" did not run on PR #14: it has made all the runs it may this hour.',
+    );
+  });
+
   it("says an Agent proposed a Guideline, new or changed, which waits for the Owner", () => {
     const proposed: OfficeEvent = {
       type: "guideline.proposed",
