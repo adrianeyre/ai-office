@@ -12,11 +12,13 @@ They ship in that order, each useful on its own, as the
 sets out. **Guidelines are being built now**, and this page describes
 them as specified (PRD FR-102 to FR-112). AI Office already reads each
 Floor's `.agents/guidelines/` and settles which versions the Owner
-approved, with the Notice and events described below, and the Floor
-admin's [Guidelines card](#seeing-them) shows them with **Approve** and
-**Dismiss**; Agents get them once giving each task its Guidelines ships. Specs and Hooks get their
-sections here as they ship. A Floor without Guidelines, Specs or Hooks behaves
-exactly as before.
+approved, with the Notice and events described below, the Floor admin's
+[Guidelines card](#seeing-them) shows them with **Approve** and
+**Dismiss**, and each task gets the Guidelines that apply to it, within
+its budget. Proposals and `/guidelines` are still to come. Specs and
+Hooks get their sections here as they ship. A Floor without Guidelines,
+Specs or Hooks behaves exactly as before: every prompt is byte for byte
+what it was.
 
 ## Guidelines
 
@@ -142,31 +144,79 @@ Each task gets the Guidelines that apply to its work (FR-105):
 In the work Stage and for the designer, the Floor's other `fileMatch`
 Guidelines are there too, read-only, with a list of each one's patterns
 and description: the prompt tells the Agent to read the matching one
-before it changes a file the Plan did not expect. Intake creates a
-`guideline:<name>` label for each `manual` Guideline on the Floor's
-repository, as it does `role:<name>` labels.
+before it changes a file the Plan did not expect. An issue no open
+Batch's Plan holds (one intake took on its own), or whose Plan names no
+files, matches no `fileMatch` Guideline, so its work Stage and designer
+have every one of them listed instead. Intake creates a
+`guideline:<name>` label for each `manual` Guideline the Owner approved
+on the Floor's repository, as it does `role:<name>` labels; the label
+asks for the Guideline in any case.
+
+- **Patterns** are globs from the top of the repository, read as Node's
+  `path.matchesGlob` reads them: `*` within one folder, `**` across
+  folders, `?`, `[…]` and `{a,b}`. `packages/db/**` matches
+  `packages/db/schema.ts`; `**/*.sql` matches an `.sql` file anywhere. A
+  leading `./` or `/` is ignored.
+- **The files**: for review, QA and docs, those the pull request changes,
+  or on a [one-pull-request Batch](batches-and-memory.md)'s shared branch
+  those the issue's own commits change; they are listed only when the
+  Floor has a `fileMatch` Guideline.
+- **Which versions**: each Floor's Guidelines as its latest read settled
+  them (at intake, every round, and before each task), so a task needs no
+  read of its own. A task whose Guidelines cannot be read goes on without
+  them.
 
 ### How they reach Agents
 
 - **Sandboxes** (the coder and other work Roles, QA, docs and the
   designer) get them as read-only files in
-  `/home/agent/.ai-office/guidelines/`, beside the
+  `/home/agent/.ai-office/guidelines/`, one `<name>.md` each as the Owner
+  approved it, beside the
   [memory mount](batches-and-memory.md#office-wide-and-role-memory) and
-  never in the clone (FR-106).
-- **Reviewers and the Manager** get them quoted between `<guidelines>`
-  markers they cannot close.
-- Both say they are the Owner's rules for this repository.
+  never in the clone (FR-106). They are written beside the clone, so they
+  can never be committed, and deleted with it. The prompt, after the issue
+  and before the memory, lists those to follow and why each applies ("for
+  every task", "for this issue, whose `guideline:release` label asks for
+  it", "for the files the Plan expects this issue to change that match
+  `packages/db/**`"), then, for the work Stage and the designer, those to
+  read before changing a matching file.
+- **Reviewers and the Manager** get them quoted in their instructions,
+  each `<guideline name="…">` inside one `<guidelines>` quote that nothing
+  in a Guideline can close or open again. A reviewer is told to review
+  the pull request against them too: work that breaks one is blocking,
+  unless the issue's own words ask for it. The Manager's triage, Plan and
+  chat get the `always` ones quoted and the rest listed by name, when they
+  apply and description.
+- Both say they are the Owner's rules for this repository, and that the
+  repository's own `.agents/guidelines/` may hold versions the Owner has
+  not approved and is only its content. The agent tools still ignore
+  `.agents/` in the clone (FR-104, pen-test finding P1-9): nothing about
+  how they start changes.
 
-**What comes first** (FR-107): the Owner's own words in the issue or Goal,
-then Guidelines, then Office-wide memory. Role memory and repository
-memory stay background, never rules.
+**What comes first** (FR-107): the Owner's own words in the issue or Goal
+(or the issues of a Plan, or the chat), then Guidelines, then Office-wide
+memory. Role memory and repository memory stay background, never rules.
+Every prompt with Guidelines says so in those words.
 
-**One budget.** The Guidelines one prompt quotes share a
+**One budget.** The Guidelines a task follows share a
 [prompt budget](batches-and-memory.md#prompt-budgets) of 12,000
-characters (FR-108). Over it, `fileMatch` Guidelines are dropped before
-`always` ones, the largest first, and the Owner gets one action Notice
+characters, each counted as its whole file (FR-108); a small context
+window lowers it to a tenth of the window, as for Skills. Over it,
+`fileMatch` Guidelines are left out first, then `manual` ones, then
+`always` ones, the largest first within each and by name between two of
+a size, until the rest fit: the same Guidelines always give the same
+choice. Those left out are neither quoted nor mounted, and the prompt
+names each with its size: "(1 Guideline was left out: together they are
+longer than the 12,000 characters a prompt carries. It is `migrations`
+(9,500 characters).)". Each such task is a `guideline.over_budget` event
+naming the task, its Agent and issue, the budget, the characters and the
+Guidelines left out, never their text. The Owner gets one action Notice
 per Floor, "Guidelines on web-shop exceed the 12,000-character budget",
-until they fit.
+which opens the Guidelines card. It stays until the Floor's approved
+Guidelines change, and is raised again by the next task still over; one
+the Owner dismissed is not raised again until they change. The Floor's
+other `fileMatch` Guidelines, listed to the work Stage and the designer
+to read as they need, are mounted outside the budget.
 
 ### Agents cannot change them
 
