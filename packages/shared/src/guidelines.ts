@@ -1,0 +1,325 @@
+import { parse as parseYaml, YAMLError } from "yaml";
+
+import { secretLikeLines } from "./office-memory.ts";
+import { createRedactor, type Redactor } from "./redact.ts";
+
+// Guidelines (Guidelines, Specs and Hooks PRD, FR-102, FR-112; ADR 0014):
+// the Owner's written rules for a Floor's repository, one Markdown file
+// each in `.agents/guidelines/` on its default branch, with an optional
+// front matter header saying when the Guideline applies.
+//
+// This is how one file is read and checked. A file that breaks the rules
+// is kept with its reason, so the Floor admin can say what is wrong, and
+// reaches no Agent. A Guideline never holds a credential: a file with a
+// line that looks like one is refused, naming the line and never what it
+// holds, so no reason ever repeats a secret. The server, the web app and
+// the orchestrator share these.
+
+/** Where a Floor's Guidelines live, from the top of its repository. */
+export const guidelinesFolder = ".agents/guidelines";
+
+/** The longest a Guideline's file may be, front matter and all. */
+export const maxGuidelineLength = 12_000;
+
+/**
+ * When a Guideline applies:
+ * - `always` (the default): to every task;
+ * - `fileMatch`: to work on files matching its `fileMatchPattern`;
+ * - `manual`: only to an issue labelled `guideline:<name>`.
+ */
+export const guidelineInclusions = ["always", "fileMatch", "manual"] as const;
+export type GuidelineInclusion = (typeof guidelineInclusions)[number];
+
+/** A Guideline's name: lowercase letters, digits and dashes. */
+export const guidelineNamePattern = /^[a-z0-9-]+$/;
+
+/** The fields a Guideline's front matter may have. */
+export const guidelineFrontMatterFields = [
+  "inclusion",
+  "fileMatchPattern",
+  "description",
+] as const;
+
+/** A Guideline that keeps the rules. */
+export interface Guideline {
+  /** Its file name without `.md`, such as `migrations`. */
+  readonly name: string;
+  /** Its file from the top of the repository. */
+  readonly path: string;
+  readonly inclusion: GuidelineInclusion;
+  /**
+   * The globs a `fileMatch` Guideline applies to, as written; empty for
+   * any other.
+   */
+  readonly fileMatchPatterns: readonly string[];
+  /** Its one line of description, or null when it has none. */
+  readonly description: string | null;
+  /** The whole file, front matter and all, exactly as it was read. */
+  readonly content: string;
+  /** Its rules: the Markdown after the front matter. */
+  readonly body: string;
+}
+
+/**
+ * Why a file in the Guidelines folder reaches no Agent:
+ * - `holds_secret`: a line looks like it holds a credential (FR-112);
+ * - `invalid`: it breaks another of FR-102's rules.
+ */
+export const guidelineRefusals = ["holds_secret", "invalid"] as const;
+export type GuidelineRefusal = (typeof guidelineRefusals)[number];
+
+/** A file in the Guidelines folder that reaches no Agent, and why. */
+export interface RefusedGuideline {
+  /** Its file name without `.md`, as it is, whether it fits or not. */
+  readonly name: string;
+  /** Its file from the top of the repository. */
+  readonly path: string;
+  readonly refusal: GuidelineRefusal;
+  /** What is wrong, for the Owner: never a word of what a line holds. */
+  readonly reason: string;
+  /** The lines (from 1) that look like a credential; empty otherwise. */
+  readonly secretLines: readonly number[];
+}
+
+/** A Floor's Guidelines, as read from its default branch. */
+export interface FloorGuidelines {
+  /** Those that keep the rules, by name. */
+  readonly guidelines: readonly Guideline[];
+  /** Those that break them, by path, each with its reason. */
+  readonly refused: readonly RefusedGuideline[];
+}
+
+/** A Floor with no Guidelines folder, or nothing in it. */
+export const noGuidelines: FloorGuidelines = { guidelines: [], refused: [] };
+
+/** Whether a file in the Guidelines folder is one, by its name: `*.md`. */
+export const isGuidelineFileName = (fileName: string): boolean =>
+  /\.md$/i.test(fileName) && fileName.length > 3;
+
+/** A Guideline's name from its file name: without `.md`. */
+export const guidelineNameOf = (fileName: string): string =>
+  fileName.replace(/\.md$/i, "");
+
+const listed = (items: readonly string[]): string =>
+  items.length <= 1
+    ? items.join("")
+    : `${items.slice(0, -1).join(", ")} and ${items.at(-1) ?? ""}`;
+
+/** Why lines that look like a credential refuse a Guideline. */
+export function secretLinesReason(lines: readonly number[]): string {
+  const which = listed(lines.map(String));
+  return lines.length === 1
+    ? `Line ${which} looks like it holds a credential, which a Guideline never does: take it out.`
+    : `Lines ${which} look like they hold a credential, which a Guideline never does: take them out.`;
+}
+
+type FrontMatterRead =
+  | {
+      readonly ok: true;
+      readonly fields: Record<string, unknown>;
+      readonly body: string;
+    }
+  | { readonly ok: false; readonly reason: string };
+
+/**
+ * Splits off the front matter, between a first line `---` and the next,
+ * and reads it as YAML. A file without one has no fields. No reason quotes
+ * the file: a YAML error is told by where it is, never by what is there.
+ */
+function readFrontMatter(text: string): FrontMatterRead {
+  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/);
+  if (lines[0]?.trimEnd() !== "---") {
+    return { ok: true, fields: {}, body: lines.join("\n").trim() };
+  }
+  const end = lines.findIndex(
+    (line, index) => index > 0 && line.trimEnd() === "---",
+  );
+  if (end === -1) {
+    return {
+      ok: false,
+      reason:
+        "Its front matter opens with a --- line but has no closing --- line.",
+    };
+  }
+  let yaml: unknown;
+  try {
+    yaml = parseYaml(lines.slice(1, end).join("\n"), { maxAliasCount: 0 });
+  } catch (error) {
+    const at = error instanceof YAMLError ? error.linePos?.[0] : undefined;
+    return {
+      ok: false,
+      reason:
+        at === undefined
+          ? "Its front matter is not valid YAML."
+          : // The front matter starts on the file's second line.
+            `Its front matter is not valid YAML at line ${String(at.line + 1)}, column ${String(at.col)}.`,
+    };
+  }
+  const body = lines
+    .slice(end + 1)
+    .join("\n")
+    .trim();
+  if (yaml === null || yaml === undefined) {
+    return { ok: true, fields: {}, body };
+  }
+  if (typeof yaml !== "object" || Array.isArray(yaml)) {
+    return {
+      ok: false,
+      reason: `Its front matter is a set of fields: ${listed(guidelineFrontMatterFields)}.`,
+    };
+  }
+  return { ok: true, fields: yaml as Record<string, unknown>, body };
+}
+
+const isOneLine = (value: unknown): value is string =>
+  typeof value === "string" && !/[\r\n]/.test(value);
+
+type FieldsRead =
+  | {
+      readonly ok: true;
+      readonly inclusion: GuidelineInclusion;
+      readonly fileMatchPatterns: readonly string[];
+      readonly description: string | null;
+    }
+  | { readonly ok: false; readonly reason: string };
+
+/** Checks the front matter's fields against FR-102. */
+function readFields(fields: Record<string, unknown>): FieldsRead {
+  const unknown = Object.keys(fields).filter(
+    (field) =>
+      !(guidelineFrontMatterFields as readonly string[]).includes(field),
+  );
+  if (unknown.length > 0) {
+    return {
+      ok: false,
+      reason: `Its front matter has ${listed(unknown.map((field) => `"${field}"`))}, which a Guideline does not take: only ${listed(guidelineFrontMatterFields)}.`,
+    };
+  }
+  // A field written with no value (`description:`) is as good as none.
+  const {
+    inclusion = null,
+    fileMatchPattern = null,
+    description = null,
+  } = fields;
+
+  if (
+    inclusion !== null &&
+    !(guidelineInclusions as readonly unknown[]).includes(inclusion)
+  ) {
+    return {
+      ok: false,
+      reason: "inclusion is always, fileMatch or manual.",
+    };
+  }
+  const chosen: GuidelineInclusion =
+    (inclusion as GuidelineInclusion | null) ?? "always";
+
+  let patterns: string[] = [];
+  if (fileMatchPattern !== null) {
+    const given = Array.isArray(fileMatchPattern)
+      ? (fileMatchPattern as unknown[])
+      : [fileMatchPattern];
+    if (
+      given.length === 0 ||
+      !given.every((pattern) => isOneLine(pattern) && pattern.trim() !== "")
+    ) {
+      return {
+        ok: false,
+        reason:
+          "fileMatchPattern is one glob, or a list of globs, each one line of text.",
+      };
+    }
+    patterns = (given as string[]).map((pattern) => pattern.trim());
+  }
+  if (chosen === "fileMatch" && patterns.length === 0) {
+    return {
+      ok: false,
+      reason:
+        "inclusion: fileMatch needs a fileMatchPattern: one glob, or a list of globs.",
+    };
+  }
+  if (chosen !== "fileMatch" && patterns.length > 0) {
+    // Otherwise a Guideline meant for some files would apply to every task.
+    return {
+      ok: false,
+      reason:
+        "fileMatchPattern applies only with inclusion: fileMatch, which it does not say.",
+    };
+  }
+
+  if (description !== null && !isOneLine(description)) {
+    return { ok: false, reason: "description is one line of text." };
+  }
+  const line = description?.trim() ?? "";
+
+  return {
+    ok: true,
+    inclusion: chosen,
+    fileMatchPatterns: patterns,
+    description: line === "" ? null : line,
+  };
+}
+
+/** One file of the Guidelines folder, read: a Guideline, or why it is not. */
+export type ParsedGuideline =
+  | { readonly ok: true; readonly guideline: Guideline }
+  | { readonly ok: false; readonly refused: RefusedGuideline };
+
+/**
+ * Reads one file of a Floor's Guidelines folder, `fileName` (such as
+ * `migrations.md`) holding `text`, against FR-102 and FR-112. A line that
+ * looks like a credential refuses it first, before anything else is read,
+ * so that no other reason can come near what the line holds; then its
+ * length, its name and its front matter.
+ */
+export function parseGuideline(
+  fileName: string,
+  text: string,
+  options: { readonly redactor?: Redactor } = {},
+): ParsedGuideline {
+  const name = guidelineNameOf(fileName);
+  const path = `${guidelinesFolder}/${fileName}`;
+  const refuse = (
+    reason: string,
+    refusal: GuidelineRefusal = "invalid",
+    secretLines: readonly number[] = [],
+  ): ParsedGuideline => ({
+    ok: false,
+    refused: { name, path, refusal, reason, secretLines },
+  });
+
+  const secrets = secretLikeLines(text, options.redactor ?? createRedactor());
+  if (secrets.length > 0) {
+    return refuse(secretLinesReason(secrets), "holds_secret", secrets);
+  }
+  if (text.length > maxGuidelineLength) {
+    return refuse(
+      `A Guideline is at most ${maxGuidelineLength.toLocaleString("en-GB")} characters; this one has ${text.length.toLocaleString("en-GB")}.`,
+    );
+  }
+  if (!fileName.endsWith(".md") || !guidelineNamePattern.test(name)) {
+    return refuse(
+      "A Guideline's name is its file name without .md, in lowercase letters, digits and dashes, such as migrations.md.",
+    );
+  }
+  const frontMatter = readFrontMatter(text);
+  if (!frontMatter.ok) {
+    return refuse(frontMatter.reason);
+  }
+  const fields = readFields(frontMatter.fields);
+  if (!fields.ok) {
+    return refuse(fields.reason);
+  }
+  return {
+    ok: true,
+    guideline: {
+      name,
+      path,
+      inclusion: fields.inclusion,
+      fileMatchPatterns: fields.fileMatchPatterns,
+      description: fields.description,
+      content: text,
+      body: frontMatter.body,
+    },
+  };
+}

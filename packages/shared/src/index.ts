@@ -1104,6 +1104,25 @@ export {
   type RepositoryMemoryView,
 } from "./memory.ts";
 export {
+  guidelineFrontMatterFields,
+  guidelineInclusions,
+  guidelineNameOf,
+  guidelineNamePattern,
+  guidelineRefusals,
+  guidelinesFolder,
+  isGuidelineFileName,
+  maxGuidelineLength,
+  noGuidelines,
+  parseGuideline,
+  secretLinesReason,
+  type FloorGuidelines,
+  type Guideline,
+  type GuidelineInclusion,
+  type GuidelineRefusal,
+  type ParsedGuideline,
+  type RefusedGuideline,
+} from "./guidelines.ts";
+export {
   looksLikeSecret,
   maxOfficeMemoryLength,
   maxRoleMemoryEntries,
