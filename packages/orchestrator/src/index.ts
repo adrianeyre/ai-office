@@ -635,6 +635,11 @@ export {
 } from "./skills/repository.ts";
 export { readFloorGuidelines, readGuidelines } from "./guidelines/read.ts";
 export {
+  createGuidelinesAdmin,
+  type GuidelinesAdmin,
+  type GuidelinesAdminOptions,
+} from "./guidelines/admin.ts";
+export {
   awaitingCount,
   createGuidelineApprovals,
   guidelineContentHash,

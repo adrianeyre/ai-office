@@ -182,7 +182,8 @@ describe("Guidelines only as the Owner approved them", () => {
         {
           id: openGuidelinesAction,
           label: "Open Guidelines",
-          href: `/floor-settings/${floor.id}`,
+          // It opens the Floor admin at its Guidelines card.
+          href: `/floor-settings/${floor.id}#guidelines`,
         },
       ],
     });
