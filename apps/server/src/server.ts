@@ -1617,6 +1617,10 @@ export async function startOffice(
                 promptBudget,
                 guidelines: taskGuidelines,
                 guidelineProposals,
+                // The criteria of the Spec an issue was filed from, as
+                // the Owner approved them, each tested (FR-116).
+                specs: (floorId, issue) =>
+                  issueSpec(stores.grilling, floorId, issue),
                 roles: stores.roles,
                 batchBranches,
                 onError: (error) => {
