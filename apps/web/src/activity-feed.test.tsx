@@ -1025,6 +1025,39 @@ describe("event text", () => {
     );
   });
 
+  it("names the Guidelines a task's prompt left out over its budget, and whose task it was", () => {
+    const over: OfficeEvent = {
+      type: "guideline.over_budget",
+      version: 1,
+      floorId: "web-shop",
+      task: "work",
+      agentId: "ada",
+      issue: 12,
+      budget: 12_000,
+      characters: 15_400,
+      leftOut: ["migrations", "api"],
+    };
+    expect(describeEvent(over, { agent: () => "Ada" })).toBe(
+      'Ada\'s work of #12 left out Guidelines "migrations" and "api": the Guidelines it was to follow have 15,400 characters, over the 12,000 a prompt carries.',
+    );
+    expect(
+      describeEvent(
+        {
+          type: "guideline.over_budget",
+          version: 1,
+          floorId: "web-shop",
+          task: "chat",
+          budget: 12_000,
+          characters: 13_000,
+          leftOut: ["structure"],
+        },
+        { agent: () => "Ada" },
+      ),
+    ).toBe(
+      'A chat left out Guideline "structure": the Guidelines it was to follow have 13,000 characters, over the 12,000 a prompt carries.',
+    );
+  });
+
   it("says what a reviewer's verdict was, and links the review on GitHub", () => {
     const posted: OfficeEvent = {
       type: "review.posted",

@@ -324,6 +324,17 @@ export const exampleEvents: { [Type in EventType]: EventOfType<Type> } = {
     name: "tech",
     contentHash: "c".repeat(64),
   },
+  "guideline.over_budget": {
+    type: "guideline.over_budget",
+    version: 1,
+    floorId: "web-shop",
+    task: "work",
+    agentId: "ada",
+    issue: 12,
+    budget: 12_000,
+    characters: 15_400,
+    leftOut: ["migrations"],
+  },
   "memory.curated": {
     type: "memory.curated",
     version: 1,

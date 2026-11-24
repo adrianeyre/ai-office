@@ -192,4 +192,36 @@ describe("Guideline events", () => {
       issue: null,
     });
   });
+
+  it("name the Guidelines a prompt left out over its budget, for the task's Agent and issue, never their text", () => {
+    const over = exampleEvents["guideline.over_budget"];
+    expect(officeEventSchema.parse(over)).toEqual(over);
+    expect(subjectOf(over)).toEqual({
+      floorId: "web-shop",
+      agentIds: ["ada"],
+      issue: 12,
+    });
+    // The Manager's chat is for no issue.
+    expect(
+      officeEventSchema.safeParse({
+        type: "guideline.over_budget",
+        version: 1,
+        floorId: "web-shop",
+        task: "chat",
+        budget: 12_000,
+        characters: 13_000,
+        leftOut: ["structure"],
+      }).success,
+    ).toBe(true);
+    for (const wrong of [
+      { leftOut: [] },
+      { leftOut: ["Migrations.md"] },
+      { task: "merge" },
+      { content: "Use pnpm." },
+    ]) {
+      expect(officeEventSchema.safeParse({ ...over, ...wrong }).success).toBe(
+        false,
+      );
+    }
+  });
 });

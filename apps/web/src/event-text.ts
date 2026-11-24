@@ -55,6 +55,7 @@ export const eventTypeLabels: Record<EventType, string> = {
   "guideline.approved": "Guideline approved",
   "guideline.awaiting": "Guideline awaiting approval",
   "guideline.dismissed": "Guideline change dismissed",
+  "guideline.over_budget": "Guidelines over budget",
   "sandbox.started": "Sandbox started",
   "sandbox.stopped": "Sandbox stopped",
   "sandbox.text": "Agent output",
@@ -185,7 +186,12 @@ export const eventTypeGroups: readonly {
   },
   {
     label: "Guidelines",
-    types: ["guideline.approved", "guideline.awaiting", "guideline.dismissed"],
+    types: [
+      "guideline.approved",
+      "guideline.awaiting",
+      "guideline.dismissed",
+      "guideline.over_budget",
+    ],
   },
   {
     label: "Sandboxes",
@@ -581,6 +587,28 @@ export function describeEvent(
       }, which the Owner neither merged nor pushed: it awaits the Owner's approval, and Agents keep the last version the Owner approved.`;
     case "guideline.dismissed":
       return `The Owner dismissed the change to Guideline "${event.name}": Agents keep the last version the Owner approved.`;
+    case "guideline.over_budget": {
+      const names = event.leftOut.map((name) => `"${name}"`);
+      const list =
+        names.length === 1
+          ? (names[0] ?? "")
+          : `${names.slice(0, -1).join(", ")} and ${names.at(-1) ?? ""}`;
+      const task = {
+        work: "work",
+        review: "review",
+        qa: "QA",
+        docs: "docs",
+        design: "design review",
+        triage: "triage",
+        plan: "Plan",
+        chat: "chat",
+      }[event.task];
+      return `${
+        event.agentId === undefined ? "A" : `${agent(event.agentId)}'s`
+      } ${task}${
+        event.issue === undefined ? "" : ` of #${String(event.issue)}`
+      } left out Guideline${event.leftOut.length === 1 ? "" : "s"} ${list}: the Guidelines it was to follow have ${event.characters.toLocaleString("en-GB")} characters, over the ${event.budget.toLocaleString("en-GB")} a prompt carries.`;
+    }
     case "sandbox.started":
       return `${agent(event.agentId)} started a sandbox for #${String(event.issue)} on ${event.branch}.`;
     case "sandbox.stopped":

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  guidelineLabel,
+  guidelinesBudget,
+  guidelinesLabelled,
   isGuidelineFileName,
   maxGuidelineLength,
   parseGuideline,
@@ -452,5 +455,37 @@ describe("the credential check (FR-112)", () => {
         ),
       ).inclusion,
     ).toBe("always");
+  });
+});
+
+describe("the labels that ask for a manual Guideline (FR-105)", () => {
+  it("is guideline: and its name, made like a role: label", () => {
+    expect(guidelineLabel("release")).toEqual({
+      name: "guideline:release",
+      color: "d4c5f9",
+      description: "AI Office: follow the Owner's release Guideline",
+    });
+  });
+
+  it("reads the Guidelines an issue's labels ask for, in any case, each once", () => {
+    expect(
+      guidelinesLabelled([
+        "ai-office",
+        "Guideline:Release",
+        "guideline:release",
+        "guideline: hot-fix ",
+        "role:coder",
+        "guideline:",
+        "guideline:not a name",
+      ]),
+    ).toEqual(["release", "hot-fix"]);
+    expect(guidelinesLabelled([])).toEqual([]);
+  });
+});
+
+describe("the Guidelines' prompt budget (FR-108)", () => {
+  it("is 12,000 characters: one Guideline at its longest always fits", () => {
+    expect(guidelinesBudget).toBe(12_000);
+    expect(guidelinesBudget).toBe(maxGuidelineLength);
   });
 });

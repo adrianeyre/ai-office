@@ -33,6 +33,7 @@ import {
   grillingSessionStatuses,
   guidelineApprovals,
   guidelineNamePattern,
+  guidelineTasks,
   contractorKinds,
   daySchema,
   statusUpdateTriggers,
@@ -456,6 +457,23 @@ const guidelineDismissed = event("guideline.dismissed", {
   floorId,
   name: guidelineName,
   contentHash: guidelineHash,
+});
+// A task's Guidelines were longer together than the characters a prompt
+// carries (FR-108): those left out are named, never quoted.
+const guidelineOverBudget = event("guideline.over_budget", {
+  floorId,
+  /** The work, the designer's, or the Manager's triage, Plan or chat. */
+  task: z.enum(guidelineTasks),
+  /** The Agent the task is for. */
+  agentId: agentId.optional(),
+  /** The issue it is for, when it is for one. */
+  issue: issue.optional(),
+  /** The most characters of Guidelines its prompt carries. */
+  budget: count,
+  /** How many characters the Guidelines it was to follow had together. */
+  characters: count,
+  /** The Guidelines left out, largest first. */
+  leftOut: z.array(guidelineName).min(1),
 });
 // Office-wide and Role memory (PRD FR-54, FR-55, FR-56): the Owner edits
 // the office-wide memory; Agents propose Role memory in their Handoffs, the
@@ -1106,6 +1124,7 @@ export const officeEventSchema = z.discriminatedUnion("type", [
   guidelineApproved,
   guidelineAwaiting,
   guidelineDismissed,
+  guidelineOverBudget,
   sandboxStarted,
   sandboxStopped,
   sandboxText,

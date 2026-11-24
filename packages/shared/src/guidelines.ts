@@ -2,6 +2,7 @@ import { parse as parseYaml, YAMLError } from "yaml";
 import { z } from "zod";
 
 import { secretLikeLines } from "./office-memory.ts";
+import type { PipelineLabel } from "./pipeline.ts";
 import { createRedactor, type Redactor } from "./redact.ts";
 
 // Guidelines (Guidelines, Specs and Hooks PRD, FR-102, FR-112; ADR 0014):
@@ -55,6 +56,69 @@ export const guidelineApprovals = [
   "owner_admin",
 ] as const;
 export type GuidelineApproval = (typeof guidelineApprovals)[number];
+
+/**
+ * The most characters of Guidelines one prompt carries, together (FR-108):
+ * over it, `fileMatch` Guidelines are left out before `always` ones, the
+ * largest first. As long as one Guideline may be, so one always fits.
+ */
+export const guidelinesBudget = maxGuidelineLength;
+
+/**
+ * Where a sandbox Agent's Guidelines are mounted, read-only, beside its
+ * memory and never in its clone (FR-106): one file each, `<name>.md`.
+ */
+export const sandboxGuidelinesDirectory = "/home/agent/.ai-office/guidelines";
+
+/**
+ * The tasks Guidelines are chosen for (FR-105): the four Stages' work, the
+ * designer's, and the Manager's triage, Plan and chat.
+ */
+export const guidelineTasks = [
+  "work",
+  "review",
+  "qa",
+  "docs",
+  "design",
+  "triage",
+  "plan",
+  "chat",
+] as const;
+export type GuidelineTask = (typeof guidelineTasks)[number];
+
+/** The prefix of the label that asks for a `manual` Guideline. */
+export const guidelineLabelPrefix = "guideline:";
+
+/**
+ * The label that gives an issue's tasks a `manual` Guideline (FR-105):
+ * `guideline:` and its name, such as `guideline:release`.
+ */
+export const guidelineLabelName = (name: string): string =>
+  `${guidelineLabelPrefix}${name}`;
+
+/**
+ * The `guideline:<name>` label intake makes on a Floor's repository for
+ * each of its `manual` Guidelines, as it does `role:<name>` labels.
+ */
+export const guidelineLabel = (name: string): PipelineLabel => ({
+  name: guidelineLabelName(name),
+  color: "d4c5f9",
+  description: `AI Office: follow the Owner's ${name} Guideline`.slice(0, 100),
+});
+
+/**
+ * The names of the Guidelines `labels` ask for, by `guideline:<name>`
+ * labels in any case, each once, in the labels' order.
+ */
+export const guidelinesLabelled = (labels: readonly string[]): string[] => [
+  ...new Set(
+    labels
+      .map((label) => label.trim().toLowerCase())
+      .filter((label) => label.startsWith(guidelineLabelPrefix))
+      .map((label) => label.slice(guidelineLabelPrefix.length).trim())
+      .filter((name) => guidelineNamePattern.test(name)),
+  ),
+];
 
 /** The id of the Floor admin's Guidelines card, which links name with `#`. */
 export const guidelinesCardId = "guidelines";
