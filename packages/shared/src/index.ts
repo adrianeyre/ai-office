@@ -1024,6 +1024,12 @@ export {
   type SpecTurn,
 } from "./spec.ts";
 export {
+  acceptanceCriteriaProblems,
+  acceptanceCriterionForms,
+  acceptanceCriterionProblemLine,
+  type AcceptanceCriterionProblem,
+} from "./acceptance-criteria.ts";
+export {
   defaultIssuePriority,
   issuePriorities,
   issuePriorityLabels,
