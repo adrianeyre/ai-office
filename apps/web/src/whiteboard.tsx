@@ -2,6 +2,7 @@ import type { EventType } from "@ai-office/events/schema";
 import {
   batchDetailSchema,
   batchListSchema,
+  amendSpecText,
   batchStatusLabels,
   maxPlanAnnotationLength,
   wrapUpOutcomeLabels,
@@ -12,6 +13,7 @@ import {
   type Plan,
   type PlanItem,
   type WrapUp,
+  type WrapUpDesignCheck,
 } from "@ai-office/shared";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -425,7 +427,71 @@ function WrapUpView({
           ))}
         </ul>
       )}
+      {wrapUp.designChecks?.map((check) => (
+        <DesignCheckView key={check.sessionId} check={check} />
+      ))}
     </section>
+  );
+}
+
+/** The slug of a Spec's folder: `checkout` of `.agents/specs/checkout`. */
+const slugOfFolder = (folder: string): string =>
+  folder.split("/").at(-1) ?? folder;
+
+/**
+ * The merged work compared with the design of the Spec its issues were
+ * filed from (FR-117): where it departs, that it follows it, or why it
+ * was not compared; and how to bring the Spec up to date.
+ */
+function DesignCheckView({ check }: { check: WrapUpDesignCheck }) {
+  const pullRequests = check.pullRequests
+    .map((number) => `#${String(number)}`)
+    .join(", ");
+  const merged = `The merged work (${check.pullRequests.length === 1 ? "pull request" : "pull requests"} ${pullRequests})`;
+  const folder = <code>{check.folder}/design.md</code>;
+  return (
+    <div
+      aria-label={`Against ${check.folder}/design.md`}
+      role="group"
+      data-design-check={
+        check.problem !== null
+          ? "not-compared"
+          : check.departures.length === 0
+            ? "follows"
+            : "departs"
+      }
+      className="space-y-1 text-xs"
+    >
+      {check.problem !== null ? (
+        <p>
+          {merged} was not compared with {folder}: {check.problem}
+        </p>
+      ) : check.departures.length === 0 ? (
+        <p>
+          {merged} follows {folder}.
+        </p>
+      ) : (
+        <>
+          <p>
+            {merged} departs from {folder} in {check.departures.length}{" "}
+            {check.departures.length === 1 ? "place" : "places"}:
+          </p>
+          <ul
+            aria-label="Departures from the design"
+            className="list-disc pl-4"
+          >
+            {check.departures.map((departure, index) => (
+              <li key={index}>{departure}</li>
+            ))}
+          </ul>
+          <p className="text-muted-foreground">
+            To bring the Spec up to date, say{" "}
+            <code>{amendSpecText(slugOfFolder(check.folder))}</code> in the
+            Manager chat.
+          </p>
+        </>
+      )}
+    </div>
   );
 }
 

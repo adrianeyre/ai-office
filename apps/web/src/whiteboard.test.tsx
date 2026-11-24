@@ -190,6 +190,18 @@ function initialBatches(): BatchDetail[] {
             tokens: 210_500,
             estimatedCostUsd: 2.134,
           },
+          // #8 was filed from a Spec, whose design its work departs from.
+          designChecks: [
+            {
+              folder: ".agents/specs/search",
+              sessionId: 4,
+              pullRequests: [12],
+              departures: [
+                "Architecture: the design searches through the catalogue service; src/search.ts reads the database itself.",
+              ],
+              problem: null,
+            },
+          ],
         },
       },
       plans: [finishedPlan],
@@ -700,6 +712,28 @@ describe("the whiteboard", () => {
         .getAllByRole("listitem")
         .map((entry) => entry.textContent),
     ).toEqual(["#9 is blocked: it waits for you at needs-human."]);
+    // Where the merged work departs from its Spec's design (FR-117).
+    const design = within(wrapUp).getByRole("group", {
+      name: "Against .agents/specs/search/design.md",
+    });
+    expect(design.getAttribute("data-design-check")).toBe("departs");
+    expect(design.textContent).toContain(
+      "The merged work (pull request #12) departs from .agents/specs/search/design.md in 1 place:",
+    );
+    expect(
+      within(
+        within(design).getByRole("list", {
+          name: "Departures from the design",
+        }),
+      )
+        .getAllByRole("listitem")
+        .map((entry) => entry.textContent),
+    ).toEqual([
+      "Architecture: the design searches through the catalogue service; src/search.ts reads the database itself.",
+    ]);
+    expect(design.textContent).toContain(
+      "To bring the Spec up to date, say /spec amend search in the Manager chat.",
+    );
     expect(screen.queryByRole("region", { name: "Kickoff" })).toBeNull();
   });
 
