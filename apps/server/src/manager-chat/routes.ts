@@ -131,6 +131,10 @@ const sessionBody = (session: GrillingSessionRecord): GrillingSession => ({
   documents: session.documents,
   issues: session.issues,
   sources: [...session.sources],
+  guidelines: session.guidelines.map((guideline) => ({
+    ...guideline,
+    fileMatchPatterns: [...guideline.fileMatchPatterns],
+  })),
 });
 
 /**

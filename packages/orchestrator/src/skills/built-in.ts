@@ -6,6 +6,7 @@ import {
   grillingSkillName,
   isGrillingSkillName,
   mattPocockSkillNames,
+  ownSkillNames,
   parseSkillDocument,
   skillFileName,
   skillFilesInOrder,
@@ -16,17 +17,19 @@ import {
 
 import { grillingSkill, grillingSkillInstructions } from "../grilling/skill.ts";
 
-// AI Office's built-in Skills (PRD FR-77, FR-83b), on every Floor: its own
-// `/grilling`, and those adapted from Matt Pocock's skills (MIT), each a
-// real Agent Skills folder under `built-in/` with its `SKILL.md` and
-// supporting files, read when AI Office starts and checked as every Skill
-// is. Any problem stops the load with the folder at fault.
+// AI Office's built-in Skills (PRD FR-77, FR-83b; Guidelines, Specs and
+// Hooks PRD, FR-109), on every Floor: its own `/grilling` and
+// `/guidelines`, and those adapted from Matt Pocock's skills (MIT). Every
+// one but `/grilling` is a real Agent Skills folder under `built-in/` with
+// its `SKILL.md` and supporting files, read when AI Office starts and
+// checked as every Skill is. Any problem stops the load with the folder at
+// fault.
 //
 // Two kinds:
 // - **Session-starting** (`grillingSkillNames`): `/grill-with-docs`,
-//   `/wayfinder`, `/to-tickets` and `/to-spec` start a Grilling Session,
-//   as `/grilling` does, and their instructions are loaded beside
-//   `/grilling`'s while it runs. No office or repository Skill of their
+//   `/wayfinder`, `/to-tickets`, `/to-spec` and `/guidelines` start a
+//   Grilling Session, as `/grilling` does, and their instructions are
+//   loaded beside `/grilling`'s while it runs. No office or repository Skill of their
 //   name overrides them, and the Manager is never offered them to choose.
 // - **Instructions**: `/pr`, `/domain-modeling` and the rest load their
 //   instructions into the Manager chat as any `/name` does, with their
@@ -45,7 +48,7 @@ export interface BuiltInSkill {
   readonly files: readonly SkillFile[];
 }
 
-/** The folder of the built-in Skills adapted from Matt Pocock's. */
+/** The folder of the built-in Skills kept as Skill folders. */
 export const builtInSkillsDir = fileURLToPath(
   new URL("built-in", import.meta.url),
 );
@@ -93,7 +96,7 @@ export function loadBuiltInSkill(dir: string, name: string): BuiltInSkill {
 /** AI Office's own Skills, on every Floor, by name. */
 export const builtInSkills: readonly BuiltInSkill[] = [
   grillingSkill,
-  ...mattPocockSkillNames.map((name) =>
+  ...[...ownSkillNames, ...mattPocockSkillNames].map((name) =>
     loadBuiltInSkill(builtInSkillsDir, name),
   ),
 ].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));

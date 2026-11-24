@@ -4,6 +4,7 @@ import {
   grillingDecisionSchema,
   grillingDocumentsSchema,
   grillingFactSchema,
+  grillingGuidelineSchema,
   grillingIssuesSchema,
   grillingProcessSchema,
   grillingQuestionSchema,
@@ -66,6 +67,9 @@ const checked = (session: GrillingSessionRecord): GrillingSessionRecord => ({
   issues:
     session.issues === null ? null : grillingIssuesSchema.parse(session.issues),
   sources: session.sources.map((source) => grillingSourceSchema.parse(source)),
+  guidelines: session.guidelines.map((guideline) =>
+    grillingGuidelineSchema.parse(guideline),
+  ),
 });
 
 /** Keeps sessions in memory: for tests. */
@@ -187,6 +191,9 @@ const recordOf = (row: Row): GrillingSessionRecord => ({
   sources: arrayOf(row.sources).map((source) =>
     grillingSourceSchema.parse(source),
   ),
+  guidelines: arrayOf(row.guidelines).map((guideline) =>
+    grillingGuidelineSchema.parse(guideline),
+  ),
   startedAt: row.startedAt,
   updatedAt: row.updatedAt,
   pausedAt: row.pausedAt,
@@ -210,6 +217,7 @@ const valuesOf = (session: NewGrillingSession) => ({
   documents: session.documents,
   issues: session.issues,
   sources: session.sources,
+  guidelines: session.guidelines,
   startedAt: session.startedAt,
   updatedAt: session.updatedAt,
   pausedAt: session.pausedAt,

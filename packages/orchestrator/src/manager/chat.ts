@@ -6,6 +6,7 @@ import {
   floorErrorCodes,
   grillingErrorCodes,
   grillingSkillName,
+  grillingDraftsIssues,
   grillingSourcePaths,
   grillingWritesDocuments,
   isGrillingSkillName,
@@ -1695,6 +1696,12 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
         title: clean(title),
         text: clean(text),
       })),
+      guidelines: value.guidelines.map((guideline) => ({
+        ...guideline,
+        fileMatchPatterns: guideline.fileMatchPatterns.map(clean),
+        description: clean(guideline.description),
+        text: clean(guideline.text),
+      })),
     };
   };
 
@@ -1980,7 +1987,7 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
           }
           const said = [
             value.message.trim(),
-            documentsText(written, applied.leftOut),
+            documentsText(written, applied.leftOut, applied.leftOutGuidelines),
           ]
             .filter((part) => part !== "")
             .join("\n\n");
@@ -2020,7 +2027,8 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
    * be opened, the session stays open, awaiting confirmation, and the chat
    * says why, so "confirm" tries again. A session that writes no documents
    * (`/to-tickets`), or one with no `writer`, ends with no pull request.
-   * Either way the Manager then drafts its issues, when they can be filed.
+   * Either way the Manager then drafts its issues, when they can be filed,
+   * unless it wrote the Floor's Guidelines (`/guidelines`, FR-109).
    */
   const close = async (
     floor: FloorRecord,
@@ -2099,8 +2107,12 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
       text: redactor.redactText(kept.text),
       createdAt: now(),
     });
-    // Then the Manager drafts the issues that build it (FR-81).
-    const drafting = ended !== undefined && options.issues !== undefined;
+    // Then the Manager drafts the issues that build it (FR-81); a
+    // `/guidelines` session's pull request is all it makes (FR-109).
+    const drafting =
+      ended !== undefined &&
+      options.issues !== undefined &&
+      grillingDraftsIssues(ended.skill);
     if (!drafting) {
       busy.delete(floor.id);
     }
@@ -2631,6 +2643,7 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
         documents: null,
         issues: null,
         sources,
+        guidelines: [],
         startedAt: at,
         updatedAt: at,
         pausedAt: null,
@@ -2702,6 +2715,12 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
       return say(
         "hint",
         `The ${sessionName(session)} has not ended: its issues are drafted once it ends and its documents' pull request is open.`,
+      );
+    }
+    if (!grillingDraftsIssues(session.skill)) {
+      return say(
+        "hint",
+        `The ${sessionName(session)} writes the Floor's Guidelines and drafts no issues: its pull request is all it makes.`,
       );
     }
     if (options.issues === undefined) {

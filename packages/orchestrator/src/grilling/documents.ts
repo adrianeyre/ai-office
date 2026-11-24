@@ -4,11 +4,14 @@ import {
   grillingAdrDirectory,
   grillingBranch,
   grillingGlossaryPath,
+  grillingGuidelinesDirectory,
   grillingPrdDirectory,
   grillingProcessDirectory,
+  grillingWritesGuidelines,
   type GitIdentity,
   type GrillingAdr,
   type GrillingDocuments,
+  type GrillingGuideline,
   type GrillingProcess,
   type GrillingTerm,
 } from "@ai-office/shared";
@@ -17,7 +20,12 @@ import type { FloorRecord } from "../floors/store.ts";
 import { commitFiles, type FileToCommit } from "../git/commit-file.ts";
 import { agentTrailer, type TrailerAgent } from "../git/identity.ts";
 import type { Notices } from "../notices/notices.ts";
-import type { GrillingSessionRecord } from "./session.ts";
+import {
+  guidelineContent,
+  guidelineRefusal,
+  type GrillingSessionRecord,
+  type LeftOutGuideline,
+} from "./session.ts";
 
 // A Grilling Session's documents (PRD FR-80). As decisions settle, the
 // Manager keeps the Floor's documents current on a branch of the session's
@@ -33,6 +41,13 @@ import type { GrillingSessionRecord } from "./session.ts";
 //   turn that settled it is kept: in place of an entry of its name, or
 //   added under a heading for the session.
 // - **Process docs:** `docs/processes/<title>.md`.
+//
+// A `/guidelines` session (Guidelines, Specs and Hooks PRD, FR-109) writes
+// none of those: only its Guidelines, each `.agents/guidelines/<name>.md`
+// with its front matter, checked as AI Office reads every Guideline
+// (FR-102). One of the Floor's own of that name is replaced, which the
+// pull request shows; merging it is the Owner's approval of every one of
+// them (ADR 0014). Until a Guideline is settled there is nothing to write.
 //
 // Plain code writes every file from the session's stored data, so writing
 // them again changes nothing unless the session did. AI Office, as the
@@ -220,6 +235,26 @@ export function adrDocument(adr: GrillingAdr): string {
   ].join("\n");
 }
 
+/** A Guideline's path: `.agents/guidelines/<name>.md`. */
+export const guidelinePath = ({ name }: Pick<GrillingGuideline, "name">) =>
+  `${grillingGuidelinesDirectory}/${name}.md`;
+
+/**
+ * A Guideline's whole file, front matter and all, as AI Office reads one
+ * (FR-102); an error saying why, for one it would refuse.
+ */
+export function grillingGuidelineDocument(
+  guideline: GrillingGuideline,
+): string {
+  const reason = guidelineRefusal(guideline);
+  if (reason !== undefined) {
+    throw new Error(
+      `The ${guideline.name} Guideline cannot be written: ${reason}`,
+    );
+  }
+  return guidelineContent(guideline);
+}
+
 /** A process doc: its title, then what it says. */
 export const processDocument = ({ title, text }: GrillingProcess): string =>
   `# ${title}\n\n${text.trim()}\n`;
@@ -263,6 +298,7 @@ const inWords = (items: readonly string[]): string =>
 export function documentsText(
   written: WrittenDocuments | undefined,
   leftOut: readonly string[],
+  leftOutGuidelines: readonly LeftOutGuideline[] = [],
 ): string {
   return [
     ...(written === undefined
@@ -280,6 +316,10 @@ export function documentsText(
       (title) =>
         `Left out the ADR "${title}": an ADR is only for a decision that is hard to reverse, surprising and the result of a real trade-off, and it did not say why for each.`,
     ),
+    ...leftOutGuidelines.map(
+      ({ name, reason }) =>
+        `Left out the ${name} Guideline: ${reason} The Owner could never approve it as it is.`,
+    ),
   ].join("\n");
 }
 
@@ -295,6 +335,12 @@ export function createGrillingDocuments(
     from: string,
   ): Promise<FileToCommit[]> => {
     const { floor, session } = input;
+    if (grillingWritesGuidelines(session.skill)) {
+      return session.guidelines.map((guideline) => ({
+        path: guidelinePath(guideline),
+        content: grillingGuidelineDocument(guideline),
+      }));
+    }
     const client = github.repository(floor.repository);
     const written = new Set(session.documents?.files ?? []);
     // Its own PRD: one of the topic's name the Floor already has is left be.
@@ -356,6 +402,20 @@ export function createGrillingDocuments(
         ? branch
         : floor.defaultBranch;
     const files = await filesOf(input, from);
+    if (files.length === 0) {
+      // Nothing settled to write yet (`/guidelines` before its first).
+      return {
+        documents: {
+          branch,
+          files: [...(session.documents?.files ?? [])],
+          commit: session.documents?.commit ?? null,
+          writtenAt: session.documents?.writtenAt ?? null,
+          pullRequest: session.documents?.pullRequest ?? null,
+          problem: null,
+        },
+        changed: [],
+      };
+    }
     const [repository, writable] = await Promise.all([
       client.get(),
       client.installationToken(),
@@ -366,7 +426,7 @@ export function createGrillingDocuments(
       from,
       to: branch,
       files,
-      message: `docs: ${sessionTitle(session)}, as settled${session.round === 0 ? "" : ` in round ${String(session.round)}`}\n\nThe PRD, ADRs, glossary terms and process docs settled so far.`,
+      message: `docs: ${sessionTitle(session)}, as settled${session.round === 0 ? "" : ` in round ${String(session.round)}`}\n\n${grillingWritesGuidelines(session.skill) ? "The Guidelines settled so far." : "The PRD, ADRs, glossary terms and process docs settled so far."}`,
       identity: await options.gitIdentity(floor.id),
       agent: manager,
       scratchDir: options.scratchDir,
@@ -406,8 +466,9 @@ export function createGrillingDocuments(
     files: readonly string[],
   ): string => {
     const { session, manager } = input;
+    const guidelines = grillingWritesGuidelines(session.skill);
     return [
-      `${manager.name}, the Floor's Manager, wrote these documents in ${sessionTitle(session)} with the Owner, as its decisions settled.`,
+      `${manager.name}, the Floor's Manager, wrote ${guidelines ? "these Guidelines" : "these documents"} in ${sessionTitle(session)} with the Owner, as its decisions settled.`,
       "",
       "**Files**",
       "",
@@ -442,7 +503,20 @@ export function createGrillingDocuments(
             ]),
             "",
           ]),
-      "Review them as you would any change to the Floor's canon. Merging is yours: a Manager never merges.",
+      ...(guidelines
+        ? [
+            "**Guidelines**",
+            "",
+            ...session.guidelines.map(
+              ({ name, inclusion, fileMatchPatterns, description }) =>
+                `- \`${name}\` (${inclusion === "always" ? "always" : `fileMatch: ${fileMatchPatterns.map((pattern) => `\`${pattern}\``).join(", ")}`}): ${description}`,
+            ),
+            "",
+            "Agents follow a Guideline only in a version you approved. Merging this pull request yourself is your approval of these Guidelines: from the next task on, the Floor's Agents follow them as written here. Change any of them first if they are not your rules.",
+          ]
+        : [
+            "Review them as you would any change to the Floor's canon. Merging is yours: a Manager never merges.",
+          ]),
       "",
       `Written by ${agentTrailer(manager).replace(/^Agent: /, "")} in AI Office.`,
       "",
@@ -474,13 +548,23 @@ export function createGrillingDocuments(
     async propose(input) {
       const written = await writeNow(input);
       const { floor, manager, session } = input;
+      if (written.documents.files.length === 0) {
+        throw new Error(
+          "No Guideline is settled yet, so there is no pull request to open. Settle one first.",
+        );
+      }
       const { branch } = written.documents;
       const client = github.repository(floor.repository);
       const [open] = await client.listPullRequests({ head: branch });
       const pullRequest =
         open ??
         (await client.createPullRequest({
-          title: shorten(`docs: ${sessionTitle(session)}`, 200),
+          title: shorten(
+            grillingWritesGuidelines(session.skill)
+              ? `docs: the Guidelines of ${sessionTitle(session)}`
+              : `docs: ${sessionTitle(session)}`,
+            200,
+          ),
           body: describe(input, written.documents.files),
           head: branch,
           base: floor.defaultBranch,
@@ -500,7 +584,7 @@ export function createGrillingDocuments(
           ?.raise({
             kind: "info",
             title: shorten(
-              `PR #${String(pullRequest.number)} opened on ${floor.name}: the documents of ${sessionTitle(session)}`,
+              `PR #${String(pullRequest.number)} opened on ${floor.name}: the ${grillingWritesGuidelines(session.skill) ? "Guidelines" : "documents"} of ${sessionTitle(session)}`,
               200,
             ),
             floorId: floor.id,

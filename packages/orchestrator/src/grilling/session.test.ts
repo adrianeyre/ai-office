@@ -34,6 +34,7 @@ const empty: GrillingSessionRecord = {
   documents: null,
   issues: null,
   sources: [],
+  guidelines: [],
   startedAt: at,
   updatedAt: at,
   pausedAt: null,
@@ -249,6 +250,98 @@ describe("applyTurn and the documents", () => {
       "Columns are in English",
       "Prices in pence",
     ]);
+  });
+});
+
+describe("applyTurn and the Guidelines (FR-109)", () => {
+  const guideline = (name: string, text: string, more: object = {}) => ({
+    name,
+    description: `The ${name} Guideline.`,
+    text,
+    ...more,
+  });
+  const documents = {
+    terms: [{ term: "Export", definition: "A CSV file." }],
+    outline: [{ heading: "Problem", text: "By hand." }],
+    processes: [{ title: "Releasing", text: "Tag it." }],
+  };
+  const guidelines = { ...empty, skill: "guidelines" as const };
+
+  it("keeps a /guidelines session's Guidelines, each replacing the one of its name in place, and none of the PRD's parts", () => {
+    const first = applyTurn(
+      guidelines,
+      turn({
+        ...documents,
+        guidelines: [
+          guideline("product", "Tea."),
+          guideline("tech", "Use pnpm."),
+          guideline("migrations", "Plain SQL.", {
+            inclusion: "fileMatch",
+            fileMatchPatterns: ["packages/db/**"],
+          }),
+        ],
+      }),
+      at,
+    ).session;
+    expect(first).toMatchObject({ terms: [], outline: [], processes: [] });
+    const second = applyTurn(
+      first,
+      turn({
+        guidelines: [
+          guideline("tech", "Use pnpm, never npm."),
+          guideline("structure", "Apps in apps/."),
+        ],
+      }),
+      at,
+    );
+    expect(
+      second.session.guidelines.map(({ name, inclusion, text }) => [
+        name,
+        inclusion,
+        text,
+      ]),
+    ).toEqual([
+      ["product", "always", "Tea."],
+      ["tech", "always", "Use pnpm, never npm."],
+      ["migrations", "fileMatch", "Plain SQL."],
+      ["structure", "always", "Apps in apps/."],
+    ]);
+    expect(second.leftOutGuidelines).toEqual([]);
+  });
+
+  it("leaves out a Guideline AI Office would refuse, such as one with a line like a credential, and keeps the rest", () => {
+    const { session, leftOutGuidelines } = applyTurn(
+      guidelines,
+      turn({
+        guidelines: [
+          guideline("product", "Tea."),
+          guideline("tech", "Use pnpm.\n\nDeploy with [REDACTED]."),
+        ],
+      }),
+      at,
+    );
+    expect(session.guidelines.map(({ name }) => name)).toEqual(["product"]);
+    expect(leftOutGuidelines).toEqual([
+      {
+        name: "tech",
+        reason:
+          "Line 8 looks like it holds a credential, which a Guideline never does: take it out.",
+      },
+    ]);
+  });
+
+  it("keeps no Guidelines in any other session", () => {
+    for (const skill of ["grilling", "to-tickets"] as const) {
+      const { session } = applyTurn(
+        { ...empty, skill },
+        turn({ ...documents, guidelines: [guideline("tech", "Use pnpm.")] }),
+        at,
+      );
+      expect(session.guidelines).toEqual([]);
+    }
+    expect(applyTurn(empty, turn(documents), at).session.outline).toHaveLength(
+      1,
+    );
   });
 });
 

@@ -1,11 +1,15 @@
 import {
   grillingWritesDocuments,
+  grillingWritesGuidelines,
+  guidelineDocument,
+  parseGuideline,
   type GrillingAdr,
   type GrillingAnswers,
   type GrillingDecision,
   type GrillingDocuments,
   type GrillingFact,
   type GrillingFactStatus,
+  type GrillingGuideline,
   type GrillingIssues,
   type GrillingProcess,
   type GrillingQuestion,
@@ -55,6 +59,8 @@ export interface GrillingSessionRecord {
   readonly issues: GrillingIssues | null;
   /** The documents `/to-tickets` read when it started; none for the others. */
   readonly sources: readonly GrillingSource[];
+  /** The Guidelines `/guidelines` settled (FR-109); none for the others. */
+  readonly guidelines: readonly GrillingGuideline[];
   readonly startedAt: Date;
   readonly updatedAt: Date;
   readonly pausedAt: Date | null;
@@ -195,6 +201,45 @@ export interface AppliedTurn {
    * reverse, surprising or the result of a real trade-off (FR-80).
    */
   readonly leftOut: readonly string[];
+  /**
+   * The Guidelines it left out (`/guidelines`, FR-109): each one AI Office
+   * would refuse to give Agents, such as one with a line like a
+   * credential, which the Owner could never approve.
+   */
+  readonly leftOutGuidelines: readonly LeftOutGuideline[];
+}
+
+/** A Guideline left out of a turn, and why (FR-102, FR-112). */
+export interface LeftOutGuideline {
+  readonly name: string;
+  readonly reason: string;
+}
+
+/**
+ * A session's Guideline as its whole file: its front matter, then its
+ * rules (FR-102, FR-109).
+ */
+export const guidelineContent = (guideline: GrillingGuideline): string =>
+  guidelineDocument({
+    inclusion: guideline.inclusion,
+    fileMatchPatterns: guideline.fileMatchPatterns,
+    description: guideline.description,
+    body: guideline.text,
+  });
+
+/**
+ * Why AI Office would refuse the Guideline's file, as it refuses any
+ * (FR-102), such as a line that looks like a credential (FR-112), even one
+ * redacted already; undefined when it would not.
+ */
+export function guidelineRefusal(
+  guideline: GrillingGuideline,
+): string | undefined {
+  const parsed = parseGuideline(
+    `${guideline.name}.md`,
+    guidelineContent(guideline),
+  );
+  return parsed.ok ? undefined : parsed.refused.reason;
 }
 
 /** Whether an ADR says why it is hard to reverse, surprising and a trade-off. */
@@ -249,16 +294,21 @@ const settled = (question: GrillingQuestion | undefined): boolean =>
  *    and the Owner is asked to confirm.
  *
  * A session that writes no documents (`/to-tickets`) keeps no glossary
- * terms and no documents' parts, whatever the turn gives.
+ * terms and no documents' parts, whatever the turn gives. `/guidelines`
+ * keeps Guidelines, each replacing the one of its name, in place of them
+ * (FR-109); every other session keeps none.
  */
 export function applyTurn(
   session: GrillingSessionRecord,
   given: GrillingTurn,
   at: Date,
 ): AppliedTurn {
-  const turn: GrillingTurn = grillingWritesDocuments(session.skill)
-    ? given
-    : { ...given, terms: [], outline: [], adrs: [], processes: [] };
+  const noDocuments = { terms: [], outline: [], adrs: [], processes: [] };
+  const turn: GrillingTurn = !grillingWritesDocuments(session.skill)
+    ? { ...given, ...noDocuments, guidelines: [] }
+    : grillingWritesGuidelines(session.skill)
+      ? { ...given, ...noDocuments }
+      : { ...given, guidelines: [] };
   const when = at.toISOString();
   const known = new Set(session.questions.map(({ number }) => number));
   const decisionRound = Math.max(1, session.round);
@@ -298,6 +348,14 @@ export function applyTurn(
   const leftOut = turn.adrs
     .filter((adr) => !adrWarranted(adr))
     .map(({ title }) => title);
+
+  const guidelines = turn.guidelines.map((guideline) => ({
+    guideline: {
+      ...guideline,
+      fileMatchPatterns: [...guideline.fileMatchPatterns],
+    },
+    reason: guidelineRefusal(guideline),
+  }));
 
   const withdrawn = new Set(turn.withdraw);
   const questions: GrillingQuestion[] = session.questions.map((question) =>
@@ -372,10 +430,20 @@ export function applyTurn(
         turn.processes.map(({ title, text }) => ({ title, text })),
         ({ title }) => title,
       ),
+      guidelines: replaced(
+        session.guidelines,
+        guidelines.flatMap(({ guideline, reason }) =>
+          reason === undefined ? [guideline] : [],
+        ),
+        ({ name }) => name,
+      ),
       updatedAt: at,
     },
     asked,
     leftOut,
+    leftOutGuidelines: guidelines.flatMap(({ guideline, reason }) =>
+      reason === undefined ? [] : [{ name: guideline.name, reason }],
+    ),
   };
 }
 
