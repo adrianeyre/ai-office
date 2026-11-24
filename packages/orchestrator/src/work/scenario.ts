@@ -128,6 +128,11 @@ export interface QaRun {
   readonly silent?: boolean;
   /** What a failure reports, if not that adding a sku twice fails. */
   readonly finding?: { readonly summary: string; readonly steps: string };
+  /**
+   * The report's `Criteria:` lines, for an issue filed from a Spec, such
+   * as "R1.1 pass" (FR-116); none by default.
+   */
+  readonly criteria?: readonly string[];
 }
 
 /** What the designer does in one of its runs. */
@@ -404,7 +409,7 @@ const coding = async (
 const checking = async (
   { print, sh }: FakeAgentContext,
   run: number,
-  { result: found, addsTest = false, silent = false, finding }: QaRun,
+  { result: found, addsTest = false, silent = false, finding, criteria }: QaRun,
   proposed?: Proposing,
 ): Promise<void> => {
   if (addsTest) {
@@ -431,6 +436,7 @@ const checking = async (
         found === "pass"
           ? `Summary: pnpm test passes, QA round ${String(run)}.`
           : `Summary: ${finding?.summary ?? "Adding the same sku twice fails"}, QA round ${String(run)}.`,
+        ...(criteria === undefined ? [] : ["Criteria:", ...criteria]),
         found === "pass"
           ? "Steps: none"
           : `Steps:\n${finding?.steps ?? "1. add('a')\n2. add('a')\n3. The basket has two"}`,

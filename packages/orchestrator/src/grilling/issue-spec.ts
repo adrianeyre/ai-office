@@ -15,7 +15,10 @@ import type { GrillingStore } from "./store.ts";
 // - the coder (every work Role) gets the issue's Acceptance Criteria and
 //   the Spec's approved `design.md`, quoted, within the prompt budget;
 // - reviewers get the issue's Acceptance Criteria, and judge the pull
-//   request against them, naming any not met.
+//   request against them, naming any not met;
+// - QA gets the issue's Acceptance Criteria, writes one property-based
+//   test for each (an example test where a property does not fit), and
+//   reports each by its id, passed or failed (`../qa/report.ts`).
 //
 // Both come from the copy the Owner approved, kept with the `/spec`
 // session in AI Office's database, never from the repository: an edit to
@@ -219,5 +222,31 @@ export function reviewerSpecSection(
     "",
     '- A criterion the pull request does not meet is blocking: give it a blocking comment that starts with its id, such as "R1.2 not met: …", on the line where the pull request falls short of it, or the nearest line the diff shows.',
     '- Name every criterion not met, by its id, in `summary`, such as "Not met: R1.2, R2.1". Approve only when the pull request meets every one.',
+  ];
+}
+
+/**
+ * The QA Stage's section on the issue's Spec (FR-116): its Acceptance
+ * Criteria, quoted, within `budget`, each to be proven by a test of its
+ * own, property-based where a property fits, and reported by id. Callers
+ * put a blank line before it.
+ */
+export function qaSpecSection(
+  spec: IssueSpec,
+  budget: number | undefined,
+): string[] {
+  const within = specWithin(spec, budget, false);
+  return [
+    "## The Spec's Acceptance Criteria",
+    "",
+    `This issue is ${whereFrom(spec)}. Prove each of its Acceptance Criteria, quoted below between \`<spec>\` markers, with a test of its own. ${notTheRepositorys}`,
+    "",
+    "<spec>",
+    ...criteriaLines(within),
+    "</spec>",
+    "",
+    "- Write one property-based test for each criterion, with its id in the test's name, such as \"R1.2: …\": one that checks the criterion's response for any input its trigger allows, not for one example. Use the repository's property-testing library; in a TypeScript repository with none, add fast-check as a dev dependency and use it. Where a property does not fit a criterion, or the repository is in another language with no such library, write an example test for it instead.",
+    "- A criterion passes only when its test passes. One with no test fails: test every criterion, any left out above too, as the issue quotes it.",
+    `- List every criterion in your report's \`Criteria:\`, a line each, its id first, then pass or fail, such as "R1.1 pass". One you leave out fails, and the issue goes back to the coder.`,
   ];
 }

@@ -44,6 +44,7 @@ import {
   type SharedMemory,
 } from "../memory/shared.ts";
 import { guidelineFiles } from "../guidelines/prompt.ts";
+import type { IssueSpecOf } from "../grilling/issue-spec.ts";
 import { changedFiles, type TaskGuidelines } from "../guidelines/tasks.ts";
 import { agentMemoryWithin, type PromptBudgetOf } from "../memory/budget.ts";
 import { nextRoleAt, stageAfter, type Pipeline } from "../pipeline/pipeline.ts";
@@ -71,8 +72,8 @@ import {
 } from "./caps.ts";
 import { askAgain } from "./ask-again.ts";
 import { qaFailedHandoff, qaPassedHandoff } from "./handoff.ts";
-import { qaPrompt, qaReportForm } from "./prompt.ts";
-import { parseQaReport, type QaReport } from "./report.ts";
+import { qaPrompt, qaReportFormFor } from "./prompt.ts";
+import { parseQaReport, type QaCriterion, type QaReport } from "./report.ts";
 
 // The QA flow (PRD FR-19, FR-28; §5 scenario 4): work queued at `needs-qa`
 // is done by the Floor's QA Agent in a sandbox on the pull request's
@@ -103,6 +104,13 @@ import { parseQaReport, type QaReport } from "./report.ts";
 // Its sandbox also has the Owner's Guidelines for the task mounted
 // read-only (Guidelines PRD, FR-105, FR-106): those for every task, those
 // the issue's labels ask for, and those for the files the pull request changes.
+// For an issue filed from a Spec, it is given the issue's Acceptance
+// Criteria as the Owner approved them, writes one property-based test for
+// each (an example test where a property does not fit), and reports each
+// by its id, passed or failed (Guidelines, Specs and Hooks PRD, FR-116).
+// A criterion without a test fails, and so does the round: the issue goes
+// back to the coder, naming it. An issue filed from no Spec is checked as
+// it was.
 
 export interface QaFlowOptions {
   readonly floors: FloorStore;
@@ -160,6 +168,13 @@ export interface QaFlowOptions {
    */
   readonly guidelines?: Pick<TaskGuidelines, "forTask">;
   /**
+   * The Spec each issue was filed from, as the Owner approved it in its
+   * session, never as the repository has it (Guidelines, Specs and Hooks
+   * PRD, FR-116): its criteria quoted in the prompt, each reported on.
+   * None without it.
+   */
+  readonly specs?: IssueSpecOf;
+  /**
    * The office Role library (FR-98): each task reads its Agent's Role
    * from it as the task starts. The built-in Roles when absent.
    */
@@ -200,7 +215,14 @@ const reasonOf = (error: unknown): string => {
 const title = (text: string): string =>
   text.length <= 200 ? text : `${text.slice(0, 199)}…`;
 
-/** QA's comment on the pull request: its result, summary and steps. */
+/** A criterion's line in QA's comment: "- R1.2 failed: no test reported". */
+const criterionLine = ({ id, result, untested }: QaCriterion): string =>
+  `- ${id} ${result === "pass" ? "passed" : untested ? "failed: no test reported" : "failed"}`;
+
+/**
+ * QA's comment on the pull request: its result, summary, each Acceptance
+ * Criterion's result for an issue filed from a Spec, and steps.
+ */
 export function qaCommentOf(
   agent: TrailerAgent,
   round: { readonly number: number; readonly cap: number },
@@ -211,6 +233,14 @@ export function qaCommentOf(
     `**${qaResultLabels[report.result]}** by ${agent.name} (QA, ${agent.aiProvider} ${agent.model}) in AI Office, QA round ${String(round.number)} of ${String(round.cap)}.`,
     "",
     report.summary,
+    ...(report.criteria === undefined || report.criteria.length === 0
+      ? []
+      : [
+          "",
+          "### Acceptance Criteria",
+          "",
+          ...report.criteria.map(criterionLine),
+        ]),
     ...(added === 0
       ? []
       : [
@@ -547,6 +577,11 @@ export function createQaFlow(options: QaFlowOptions): ExecuteWork {
       ),
       ...(budget === undefined ? {} : { budget: budget.guidelines }),
     });
+    // The Spec it was filed from, as the Owner approved it (FR-116).
+    const spec = await options.specs?.(floor.id, issue.number);
+    // Its report, with each criterion's result for an issue from a Spec.
+    const parse = (text: string | null): QaReport | undefined =>
+      parseQaReport(text, spec?.criteria);
     let run: SandboxRun | undefined;
     try {
       run = await options.runner.run({
@@ -583,6 +618,7 @@ export function createQaFlow(options: QaFlowOptions): ExecuteWork {
           round: { number: round, cap: qaRoundCap },
           ...(handed === undefined ? {} : { handoff: handed.summary }),
           ...(guidelines === undefined ? {} : { guidelines }),
+          ...(spec === undefined ? {} : { spec }),
           ...(memory === undefined ? {} : { memory }),
           ...(agentMemory === undefined ? {} : { agentMemory }),
           ...(budget === undefined ? {} : { budget }),
@@ -623,7 +659,7 @@ export function createQaFlow(options: QaFlowOptions): ExecuteWork {
       }
       // A run that ends without its report is asked for it once more.
       const found =
-        parseQaReport(run.lastText) ??
+        parse(run.lastText) ??
         (await askAgain({
           models: options.models,
           agent,
@@ -631,9 +667,9 @@ export function createQaFlow(options: QaFlowOptions): ExecuteWork {
           issue: issue.number,
           pullRequest: pullRequest.number,
           tag: "qa-report",
-          form: qaReportForm,
+          form: qaReportFormFor(spec),
           lastText: run.lastText,
-          parse: parseQaReport,
+          parse,
           signal,
         }));
       if (found === undefined) {
