@@ -118,6 +118,11 @@ import {
   type RepositorySkillReviewStore,
 } from "./skills/reviews.ts";
 import {
+  databaseGuidelineStore,
+  memoryGuidelineStore,
+  type GuidelineStore,
+} from "./guidelines/store.ts";
+import {
   databaseRoleStore,
   memoryRoleStore,
   type MemoryRoleStore,
@@ -185,6 +190,11 @@ export interface OfficeStores {
   readonly floorSkills: FloorSkillToggleStore;
   /** The repository Skills the Owner reviewed on each Floor (P1-10). */
   readonly repositorySkillReviews: RepositorySkillReviewStore;
+  /**
+   * The Guideline versions the Owner approved on each Floor, and those
+   * awaiting approval or dismissed (ADR 0014).
+   */
+  readonly guidelines: GuidelineStore;
   readonly batches: BatchStore;
   /** The turns of the work Roles a Plan gives an issue (FR-25 (1)). */
   readonly workTurns: WorkTurnsStore;
@@ -201,7 +211,7 @@ export interface OfficeStores {
  * `floor_templates`,
  * `notices`, `issue_token_caps`, `agent_cap_pauses`, `review_verdicts`,
  * `qa_reports`, `design_reviews`, `handoffs`, `skills`, `floor_skill_toggles`,
- * `repository_skill_reviews`,
+ * `repository_skill_reviews`, `approved_guidelines`, `guideline_changes`,
  * `manager_chat_messages`, `grilling_sessions`, `status_updates`, `issue_triage`, `manager_decisions`, `batches`,
  * `plans`, `batch_issues`, `issue_work_turns`, `memory_proposals`,
  * `memory_curations`,
@@ -231,6 +241,7 @@ export const databaseStores = (db: Database): OfficeStores => ({
   decisions: databaseDecisionStore(db),
   floorSkills: databaseFloorSkillToggleStore(db),
   repositorySkillReviews: databaseRepositorySkillReviewStore(db),
+  guidelines: databaseGuidelineStore(db),
   batches: databaseBatchStore(db),
   workTurns: databaseWorkTurnsStore(db),
   memory: databaseMemoryStore(db),
@@ -301,6 +312,7 @@ export function memoryStores(): OfficeStores & {
     decisions: memoryDecisionStore(),
     floorSkills: memoryFloorSkillToggleStore(),
     repositorySkillReviews: memoryRepositorySkillReviewStore(),
+    guidelines: memoryGuidelineStore(),
     batches: memoryBatchStore(),
     workTurns: memoryWorkTurnsStore(),
     memory: memoryMemoryStore(),

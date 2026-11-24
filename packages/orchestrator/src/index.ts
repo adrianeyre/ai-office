@@ -635,6 +635,30 @@ export {
 } from "./skills/repository.ts";
 export { readFloorGuidelines, readGuidelines } from "./guidelines/read.ts";
 export {
+  awaitingCount,
+  createGuidelineApprovals,
+  guidelineContentHash,
+  guidelinesNoticeTitle,
+  GuidelineVersionError,
+  openGuidelinesAction,
+  withGuidelines,
+  type ApprovedGuideline,
+  type FloorGuidelineApprovals,
+  type GuidelineApprovals,
+  type GuidelineApprovalsOptions,
+  type UnapprovedGuideline,
+} from "./guidelines/approval.ts";
+export {
+  databaseGuidelineStore,
+  guidelineChangeStatuses,
+  memoryGuidelineStore,
+  type GuidelineApprovalRecord,
+  type GuidelineChangeRecord,
+  type GuidelineChangeStatus,
+  type GuidelineStore,
+  type GuidelineVersion,
+} from "./guidelines/store.ts";
+export {
   databaseRepositorySkillReviewStore,
   memoryRepositorySkillReviewStore,
   type RepositorySkillReview,

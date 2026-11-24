@@ -17,6 +17,7 @@ import {
 } from "@ai-office/shared";
 
 import type { FloorRecord, FloorStore } from "../floors/store.ts";
+import type { GuidelineApprovals } from "../guidelines/approval.ts";
 import type { Triage } from "../manager/triage.ts";
 import { positionOf, type Pipeline } from "../pipeline/pipeline.ts";
 import { createRounds } from "../rounds.ts";
@@ -40,6 +41,8 @@ import { approvedIssue, UnapprovedIssueError } from "./approved.ts";
 // depends on, is the Batch's to start, not intake's. With the GitHub App's
 // webhooks on, a webhook starts a round at once; polling carries on, in
 // case a delivery is lost.
+// Each round also reads each Floor's Guidelines from its default branch,
+// so only the versions the Owner approved reach Agents (ADR 0014).
 
 /**
  * Renames the labels the pipeline has renamed on a Floor's repository
@@ -171,6 +174,12 @@ export interface IntakeOptions {
    * them for their Batch to start.
    */
   readonly held?: (floorId: string) => Promise<ReadonlySet<number>>;
+  /**
+   * Reads each Floor's Guidelines from its default branch every round,
+   * settling which versions the Owner approved (Guidelines PRD, FR-103):
+   * a Floor whose read fails still has its issues taken in.
+   */
+  readonly guidelines?: Pick<GuidelineApprovals, "sync">;
   /** Told of each round that did something or failed somewhere. */
   readonly onReport?: (report: IntakeReport) => void;
 }
@@ -278,6 +287,11 @@ export function createIntake(options: IntakeOptions): Intake {
     const { ownerLogin } = await options.settings();
     // Archived Floors are not listed: their intake has stopped (FR-9).
     for (const floor of await options.floors.list()) {
+      try {
+        await options.guidelines?.sync(floor);
+      } catch (error) {
+        report.failed.push({ floorId: floor.id, error });
+      }
       let issues: Issue[];
       try {
         await ensureLabels(floor);
