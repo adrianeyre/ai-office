@@ -301,8 +301,9 @@ const batchPlanned = event("batch.planned", {
   editedFrom: z.number().int().positive().optional(),
 });
 // The Owner approves a Batch's Plan on the whiteboard (FR-25.3), or by
-// asking for its work in the Manager chat (ADR 0004, ADR 0012); its work
-// then starts (`batch.started`).
+// asking for its work in the Manager chat (ADR 0004, ADR 0012), or by
+// confirming the tasks of the Spec whose issues it works (Guidelines,
+// Specs and Hooks PRD, FR-115); its work then starts (`batch.started`).
 const batchApproved = event("batch.approved", {
   floorId,
   batchId,
@@ -315,6 +316,11 @@ const batchApproved = event("batch.approved", {
    * approval; absent when the Owner approved it on the whiteboard.
    */
   messageId: z.number().int().positive().optional(),
+  /**
+   * The `/spec` Grilling Session whose confirmed tasks stand as the
+   * approval (FR-115); absent for any other Batch.
+   */
+  specSessionId: z.number().int().positive().optional(),
 });
 const batchStarted = event("batch.started", {
   floorId,

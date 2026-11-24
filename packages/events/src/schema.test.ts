@@ -119,6 +119,16 @@ describe("a Plan's approval in events", () => {
       officeEventSchema.safeParse({ ...approved, messageId: 0 }).success,
     ).toBe(false);
   });
+
+  it("reads one by a Spec's confirmed tasks, naming its session (FR-115)", () => {
+    const approved = exampleEvents["batch.approved"];
+    expect(
+      officeEventSchema.safeParse({ ...approved, specSessionId: 7 }).success,
+    ).toBe(true);
+    expect(
+      officeEventSchema.safeParse({ ...approved, specSessionId: 0 }).success,
+    ).toBe(false);
+  });
 });
 
 describe("subjectOf", () => {
