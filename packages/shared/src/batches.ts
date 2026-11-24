@@ -294,6 +294,51 @@ export const wrapUpIssueSchema = z.object({
 });
 export type WrapUpIssue = z.infer<typeof wrapUpIssueSchema>;
 
+/** The most departures from one Spec's design a Wrap-up keeps. */
+export const maxDesignDepartures = 20;
+/** The longest departure, in a line. */
+export const maxDesignDepartureLength = 500;
+
+/**
+ * How a Batch's merged work stands against the design of the Spec its
+ * issues were filed from (Guidelines, Specs and Hooks PRD, FR-117): the
+ * Wrap-up has the Manager compare the merged pull requests with
+ * `design.md` as the Owner approved it, and says where they depart.
+ */
+export const wrapUpDesignCheckSchema = z.object({
+  /** The Spec's folder: `.agents/specs/<slug>`. */
+  folder: z.string(),
+  /** The `/spec` Grilling Session that approved its design. */
+  sessionId: z.number().int().positive(),
+  /** The merged pull requests compared with it. */
+  pullRequests: z.array(issueNumberSchema),
+  /**
+   * Where the merged work departs from `design.md`, a line each, as the
+   * Manager found it (redacted); none when it follows the design, or it
+   * could not be compared.
+   */
+  departures: z
+    .array(z.string().max(maxDesignDepartureLength))
+    .max(maxDesignDepartures),
+  /** Why it could not be compared; null when it was. */
+  problem: z.string().nullable(),
+});
+export type WrapUpDesignCheck = z.infer<typeof wrapUpDesignCheckSchema>;
+
+/**
+ * The Manager's answer to a Wrap-up's design check: where the merged work
+ * departs from the Spec's `design.md`, a line each; none when it follows.
+ * AI Office squeezes each onto one line and keeps at most
+ * `maxDesignDepartures`.
+ */
+export const designCheckAnswerSchema = z.object({
+  departures: z.array(
+    z.string({ error: "Each departure is a line of text." }),
+    { error: "`departures` is a list of lines." },
+  ),
+});
+export type DesignCheckAnswer = z.infer<typeof designCheckAnswerSchema>;
+
 /** A finished Batch's results, as its Wrap-up presents them (FR-25.6). */
 export const wrapUpSchema = z.object({
   /** The version of the Plan it finished on. */
@@ -310,6 +355,11 @@ export const wrapUpSchema = z.object({
     tokens: tokenCount,
     estimatedCostUsd: z.number().min(0),
   }),
+  /**
+   * For issues filed from a Spec with a design, the merged work compared
+   * with each Spec's `design.md` (FR-117). Absent for a Batch with none.
+   */
+  designChecks: z.array(wrapUpDesignCheckSchema).optional(),
 });
 export type WrapUp = z.infer<typeof wrapUpSchema>;
 

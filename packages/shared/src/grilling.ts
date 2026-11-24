@@ -882,6 +882,27 @@ export const confirmSpecPhaseText = (phase: SpecPhase): string =>
   `confirm ${phase}`;
 /** What skips a `/spec` session's design (FR-113). */
 export const skipSpecDesignText = "skip design";
+/**
+ * What starts a session that amends the Spec in `.agents/specs/<slug>/`
+ * (FR-117): "/spec amend checkout-with-saved-cards".
+ */
+export const amendSpecText = (slug: string): string =>
+  `/${specSkillName} amend ${slug}`;
+
+/**
+ * The slug of the Spec `/spec`'s arguments ask to amend: "amend
+ * checkout-with-saved-cards", one folder name after "amend", lower case,
+ * digits and dashes (a trailing slash, or the folder's path, allowed).
+ * None for any other words, which start a new Spec.
+ */
+export function readSpecAmend(given: string): string | undefined {
+  const match =
+    /^\s*amend\s+(?:\.agents\/specs\/)?([a-z0-9][a-z0-9-]*)\/?\s*$/i.exec(
+      given,
+    );
+  return match?.[1]?.toLowerCase();
+}
+
 /** What reopens a `/spec` session's earlier phase: "reopen requirements". */
 export const reopenSpecPhaseText = (phase: SpecPhase): string =>
   `reopen ${phase}`;

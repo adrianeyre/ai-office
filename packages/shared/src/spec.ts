@@ -19,7 +19,11 @@ import { maxGrillingIssues } from "./grilling-issues.ts";
 // Reopening an earlier phase drops the approved copies from it on, and the
 // drafts of the later phases, which are drafted again. Later prompts and
 // Agents read the approved copy kept with the session, never the file as
-// it stands. The server, the web app and the orchestrator share these.
+// it stands. Code moves on after a Spec is approved: `/spec amend <slug>`
+// starts a new session on the same folder, back at the requirements, with
+// the documents approved last loaded as its drafts, each phase confirmed
+// again; its pull request updates the Spec's files (FR-117). The server,
+// the web app and the orchestrator share these.
 
 /** Where a Floor's Specs are kept, one folder each: `.agents/specs/<slug>/`. */
 export const specsFolder = ".agents/specs";
@@ -137,6 +141,28 @@ export const grillingSpecSchema = z.object({
     design: timestampSchema.nullable(),
     tasks: timestampSchema.nullable(),
   }),
+  /**
+   * The Spec this session amends (`/spec amend <slug>`, FR-117): the
+   * session that approved it, and its tasks that had an issue, each of
+   * which keeps its issue while the amended tasks hold it unchanged.
+   * Absent for a new Spec.
+   */
+  amends: z
+    .object({
+      sessionId: z.number().int().positive(),
+      tasks: z.array(
+        z.object({
+          title: z.string(),
+          description: z.string(),
+          meets: z.array(z.string()),
+          issue: z.object({
+            number: z.number().int().positive(),
+            url: z.string(),
+          }),
+        }),
+      ),
+    })
+    .optional(),
 });
 export type GrillingSpec = z.infer<typeof grillingSpecSchema>;
 

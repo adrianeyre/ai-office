@@ -7,6 +7,7 @@ import {
   startsGrillingSession,
 } from "./built-in-skills.ts";
 import {
+  amendSpecText,
   composeGrillingAnswers,
   draftGrillingIssuesText,
   fileGrillingIssuesText,
@@ -18,6 +19,7 @@ import {
   grillingWritesGuidelines,
   grillingWritesSpec,
   guidelinesSkillName,
+  readSpecAmend,
   confirmSpecPhaseText,
   reopenSpecPhaseText,
   skipSpecDesignText,
@@ -418,5 +420,27 @@ describe("a /guidelines turn's Guidelines (FR-109)", () => {
         `The ${name} Guideline is always: product, tech and structure apply to every task.`,
       ]);
     }
+  });
+});
+
+describe("/spec amend <slug> (FR-117)", () => {
+  it("names the Spec to amend by its folder's slug", () => {
+    expect(amendSpecText("checkout-with-saved-cards")).toBe(
+      "/spec amend checkout-with-saved-cards",
+    );
+    expect(readSpecAmend("amend checkout-with-saved-cards")).toBe(
+      "checkout-with-saved-cards",
+    );
+    expect(readSpecAmend("  Amend Checkout  ")).toBe("checkout");
+    expect(readSpecAmend("amend .agents/specs/checkout/")).toBe("checkout");
+    expect(readSpecAmend("amend checkout-2")).toBe("checkout-2");
+  });
+
+  it("reads any other words as a new Spec's", () => {
+    expect(readSpecAmend("checkout with saved cards")).toBeUndefined();
+    expect(readSpecAmend("amend the checkout")).toBeUndefined();
+    expect(readSpecAmend("amend")).toBeUndefined();
+    expect(readSpecAmend("amendments to checkout")).toBeUndefined();
+    expect(readSpecAmend("")).toBeUndefined();
   });
 });
