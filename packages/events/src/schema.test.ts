@@ -10,7 +10,7 @@ import {
 import { exampleEvents } from "./test-support.ts";
 
 describe("officeEventSchema", () => {
-  it("covers Floor, Agent, Contractor, issue, Manager decision, Batch, Status update, memory, sandbox, Grilling Session fact-finding, documents and issues, repository, branch, pull request, review, QA, design review, Handoff, model call, Notice, cap, AI Account, config, Connection, Google sign-in, Skill, Role, Floor Template, sign-in and Gateway Key events", () => {
+  it("covers Floor, Agent, Contractor, issue, Manager decision, Batch, Status update, memory, Guideline, sandbox, Grilling Session fact-finding, documents and issues, repository, branch, pull request, review, QA, design review, Handoff, model call, Notice, cap, AI Account, config, Connection, Google sign-in, Skill, Role, Floor Template, sign-in and Gateway Key events", () => {
     const families = new Set(eventTypes.map((type) => type.split(".")[0]));
     expect([...families].sort()).toEqual(
       [
@@ -28,6 +28,7 @@ describe("officeEventSchema", () => {
         "gateway_key",
         "google",
         "grilling",
+        "guideline",
         "handoff",
         "issue",
         "manager",
@@ -157,5 +158,38 @@ describe("matchesFilter", () => {
     expect(
       matchesFilter(handoff, { floorId: "web-shop", issue: 4, agentId: "x" }),
     ).toBe(false);
+  });
+});
+
+describe("Guideline events", () => {
+  it("name a Guideline and its version, never its text", () => {
+    const approved = exampleEvents["guideline.approved"];
+    expect(officeEventSchema.parse(approved)).toEqual(approved);
+    // A Floor admin approval has no commit or pull request.
+    expect(
+      officeEventSchema.safeParse({
+        type: "guideline.approved",
+        version: 1,
+        floorId: "web-shop",
+        name: "tech",
+        contentHash: "a".repeat(64),
+        approval: "owner_admin",
+      }).success,
+    ).toBe(true);
+    for (const wrong of [
+      { name: "Tech.md" },
+      { contentHash: "not-a-hash" },
+      { approval: "app_merge" },
+      { content: "Use pnpm." },
+    ]) {
+      expect(
+        officeEventSchema.safeParse({ ...approved, ...wrong }).success,
+      ).toBe(false);
+    }
+    expect(subjectOf(exampleEvents["guideline.awaiting"])).toEqual({
+      floorId: "web-shop",
+      agentIds: [],
+      issue: null,
+    });
   });
 });

@@ -31,6 +31,8 @@ import {
   triageOutcomes,
   watchdogTriggers,
   grillingSessionStatuses,
+  guidelineApprovals,
+  guidelineNamePattern,
   contractorKinds,
   daySchema,
   statusUpdateTriggers,
@@ -419,6 +421,41 @@ const memoryCurated = event("memory.curated", {
   /** The pull request it opened or updated; none when nothing changed. */
   pullRequest: issue.optional(),
   url: z.url().optional(),
+});
+// Guidelines (Guidelines, Specs and Hooks PRD, FR-103, FR-111; ADR 0014):
+// a version of one of a Floor's Guidelines the Owner approved, one waiting
+// for the Owner's approval (Agents keep the last approved one meanwhile),
+// and one the Owner dismissed. Each names the Guideline and its version by
+// its content's hash, never its text.
+const guidelineName = z.string().regex(guidelineNamePattern).max(255);
+/** The SHA-256 of the version's whole file. */
+const guidelineHash = z.string().regex(/^[0-9a-f]{64}$/);
+const gitSha = z.string().regex(/^[0-9a-f]{40,64}$/);
+const guidelineApproved = event("guideline.approved", {
+  floorId,
+  name: guidelineName,
+  contentHash: guidelineHash,
+  approval: z.enum(guidelineApprovals),
+  /** The commit that last changed it; absent for the Floor admin's. */
+  sha: gitSha.optional(),
+  /** The Owner's pull request that merged it, for `owner_merge`. */
+  pullRequest: issue.optional(),
+  /** That pull request, or that commit, on GitHub. */
+  url: z.url().optional(),
+});
+const guidelineAwaiting = event("guideline.awaiting", {
+  floorId,
+  name: guidelineName,
+  contentHash: guidelineHash,
+  /** The commit that last changed it, which the Owner neither merged nor pushed. */
+  sha: gitSha.optional(),
+  /** That commit on GitHub. */
+  url: z.url().optional(),
+});
+const guidelineDismissed = event("guideline.dismissed", {
+  floorId,
+  name: guidelineName,
+  contentHash: guidelineHash,
 });
 // Office-wide and Role memory (PRD FR-54, FR-55, FR-56): the Owner edits
 // the office-wide memory; Agents propose Role memory in their Handoffs, the
@@ -1066,6 +1103,9 @@ export const officeEventSchema = z.discriminatedUnion("type", [
   memoryOfficeChanged,
   memoryRoleProposed,
   memoryRoleChanged,
+  guidelineApproved,
+  guidelineAwaiting,
+  guidelineDismissed,
   sandboxStarted,
   sandboxStopped,
   sandboxText,

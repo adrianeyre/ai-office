@@ -950,6 +950,81 @@ describe("event text", () => {
     ]);
   });
 
+  it("says how a Guideline was approved, or that it awaits approval, and links GitHub", () => {
+    const sha = "b".repeat(40);
+    const names = { agent: (id: string) => id };
+    const approved: OfficeEvent = {
+      type: "guideline.approved",
+      version: 1,
+      floorId: "web-shop",
+      name: "migrations",
+      contentHash: "a".repeat(64),
+      approval: "owner_merge",
+      sha,
+      pullRequest: 12,
+      url: "https://github.com/adrianeyre/web-shop/pull/12",
+    };
+    expect(describeEvent(approved, names)).toBe(
+      'Guideline "migrations" approved: the Owner merged PR #12, which changed it. Agents follow this version.',
+    );
+    expect(sourceLinks(approved, [])).toEqual([
+      {
+        kind: "github",
+        href: "https://github.com/adrianeyre/web-shop/pull/12",
+        label: "PR #12 on GitHub",
+      },
+    ]);
+    expect(
+      describeEvent(
+        {
+          type: "guideline.approved",
+          version: 1,
+          floorId: "web-shop",
+          name: "tech",
+          contentHash: "a".repeat(64),
+          approval: "owner_push",
+          sha,
+        },
+        names,
+      ),
+    ).toBe(
+      'Guideline "tech" approved: the Owner pushed the commit that changed it. Agents follow this version.',
+    );
+    const awaiting: OfficeEvent = {
+      type: "guideline.awaiting",
+      version: 1,
+      floorId: "web-shop",
+      name: "tech",
+      contentHash: "c".repeat(64),
+      sha,
+      url: `https://github.com/adrianeyre/web-shop/commit/${sha}`,
+    };
+    expect(describeEvent(awaiting, names)).toBe(
+      'Guideline "tech" changed in bbbbbbb, which the Owner neither merged nor pushed: it awaits the Owner\'s approval, and Agents keep the last version the Owner approved.',
+    );
+    expect(sourceLinks(awaiting, [])).toEqual([
+      {
+        kind: "github",
+        href: `https://github.com/adrianeyre/web-shop/commit/${sha}`,
+        label: "Commit on GitHub",
+      },
+    ]);
+    expect(
+      describeEvent(
+        {
+          type: "guideline.dismissed",
+          version: 1,
+          floorId: "web-shop",
+          name: "tech",
+          contentHash: "c".repeat(64),
+        },
+        names,
+      ),
+    ).toBe(
+      'The Owner dismissed the change to Guideline "tech": Agents keep the last version the Owner approved.',
+    );
+  });
+
   it("says what a reviewer's verdict was, and links the review on GitHub", () => {
     const posted: OfficeEvent = {
       type: "review.posted",

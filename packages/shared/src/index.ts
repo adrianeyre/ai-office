@@ -1104,6 +1104,8 @@ export {
   type RepositoryMemoryView,
 } from "./memory.ts";
 export {
+  floorGuidelinesPath,
+  guidelineApprovals,
   guidelineFrontMatterFields,
   guidelineInclusions,
   guidelineNameOf,
@@ -1117,6 +1119,7 @@ export {
   secretLinesReason,
   type FloorGuidelines,
   type Guideline,
+  type GuidelineApproval,
   type GuidelineInclusion,
   type GuidelineRefusal,
   type ParsedGuideline,

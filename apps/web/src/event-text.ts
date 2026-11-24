@@ -52,6 +52,9 @@ export const eventTypeLabels: Record<EventType, string> = {
   "memory.office_changed": "Office-wide memory changed",
   "memory.role_proposed": "Role memory proposed",
   "memory.role_changed": "Role memory changed",
+  "guideline.approved": "Guideline approved",
+  "guideline.awaiting": "Guideline awaiting approval",
+  "guideline.dismissed": "Guideline change dismissed",
   "sandbox.started": "Sandbox started",
   "sandbox.stopped": "Sandbox stopped",
   "sandbox.text": "Agent output",
@@ -179,6 +182,10 @@ export const eventTypeGroups: readonly {
       "memory.role_proposed",
       "memory.role_changed",
     ],
+  },
+  {
+    label: "Guidelines",
+    types: ["guideline.approved", "guideline.awaiting", "guideline.dismissed"],
   },
   {
     label: "Sandboxes",
@@ -557,6 +564,23 @@ export function describeEvent(
           : `: ${event.reason.replace(/[.!?]+$/, "")}`
       }.`;
     }
+    case "guideline.approved":
+      return `Guideline "${event.name}" approved: ${
+        {
+          owner_merge:
+            event.pullRequest === undefined
+              ? "the Owner merged the pull request that changed it"
+              : `the Owner merged PR #${String(event.pullRequest)}, which changed it`,
+          owner_push: "the Owner pushed the commit that changed it",
+          owner_admin: "the Owner approved it in the Floor admin",
+        }[event.approval]
+      }. Agents follow this version.`;
+    case "guideline.awaiting":
+      return `Guideline "${event.name}" changed${
+        event.sha === undefined ? "" : ` in ${event.sha.slice(0, 7)}`
+      }, which the Owner neither merged nor pushed: it awaits the Owner's approval, and Agents keep the last version the Owner approved.`;
+    case "guideline.dismissed":
+      return `The Owner dismissed the change to Guideline "${event.name}": Agents keep the last version the Owner approved.`;
     case "sandbox.started":
       return `${agent(event.agentId)} started a sandbox for #${String(event.issue)} on ${event.branch}.`;
     case "sandbox.stopped":

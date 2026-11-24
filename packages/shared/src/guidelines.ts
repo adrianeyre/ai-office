@@ -40,6 +40,25 @@ export const guidelineFrontMatterFields = [
   "description",
 ] as const;
 
+/**
+ * How the Owner approved a version of a Guideline (FR-103; ADR 0014):
+ * - `owner_merge`: the last commit that changed it reached the default
+ *   branch through a pull request the Owner merged, on GitHub or with
+ *   **Approve and merge** in AI Office;
+ * - `owner_push`: the Owner pushed that commit;
+ * - `owner_admin`: the Owner approved it in the Floor admin.
+ */
+export const guidelineApprovals = [
+  "owner_merge",
+  "owner_push",
+  "owner_admin",
+] as const;
+export type GuidelineApproval = (typeof guidelineApprovals)[number];
+
+/** Where the Owner sees a Floor's Guidelines: its Floor admin. */
+export const floorGuidelinesPath = (floorId: string): string =>
+  `/floor-settings/${encodeURIComponent(floorId)}`;
+
 /** A Guideline that keeps the rules. */
 export interface Guideline {
   /** Its file name without `.md`, such as `migrations`. */
