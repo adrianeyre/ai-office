@@ -2503,10 +2503,7 @@ export const hooks = pgTable(
       "hooks_skill_name",
       sql`${table.skillName} ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND length(${table.skillName}) <= 64`,
     ),
-    check(
-      "hooks_runs_per_hour",
-      sql`${table.runsPerHour} BETWEEN 1 AND 60`,
-    ),
+    check("hooks_runs_per_hour", sql`${table.runsPerHour} BETWEEN 1 AND 60`),
     check("hooks_failures", sql`${table.failures} >= 0`),
   ],
 );
