@@ -463,8 +463,10 @@ it:
 
 Only the Owner moves the Spec on, in those words, read by plain code; the
 Manager never does. A confirmation is refused, saying why, while a
-question of the phase is open, before the phase is drafted, or for a
-phase the Spec is not on; so is "skip design" outside the design.
+question of the phase is open, before the phase is drafted, for a
+phase the Spec is not on, or, for the requirements, while any
+[Acceptance Criterion fails the check](#acceptance-criteria-are-checked);
+so is "skip design" outside the design.
 Once nothing is left to ask, the chat says which words end the phase.
 
 - **Each confirmation commits its document.** The draft becomes the
@@ -510,3 +512,39 @@ Once nothing is left to ask, the chat says which words end the phase.
   (`GET /api/floors/:floorId/grilling-sessions/:id`) sends it as `spec`:
   `{"slug","phase","drafts","approved","designSkipped","confirmedAt"}`,
   null for every other session.
+
+### Acceptance Criteria are checked
+
+An Acceptance Criterion is useful to reviewers and QA only as one
+testable statement they can name, so plain code checks every one before
+"confirm requirements" is accepted (FR-114;
+`packages/shared/src/acceptance-criteria.ts`). Each criterion:
+
+- **starts with its id**, a capital `R`, its own requirement's number, a
+  dot and a number from 1: requirement 2's criteria are `R2.1`, `R2.2`
+  and on, in any order (the id may be in bold, and followed by a colon);
+- **has an id no other criterion of the Spec has**;
+- **is in one of four forms**, its keywords in capitals:
+  `WHEN <trigger> THE SYSTEM SHALL <response>`,
+  `IF <condition> THEN … SHALL <response>`,
+  `WHILE <state> … SHALL <response>` or
+  `WHERE <option> … SHALL <response>`, each part said;
+- **says `SHALL` once**: one behaviour per criterion, so "keep the token
+  and email the shopper" is two.
+
+Prose that is not such a statement (context, notes, examples) belongs in
+the user story or the introduction. While any criterion fails,
+"confirm requirements" is refused with a list of **every** failing
+criterion, not just the first: where it is, what it says (cut short when
+long) and each reason it fails, such as
+
+```text
+- Requirement 1, criterion 3, "Saved cards are kept safe.": it has no id: start it with one, such as R1.3; it is not in a criterion's form: …
+- Requirement 2, criterion 2 (R1.4), "R1.4 IF a saved card is declined THEN …": its id R1.4 is not one of requirement 2's: they are R2.1, R2.2 and on.
+```
+
+The draft stays as it was and nothing is committed. The chat says so as
+soon as such a draft is complete, in place of asking the Owner to
+confirm, and the Manager's next turn is given the same list to fix; the
+Owner says what to change, or asks for them to be fixed. The `/spec`
+instructions teach the Manager these rules from its first draft.
