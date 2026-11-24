@@ -54,6 +54,7 @@ import {
   createPipeline,
   createNoAccountLeftNotices,
   createGuidelineApprovals,
+  createHookRunner,
   createGuidelineProposals,
   createTaskGuidelines,
   plannedFiles,
@@ -1017,6 +1018,26 @@ export async function startOffice(
     github,
   });
 
+  // Each Floor's Hooks (Guidelines PRD, FR-118 to FR-120; ADR 0016): on the
+  // events the Owner chose, an Agent follows a Skill in one model call
+  // through the AI Gateway, as that Agent, and its answer is posted.
+  const hookRunner = createHookRunner({
+    floors: stores.floors,
+    agents: stores.agents,
+    roles: stores.roles,
+    store: stores.hooks,
+    events,
+    github,
+    skills: floorSkills,
+    models,
+    notices,
+    defaultModels: () => aiProviders.defaultModels(),
+    redactor,
+    onError: (error) => {
+      logger.warn({ err: error }, "A Hook could not be run.");
+    },
+  });
+
   // A Grilling Session's facts (FR-79), found in read-only sandboxes that
   // reach models through the AI Gateway with the Agent's own Gateway Key
   // (ADR 0001), when the GitHub App and the sandboxes' Gateway are set.
@@ -1339,6 +1360,7 @@ export async function startOffice(
     notices,
     guidelineApprovals,
     guidelineProposals,
+    hookRunner,
     aiAccounts,
     combos,
     modelMappings,
@@ -2150,6 +2172,8 @@ export async function startOffice(
     );
   }, keepAliveRoundMs);
   keepCachesWarm.unref();
+  /** Stops the Hooks once they have started. */
+  let stopHooks = (): void => undefined;
   app.addHook("onClose", async () => {
     // A restart writes a new setup token; this one's file goes.
     await setupToken?.spend();
@@ -2164,6 +2188,7 @@ export async function startOffice(
     noAccountLeft.stop();
     guidelineApprovals.stop();
     taskGuidelines.stop();
+    stopHooks();
     capEnforcement.stop();
     workingAgents.stop();
     await intake.stop();
@@ -2257,6 +2282,10 @@ export async function startOffice(
       logger.warn({ err: error }, "The Communications Agent did not start.");
     });
   intake.start();
+  stopHooks = await hookRunner.start().catch((error: unknown) => {
+    logger.warn({ err: error }, "Hooks did not start.");
+    return () => undefined;
+  });
   refreshPrices();
   refreshCatalogue();
   refreshTokens();
