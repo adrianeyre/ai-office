@@ -1,3 +1,9 @@
+## [1.14.0](https://github.com/adrianeyre/ai-office/compare/v1.13.0...v1.14.0) (2026-11-24)
+
+### Features
+
+* **web:** lead each AI Account with a priority badge ([7cc1041](https://github.com/adrianeyre/ai-office/commit/7cc1041f0284575b25006d91c4815bb40fb67cb3))
+
 ## [1.13.0](https://github.com/adrianeyre/ai-office/compare/v1.12.0...v1.13.0) (2026-11-21)
 
 ### Features
