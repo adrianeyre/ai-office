@@ -500,13 +500,14 @@ CREATE TABLE "grilling_sessions" (
 	"issues" jsonb,
 	"sources" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"guidelines" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"spec" jsonb,
 	"started_at" timestamp with time zone NOT NULL,
 	"updated_at" timestamp with time zone NOT NULL,
 	"paused_at" timestamp with time zone,
 	"ended_at" timestamp with time zone,
 	CONSTRAINT "grilling_sessions_status" CHECK ("grilling_sessions"."status" IN ('active', 'paused', 'ended')),
 	CONSTRAINT "grilling_sessions_round" CHECK ("grilling_sessions"."round" >= 0),
-	CONSTRAINT "grilling_sessions_skill" CHECK ("grilling_sessions"."skill" IN ('grilling', 'grill-with-docs', 'wayfinder', 'to-tickets', 'to-spec', 'guidelines')),
+	CONSTRAINT "grilling_sessions_skill" CHECK ("grilling_sessions"."skill" IN ('grilling', 'grill-with-docs', 'wayfinder', 'to-tickets', 'to-spec', 'guidelines', 'spec')),
 	CONSTRAINT "grilling_sessions_paused" CHECK (("grilling_sessions"."status" = 'paused') = ("grilling_sessions"."paused_at" IS NOT NULL)),
 	CONSTRAINT "grilling_sessions_ended" CHECK (("grilling_sessions"."status" = 'ended') = ("grilling_sessions"."ended_at" IS NOT NULL))
 );

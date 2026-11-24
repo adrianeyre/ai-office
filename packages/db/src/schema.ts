@@ -1988,7 +1988,9 @@ export const directChatMessages = pgTable(
 // `/guidelines`, Guidelines, Specs and Hooks PRD FR-109), `sources` the
 // documents `/to-tickets` read into it (`grillingSourceSchema`), and
 // `guidelines` the Guidelines `/guidelines` settled
-// (`grillingGuidelineSchema`). A Floor runs at most one session at a time;
+// (`grillingGuidelineSchema`). `spec` is a `/spec` session's phase, its
+// drafts and the documents the Owner approved (FR-113, `grillingSpecSchema`),
+// null for every other session. A Floor runs at most one session at a time;
 // the rest are paused or ended, and every one is kept.
 export const grillingSessions = pgTable(
   "grilling_sessions",
@@ -2020,6 +2022,7 @@ export const grillingSessions = pgTable(
     issues: jsonb("issues"),
     sources: jsonb("sources").notNull().default([]),
     guidelines: jsonb("guidelines").notNull().default([]),
+    spec: jsonb("spec"),
     startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
     pausedAt: timestamp("paused_at", { withTimezone: true }),
@@ -2037,7 +2040,7 @@ export const grillingSessions = pgTable(
     check("grilling_sessions_round", sql`${table.round} >= 0`),
     check(
       "grilling_sessions_skill",
-      sql`${table.skill} IN ('grilling', 'grill-with-docs', 'wayfinder', 'to-tickets', 'to-spec', 'guidelines')`,
+      sql`${table.skill} IN ('grilling', 'grill-with-docs', 'wayfinder', 'to-tickets', 'to-spec', 'guidelines', 'spec')`,
     ),
     check(
       "grilling_sessions_paused",
