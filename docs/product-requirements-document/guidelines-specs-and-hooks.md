@@ -8,7 +8,7 @@
 | **Date** | 2026-11-24 |
 | **Parent PRD** | [`ai-office.md`](./ai-office.md) |
 | **Glossary** | [`GLOSSARY.md`](../../GLOSSARY.md) |
-| **Decisions** | [ADR 0014](../architectural-decision-record/0014-agents-follow-only-guidelines-the-owner-approved.md) (Guidelines); [ADR 0015](../architectural-decision-record/0015-a-spec-is-a-grilling-session.md) (Specs); ADR 0016 (Hooks) to come with its release |
+| **Decisions** | [ADR 0014](../architectural-decision-record/0014-agents-follow-only-guidelines-the-owner-approved.md) (Guidelines); [ADR 0015](../architectural-decision-record/0015-a-spec-is-a-grilling-session.md) (Specs); [ADR 0016](../architectural-decision-record/0016-hooks-are-the-owners-and-live-in-ai-office.md) (Hooks) |
 | **Guide** | [Guidelines, Specs and Hooks](../guide/guidelines-specs-and-hooks.md) |
 
 ## 1. Summary
