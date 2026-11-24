@@ -1,4 +1,5 @@
 import { parse as parseYaml, YAMLError } from "yaml";
+import { z } from "zod";
 
 import { secretLikeLines } from "./office-memory.ts";
 import { createRedactor, type Redactor } from "./redact.ts";
@@ -55,9 +56,12 @@ export const guidelineApprovals = [
 ] as const;
 export type GuidelineApproval = (typeof guidelineApprovals)[number];
 
-/** Where the Owner sees a Floor's Guidelines: its Floor admin. */
+/** The id of the Floor admin's Guidelines card, which links name with `#`. */
+export const guidelinesCardId = "guidelines";
+
+/** Where the Owner sees a Floor's Guidelines: its Floor admin's card. */
 export const floorGuidelinesPath = (floorId: string): string =>
-  `/floor-settings/${encodeURIComponent(floorId)}`;
+  `/floor-settings/${encodeURIComponent(floorId)}#${guidelinesCardId}`;
 
 /** A Guideline that keeps the rules. */
 export interface Guideline {
@@ -342,3 +346,105 @@ export function parseGuideline(
     },
   };
 }
+
+// The Floor admin's Guidelines card (FR-103, FR-111): `GET
+// /api/floors/:floorId/guidelines` lists each Guideline on the Floor's
+// default branch, the version the Owner approved and any awaiting
+// approval, or why the file reaches no Agent; `POST …/guidelines/:name/
+// approve` and `…/dismiss` name the version the Owner saw by its hash, and
+// are refused with a 409 when it is no longer the one waiting.
+
+/** A version, by the SHA-256 of its whole file. */
+const contentHashSchema = z.string().regex(/^[0-9a-f]{64}$/, {
+  error: "Give the content hash of the version you saw.",
+});
+
+/** The version of a Guideline Agents get: the one the Owner approved. */
+export const approvedGuidelineVersionSchema = z.object({
+  contentHash: z.string(),
+  approval: z.enum(guidelineApprovals),
+  /** The whole file, as approved. */
+  content: z.string(),
+  /**
+   * Whether it is the version on the default branch: false while a later
+   * one waits or breaks the rules there.
+   */
+  current: z.boolean(),
+});
+export type ApprovedGuidelineVersion = z.infer<
+  typeof approvedGuidelineVersionSchema
+>;
+
+/** What a version the Owner has not approved waits for. */
+export const guidelineVersionStatuses = ["awaiting", "dismissed"] as const;
+
+/** The version on the default branch the Owner has not approved. */
+export const awaitingGuidelineVersionSchema = z.object({
+  contentHash: z.string(),
+  /** `awaiting` the Owner's approval, or `dismissed` by the Owner. */
+  status: z.enum(guidelineVersionStatuses),
+  /** The whole file, as it is on the default branch. */
+  content: z.string(),
+  /** The last commit that changed it, when GitHub said. */
+  commitSha: z.string().nullable(),
+});
+export type AwaitingGuidelineVersion = z.infer<
+  typeof awaitingGuidelineVersionSchema
+>;
+
+/** Why the file on the default branch reaches no Agent (FR-102, FR-112). */
+export const guidelineErrorSchema = z.object({
+  refusal: z.enum(guidelineRefusals),
+  /** For the Owner: never a word of what a line holds. */
+  reason: z.string(),
+  secretLines: z.array(z.number().int()),
+});
+
+/** One Guideline of a Floor, as its admin card shows it. */
+export const floorGuidelineSchema = z.object({
+  name: z.string(),
+  path: z.string(),
+  /**
+   * When it applies, its patterns and description: as Agents get it, or,
+   * with no version approved, as the one awaiting approval says; null and
+   * empty when neither is readable.
+   */
+  inclusion: z.enum(guidelineInclusions).nullable(),
+  fileMatchPatterns: z.array(z.string()),
+  description: z.string().nullable(),
+  /** What Agents get; null when the Owner has approved no version. */
+  approved: approvedGuidelineVersionSchema.nullable(),
+  /** The version on the default branch, when the Owner has not approved it. */
+  awaiting: awaitingGuidelineVersionSchema.nullable(),
+  /** Why the file on the default branch breaks the rules; null when it keeps them. */
+  error: guidelineErrorSchema.nullable(),
+});
+export type FloorGuideline = z.infer<typeof floorGuidelineSchema>;
+
+export const floorGuidelineListSchema = z.object({
+  /** By name. */
+  guidelines: z.array(floorGuidelineSchema),
+  /** How many versions await the Owner's approval. */
+  awaitingCount: z.number().int(),
+});
+export type FloorGuidelineList = z.infer<typeof floorGuidelineListSchema>;
+
+/** The body of `POST …/guidelines/:name/approve` and `…/dismiss`. */
+export const guidelineVersionRequestSchema = z.strictObject({
+  contentHash: contentHashSchema,
+});
+export type GuidelineVersionRequest = z.infer<
+  typeof guidelineVersionRequestSchema
+>;
+
+export const guidelineErrorCodes = {
+  /** The Floor's default branch has no Guideline of that name. */
+  guidelineNotFound: "guideline_not_found",
+  /**
+   * The version named is not the one waiting: it changed meanwhile, or was
+   * approved or dismissed already.
+   */
+  guidelineChanged: "guideline_changed",
+} as const;
+export type GuidelineErrorCode =
+  (typeof guidelineErrorCodes)[keyof typeof guidelineErrorCodes];
