@@ -52,6 +52,7 @@ import {
   createPipeline,
   createNoAccountLeftNotices,
   createGuidelineApprovals,
+  createGuidelineProposals,
   createTaskGuidelines,
   plannedFiles,
   withGuidelines,
@@ -825,6 +826,21 @@ export async function startOffice(
     ownerLogin: async () => (await officeSettings.intakeSettings()).ownerLogin,
     redactor,
   });
+  // The Guidelines Agents propose in their Handoffs and QA reports (FR-110):
+  // kept for the Owner, who opens one as a pull request, which the GitHub
+  // App commits and opens, or rejects it. No model accepts one.
+  const guidelineProposals = createGuidelineProposals({
+    floors: stores.floors,
+    agents: stores.agents,
+    store: stores.guidelineProposals,
+    guidelines: stores.guidelines,
+    events,
+    github,
+    gitIdentity: (floorId) => officeSettings.floorGitIdentity(floorId),
+    defaultModels: () => aiProviders.defaultModels(),
+    scratchDir: config.sandboxes.workDir,
+    redactor,
+  });
   // Each task's Guidelines (Guidelines PRD, FR-105 to FR-108): chosen by
   // its Stage, the files it is about and the issue's labels, within its
   // prompt budget; one Notice per Floor while any task's are over it.
@@ -1307,6 +1323,7 @@ export async function startOffice(
     stores,
     notices,
     guidelineApprovals,
+    guidelineProposals,
     aiAccounts,
     combos,
     modelMappings,
@@ -1510,6 +1527,7 @@ export async function startOffice(
                 sharedMemory,
                 promptBudget,
                 guidelines: taskGuidelines,
+                guidelineProposals,
                 roles: stores.roles,
                 turns,
                 batchBranches,
@@ -1575,6 +1593,7 @@ export async function startOffice(
                 sharedMemory,
                 promptBudget,
                 guidelines: taskGuidelines,
+                guidelineProposals,
                 roles: stores.roles,
                 batchBranches,
                 onError: (error) => {
@@ -1603,6 +1622,7 @@ export async function startOffice(
                 sharedMemory,
                 promptBudget,
                 guidelines: taskGuidelines,
+                guidelineProposals,
                 roles: stores.roles,
                 batchBranches,
                 onError: (error) => {

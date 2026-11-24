@@ -1,5 +1,5 @@
 import type { Rebase } from "../git/publish.ts";
-import { withoutMemory } from "../memory/memory.ts";
+import { withoutProposals } from "../memory/memory.ts";
 import type { HandoffSummary, VerdictRecord } from "./store.ts";
 
 // Handoffs in the Review Loop (PRD FR-26, FR-27): each carries a short
@@ -7,8 +7,9 @@ import type { HandoffSummary, VerdictRecord } from "./store.ts";
 // transcript. The coder writes its own at the end of its run, in a
 // `<handoff>` block; whatever it leaves out is filled in from its commits.
 // The reviewers' is written from their verdicts. Entries proposed for the
-// repository's memory, between `<memory>` markers in the block, are not
-// part of the summary (`proposedMemory` reads them).
+// repository's memory, between `<memory>` markers in the block, and a
+// Guideline it proposes, in a `<guideline>` block, are not part of the
+// summary (`proposedMemory` and `proposedGuideline` read them).
 
 /** The longest each part of a summary may be. */
 export const maxHandoffPart = 2000;
@@ -25,12 +26,12 @@ const labels = { changed: "changed", check: "check", risks: "risks" } as const;
 /**
  * The parts of the last `<handoff>` block in an Agent's text, each from a
  * `Changed:`, `Check:` or `Risks:` line to the next, leaving out its
- * `<memory>` block.
+ * `<memory>` and `<guideline>` blocks.
  */
 export function parseHandoff(text: string | null): Partial<HandoffSummary> {
   const blocks = [...(text ?? "").matchAll(/<handoff>([\s\S]*?)<\/handoff>/gi)];
   const last = blocks.at(-1)?.[1];
-  const block = last === undefined ? undefined : withoutMemory(last);
+  const block = last === undefined ? undefined : withoutProposals(last);
   if (block === undefined) {
     return {};
   }

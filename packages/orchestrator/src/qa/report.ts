@@ -1,14 +1,15 @@
 import type { QaResult } from "@ai-office/shared";
 
-import { withoutMemory } from "../memory/memory.ts";
+import { withoutProposals } from "../memory/memory.ts";
 import { maxHandoffPart } from "../review/handoff.ts";
 
 // The QA Agent's report (PRD FR-28): it ends its run with a `<qa-report>`
 // block, saying whether its checks pass, what it found, and for a failure
 // the steps that reproduce it. It is the Agent's own text, so untrusted:
 // only the block's parts are read, and each is cut to length. Entries it
-// proposes for the repository's memory, between `<memory>` markers, are
-// not part of it (`proposedMemory` reads them).
+// proposes for the repository's memory, between `<memory>` markers, and a
+// Guideline it proposes, in a `<guideline>` block, are not part of it
+// (`proposedMemory` and `proposedGuideline` read them).
 
 /** What QA found in one round. */
 export interface QaReport {
@@ -38,7 +39,7 @@ export function parseQaReport(text: string | null): QaReport | undefined {
   if (last === undefined) {
     return undefined;
   }
-  const block = withoutMemory(last);
+  const block = withoutProposals(last);
   const found: Partial<Record<"result" | "summary" | "steps", string>> = {};
   let current: keyof typeof found | undefined;
   for (const line of block.split("\n")) {

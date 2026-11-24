@@ -9,6 +9,7 @@ import {
   type Redactor,
 } from "@ai-office/shared";
 
+import { withoutGuidelineProposals } from "../guidelines/proposal.ts";
 import { sameEntry } from "./file.ts";
 import type { MemoryStore, ProposalRecord } from "./store.ts";
 
@@ -168,9 +169,15 @@ export const proposingMemory = (where: "Handoff" | "report"): string[] => [
   "Leave it out when there is nothing new, and never put a credential, a token or a secret in it. The Manager decides what the memory keeps.",
 ];
 
-/** `text` without its `<memory>` (and `<role-memory>`) blocks. */
-export const withoutMemory = (text: string): string =>
-  text.replaceAll(/<(role-)?memory>[\s\S]*?(?:<\/\1memory>|$)/gi, "");
+/**
+ * `text` without what its Agent proposed: its `<memory>` and
+ * `<role-memory>` blocks, and its `<guideline>` block, which no later
+ * Agent may read as the Owner's (FR-110).
+ */
+export const withoutProposals = (text: string): string =>
+  withoutGuidelineProposals(
+    text.replaceAll(/<(role-)?memory>[\s\S]*?(?:<\/\1memory>|$)/gi, ""),
+  );
 
 /**
  * The entries proposed in the last `<memory>` block (or `<role-memory>`,

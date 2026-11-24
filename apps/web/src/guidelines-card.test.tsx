@@ -1,4 +1,8 @@
-import type { FloorGuideline, FloorGuidelineList } from "@ai-office/shared";
+import type {
+  FloorGuideline,
+  FloorGuidelineList,
+  GuidelineProposal,
+} from "@ai-office/shared";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -111,15 +115,52 @@ function stubServer(
   answers: {
     readonly approve?: () => Response;
     readonly dismiss?: () => Response;
+    readonly open?: () => Response;
+    readonly reject?: () => Response;
   } = {},
+  proposals: GuidelineProposal[] = [],
 ) {
   let state = listOf(guidelines);
+  let waiting = proposals;
   const posts: { url: string; body: unknown; csrf: string | null }[] = [];
   vi.stubGlobal(
     "fetch",
     vi.fn((url: string, init?: RequestInit) => {
       if (url === "/api/floors/web-shop/guidelines") {
         return Promise.resolve(Response.json(state));
+      }
+      if (url === "/api/floors/web-shop/guideline-proposals") {
+        return Promise.resolve(Response.json({ proposals: waiting }));
+      }
+      const settled =
+        /^\/api\/floors\/web-shop\/guideline-proposals\/(\d+)\/(open|reject)$/.exec(
+          url,
+        );
+      if (settled !== null && init?.method === "POST") {
+        posts.push({
+          url,
+          body: JSON.parse(init.body as string) as unknown,
+          csrf: new Headers(init.headers).get("x-csrf-token"),
+        });
+        const answer = settled[2] === "open" ? answers.open : answers.reject;
+        const given = answer?.();
+        if (given !== undefined) {
+          return Promise.resolve(given);
+        }
+        waiting = waiting.filter(({ id }) => String(id) !== settled[1]);
+        return Promise.resolve(
+          Response.json(
+            settled[2] === "open"
+              ? {
+                  pullRequest: {
+                    number: 12,
+                    url: "https://github.com/adrianeyre/web-shop/pull/12",
+                  },
+                  proposals: waiting,
+                }
+              : { proposals: waiting },
+          ),
+        );
       }
       const action =
         /^\/api\/floors\/web-shop\/guidelines\/([^/]+)\/(approve|dismiss)$/.exec(
@@ -426,5 +467,153 @@ describe("a Floor's Guidelines in its admin", () => {
     expect(card).not.toBeNull();
     expect(scrolled).toHaveBeenCalled();
     scrollIntoView.mockRestore();
+  });
+});
+
+const proposal = (
+  id: number,
+  name: string,
+  content: string,
+  agentName: string | null = "Ada",
+): GuidelineProposal => ({
+  id,
+  name,
+  path: `.agents/guidelines/${name}.md`,
+  content,
+  contentHash: "e".repeat(64),
+  agentId: "ada",
+  agentName,
+  issue: 4,
+  proposedAt: "2026-11-24T10:00:00.000Z",
+});
+
+const proposedItem = async (name: string) =>
+  within(
+    await screen.findByRole("list", { name: "Proposed Guidelines" }),
+  ).getByRole("listitem", { name });
+
+describe("the Guidelines Agents proposed, in the Floor's admin", () => {
+  it("shows none while none wait", async () => {
+    stubServer([tech]);
+    renderCard();
+    await item("tech");
+    expect(
+      screen.queryByRole("list", { name: "Proposed Guidelines" }),
+    ).toBeNull();
+    expect(screen.queryByText("Proposed by Agents")).toBeNull();
+  });
+
+  it("shows a change as its difference from the version Agents get, and a new one whole, each by its Agent and issue", async () => {
+    stubServer([tech], {}, [
+      proposal(1, "tech", "Use pnpm.\nNo default exports.\n"),
+      proposal(2, "accessibility", "Every image has alt text.\n", null),
+    ]);
+    renderCard();
+    const change = await proposedItem("tech, proposed on #4");
+    expect(within(change).getByText("Change")).toBeDefined();
+    expect(change.textContent).toContain(
+      "Proposed by Ada on #4, for .agents/guidelines/tech.md, against the version Agents get:",
+    );
+    const lines = within(change).getByLabelText("Proposed tech");
+    expect(lines.querySelector("ins")?.textContent).toBe(
+      "+ No default exports.",
+    );
+    expect(lines.querySelector("del")).toBeNull();
+
+    const added = await proposedItem("accessibility, proposed on #4");
+    expect(within(added).getByText("New Guideline")).toBeDefined();
+    expect(added.textContent).toContain(
+      "Proposed by an Agent no longer on this Floor on #4, for .agents/guidelines/accessibility.md.",
+    );
+    expect(
+      within(added).getByLabelText("Proposed accessibility").textContent,
+    ).toBe("+ Every image has alt text.");
+  });
+
+  it("opens one as a pull request, linking it, and rejects another", async () => {
+    const server = stubServer([tech], {}, [
+      proposal(1, "tech", "Use pnpm.\nNo default exports.\n"),
+      proposal(2, "accessibility", "Every image has alt text.\n"),
+    ]);
+    renderCard();
+    const user = userEvent.setup();
+    await user.click(
+      within(await proposedItem("tech, proposed on #4")).getByRole("button", {
+        name: "Open tech as pull request",
+      }),
+    );
+    const status = await screen.findByRole("status");
+    expect(status.textContent).toBe(
+      "Opened PR #12 for tech. No Agent gets it until you merge it.",
+    );
+    expect(
+      within(status).getByRole("link", { name: "PR #12" }).getAttribute("href"),
+    ).toBe("https://github.com/adrianeyre/web-shop/pull/12");
+    expect(
+      screen.queryByRole("listitem", { name: "tech, proposed on #4" }),
+    ).toBeNull();
+
+    await user.click(
+      within(await proposedItem("accessibility, proposed on #4")).getByRole(
+        "button",
+        { name: "Reject accessibility" },
+      ),
+    );
+    await vi.waitFor(() => {
+      expect(
+        screen.queryByRole("list", { name: "Proposed Guidelines" }),
+      ).toBeNull();
+    });
+    expect(server.posts).toEqual([
+      {
+        url: "/api/floors/web-shop/guideline-proposals/1/open",
+        body: {},
+        csrf: "csrf-token-1",
+      },
+      {
+        url: "/api/floors/web-shop/guideline-proposals/2/reject",
+        body: {},
+        csrf: "csrf-token-1",
+      },
+    ]);
+  });
+
+  it("says why one could not be opened", async () => {
+    stubServer(
+      [tech],
+      {
+        open: () =>
+          Response.json(
+            {
+              error: "guideline_proposal_unchanged",
+              message:
+                "main already has .agents/guidelines/tech.md as proposed: reject the proposal instead.",
+            },
+            { status: 409 },
+          ),
+      },
+      [proposal(1, "tech", "Use pnpm.\n")],
+    );
+    renderCard();
+    await userEvent.setup().click(
+      within(await proposedItem("tech, proposed on #4")).getByRole("button", {
+        name: "Open tech as pull request",
+      }),
+    );
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "main already has .agents/guidelines/tech.md as proposed: reject the proposal instead.",
+    );
+    expect(await proposedItem("tech, proposed on #4")).toBeDefined();
+  });
+
+  it("settles nothing on an archived Floor", async () => {
+    stubServer([tech], {}, [proposal(1, "tech", "Use pnpm.\n")]);
+    renderCard("2026-11-01T00:00:00.000Z");
+    const proposed = await proposedItem("tech, proposed on #4");
+    for (const name of ["Open tech as pull request", "Reject tech"]) {
+      expect(
+        within(proposed).getByRole("button", { name }).hasAttribute("disabled"),
+      ).toBe(true);
+    }
   });
 });

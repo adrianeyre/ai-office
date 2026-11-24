@@ -458,6 +458,21 @@ const guidelineDismissed = event("guideline.dismissed", {
   name: guidelineName,
   contentHash: guidelineHash,
 });
+// An Agent proposed a new or changed Guideline in its Handoff or QA report
+// (FR-110, FR-111). It waits for the Owner, who may open it as a pull
+// request; no model accepts one, and no Agent gets it until the Owner
+// merges it. Named by its content's hash, never its text.
+const guidelineProposed = event("guideline.proposed", {
+  floorId,
+  /** The Agent that proposed it. */
+  agentId,
+  /** The issue whose Handoff, or QA report, proposed it. */
+  issue,
+  name: guidelineName,
+  contentHash: guidelineHash,
+  /** Whether it is a new Guideline: none of that name was approved. */
+  new: z.boolean(),
+});
 // A task's Guidelines were longer together than the characters a prompt
 // carries (FR-108): those left out are named, never quoted.
 const guidelineOverBudget = event("guideline.over_budget", {
@@ -1124,6 +1139,7 @@ export const officeEventSchema = z.discriminatedUnion("type", [
   guidelineApproved,
   guidelineAwaiting,
   guidelineDismissed,
+  guidelineProposed,
   guidelineOverBudget,
   sandboxStarted,
   sandboxStopped,

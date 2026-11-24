@@ -55,6 +55,7 @@ export const eventTypeLabels: Record<EventType, string> = {
   "guideline.approved": "Guideline approved",
   "guideline.awaiting": "Guideline awaiting approval",
   "guideline.dismissed": "Guideline change dismissed",
+  "guideline.proposed": "Guideline proposed",
   "guideline.over_budget": "Guidelines over budget",
   "sandbox.started": "Sandbox started",
   "sandbox.stopped": "Sandbox stopped",
@@ -190,6 +191,7 @@ export const eventTypeGroups: readonly {
       "guideline.approved",
       "guideline.awaiting",
       "guideline.dismissed",
+      "guideline.proposed",
       "guideline.over_budget",
     ],
   },
@@ -587,6 +589,10 @@ export function describeEvent(
       }, which the Owner neither merged nor pushed: it awaits the Owner's approval, and Agents keep the last version the Owner approved.`;
     case "guideline.dismissed":
       return `The Owner dismissed the change to Guideline "${event.name}": Agents keep the last version the Owner approved.`;
+    case "guideline.proposed":
+      return `${agent(event.agentId)} proposed ${
+        event.new ? "a new Guideline" : "a change to Guideline"
+      } "${event.name}" on #${String(event.issue)}: it waits for the Owner in the Floor admin, and no Agent gets it unless the Owner merges it.`;
     case "guideline.over_budget": {
       const names = event.leftOut.map((name) => `"${name}"`);
       const list =

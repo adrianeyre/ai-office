@@ -2372,6 +2372,60 @@ export const guidelineChanges = pgTable(
   ],
 );
 
+// The new or changed Guidelines Agents proposed (Guidelines, Specs and
+// Hooks PRD, FR-110, FR-111): the coder, the docs Agent or QA (`agent_id`)
+// ended its Handoff or QA report on an issue (`issue`) with one
+// `<guideline name="…">` block, kept here redacted as the whole file
+// (`content`, by its SHA-256, `content_hash`). It waits for the Owner
+// (`proposed`), who opens it as a pull request (`opened`, with its number
+// and address) or rejects it (`rejected`). No model decides one, and no
+// Agent gets one: only the Owner's merge of its pull request approves it
+// (ADR 0014). The same version of a Guideline waits once per Floor.
+export const guidelineProposals = pgTable(
+  "guideline_proposals",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
+    floorId: text("floor_id")
+      .notNull()
+      .references(() => floors.id),
+    name: text("name").notNull(),
+    contentHash: text("content_hash").notNull(),
+    content: text("content").notNull(),
+    agentId: text("agent_id").notNull(),
+    issue: integer("issue").notNull(),
+    status: text("status").notNull().default("proposed"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    pullRequest: integer("pull_request"),
+    url: text("url"),
+  },
+  (table) => [
+    index("guideline_proposals_floor").on(table.floorId, table.status),
+    uniqueIndex("guideline_proposals_waiting")
+      .on(table.floorId, table.name, table.contentHash)
+      .where(sql`${table.status} = 'proposed'`),
+    check(
+      "guideline_proposals_name",
+      sql`${table.name} ~ '^[a-z0-9-]+$' AND length(${table.name}) <= 255`,
+    ),
+    check(
+      "guideline_proposals_content_hash",
+      sql`${table.contentHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "guideline_proposals_content",
+      sql`length(${table.content}) BETWEEN 1 AND 12000`,
+    ),
+    check("guideline_proposals_issue", sql`${table.issue} > 0`),
+    check(
+      "guideline_proposals_status",
+      sql`${table.status} IN ('proposed', 'opened', 'rejected') AND (${table.status} = 'proposed') = (${table.decidedAt} IS NULL) AND (${table.status} = 'opened') = (${table.pullRequest} IS NOT NULL AND ${table.url} IS NOT NULL)`,
+    ),
+  ],
+);
+
 // Batches (PRD FR-25, §5 scenario 1): the issues the Owner handed a
 // Floor's Manager in one command, such as "complete issues 1 to 5", in the
 // order named (1 to 50 of them), or those the Manager filed for one of the

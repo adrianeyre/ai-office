@@ -64,6 +64,7 @@ import {
   createTokenCaps,
   createFloorSkills,
   createGuidelineApprovals,
+  createGuidelineProposals,
   createGuidelinesAdmin,
   floorChatSkills,
   createRepositoryMemoryShelf,
@@ -94,6 +95,7 @@ import {
   type StatusUpdates,
   type ModelClient,
   type GuidelineApprovals,
+  type GuidelineProposals,
   type Notices,
   type OfficeStores,
   type SharedMemory,
@@ -276,6 +278,11 @@ export interface AppOptions {
    * `stores`, `github` and `notices` when not given (in tests).
    */
   readonly guidelineApprovals?: GuidelineApprovals;
+  /**
+   * The Guidelines Agents propose, which the Owner opens as a pull request
+   * or rejects (Guidelines PRD, FR-110); made here when not given.
+   */
+  readonly guidelineProposals?: GuidelineProposals;
   /**
    * Each Floor's AI Office branches, for the Branches page. Made from
    * `stores`, the work queue, `github` and `events` when not given.
@@ -940,7 +947,31 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
           now,
         }));
   const noGitHub = () => Promise.reject(new GitHubNotConfiguredError());
+  // The Guidelines Agents propose (FR-110), which the Owner opens as a
+  // pull request or rejects in the same card.
+  const guidelineProposals =
+    options.guidelineProposals ??
+    createGuidelineProposals({
+      floors: stores.floors,
+      agents: stores.agents,
+      store: stores.guidelineProposals,
+      guidelines: stores.guidelines,
+      events,
+      github: options.github ?? {
+        installations: noGitHub,
+        repositories: noGitHub,
+        repository: () => {
+          throw new GitHubNotConfiguredError();
+        },
+      },
+      gitIdentity: (floorId) => officeSettings.floorGitIdentity(floorId),
+      defaultModels,
+      scratchDir: tmpdir(),
+      ...(options.redactor === undefined ? {} : { redactor: options.redactor }),
+      now,
+    });
   registerGuidelineRoutes(app, {
+    proposals: guidelineProposals,
     guidelines: createGuidelinesAdmin({
       floors: stores.floors,
       approvals: guidelineApprovals ?? {

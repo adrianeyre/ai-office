@@ -1025,6 +1025,30 @@ describe("event text", () => {
     );
   });
 
+  it("says an Agent proposed a Guideline, new or changed, which waits for the Owner", () => {
+    const proposed: OfficeEvent = {
+      type: "guideline.proposed",
+      version: 1,
+      floorId: "web-shop",
+      agentId: "ada",
+      issue: 4,
+      name: "migrations",
+      contentHash: "e".repeat(64),
+      new: false,
+    };
+    expect(describeEvent(proposed, { agent: () => "Ada" })).toBe(
+      'Ada proposed a change to Guideline "migrations" on #4: it waits for the Owner in the Floor admin, and no Agent gets it unless the Owner merges it.',
+    );
+    expect(
+      describeEvent(
+        { ...proposed, name: "accessibility", new: true },
+        { agent: () => "Ada" },
+      ),
+    ).toBe(
+      'Ada proposed a new Guideline "accessibility" on #4: it waits for the Owner in the Floor admin, and no Agent gets it unless the Owner merges it.',
+    );
+  });
+
   it("names the Guidelines a task's prompt left out over its budget, and whose task it was", () => {
     const over: OfficeEvent = {
       type: "guideline.over_budget",

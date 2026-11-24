@@ -7,6 +7,7 @@ import {
 } from "../coder/prompt.ts";
 import { agentTrailer, type TrailerAgent } from "../git/identity.ts";
 import {
+  withGuidelineProposals,
   withMountedGuidelines,
   type GivenGuidelines,
 } from "../guidelines/prompt.ts";
@@ -157,6 +158,7 @@ export function qaPrompt(input: QaPromptInput): string {
     "",
     ...proposingMemory("report"),
     ...withRoleProposals(input.agentMemory, "report"),
+    ...withGuidelineProposals(input.guidelines, "report"),
     ...(extra === ""
       ? []
       : ["", "## The Owner's instructions for you", "", extra]),

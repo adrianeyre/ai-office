@@ -33,6 +33,10 @@ import { createPushRun } from "../git/push-run.ts";
 import type { IntakeQueue } from "../intake/intake.ts";
 import type { ModelClient } from "../models/client.ts";
 import type { Notices } from "../notices/notices.ts";
+import {
+  keepGuidelineProposal,
+  type GuidelineProposals,
+} from "../guidelines/proposals.ts";
 import { keepProposals, type RepositoryMemory } from "../memory/memory.ts";
 import {
   keepRoleProposals,
@@ -138,6 +142,11 @@ export interface QaFlowOptions {
    * Role's proposed to (FR-54, FR-55).
    */
   readonly sharedMemory?: SharedMemory;
+  /**
+   * Keeps the Guideline an Agent proposes in its Handoff or report, for
+   * the Owner (Guidelines, Specs and Hooks PRD, FR-110).
+   */
+  readonly guidelineProposals?: Pick<GuidelineProposals, "propose">;
   /**
    * How much of the memory and the Skills an Agent's prompt carries, for
    * its Model (the prompt budget); as much as AI Office keeps without it.
@@ -688,6 +697,17 @@ export function createQaFlow(options: QaFlowOptions): ExecuteWork {
           issue: issue.number,
           agentId: agent.id,
           role: agent.role,
+          text: run.lastText,
+          tag: "qa-report",
+        },
+        report,
+      );
+      await keepGuidelineProposal(
+        options.guidelineProposals,
+        {
+          floorId: floor.id,
+          issue: issue.number,
+          agentId: agent.id,
           text: run.lastText,
           tag: "qa-report",
         },

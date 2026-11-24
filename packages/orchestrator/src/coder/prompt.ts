@@ -1,5 +1,6 @@
 import { agentTrailer, type TrailerAgent } from "../git/identity.ts";
 import {
+  withGuidelineProposals,
   withMountedGuidelines,
   type GivenGuidelines,
 } from "../guidelines/prompt.ts";
@@ -338,6 +339,7 @@ export function coderPrompt(input: CoderPromptInput): string {
     "",
     ...proposingMemory("Handoff"),
     ...withRoleProposals(input.agentMemory, "Handoff"),
+    ...withGuidelineProposals(input.guidelines, "Handoff"),
     ...(extra === ""
       ? []
       : ["", "## The Owner's instructions for you", "", extra]),

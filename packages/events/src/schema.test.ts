@@ -193,6 +193,26 @@ describe("Guideline events", () => {
     });
   });
 
+  it("name a proposed Guideline by its hash, with its Agent and issue, never its text", () => {
+    const proposed = exampleEvents["guideline.proposed"];
+    expect(officeEventSchema.parse(proposed)).toEqual(proposed);
+    expect(subjectOf(proposed)).toEqual({
+      floorId: "web-shop",
+      agentIds: ["ada"],
+      issue: 4,
+    });
+    for (const wrong of [
+      { name: "Migrations.md" },
+      { contentHash: "not-a-hash" },
+      { content: "Use pnpm." },
+      { new: "yes" },
+    ]) {
+      expect(
+        officeEventSchema.safeParse({ ...proposed, ...wrong }).success,
+      ).toBe(false);
+    }
+  });
+
   it("name the Guidelines a prompt left out over its budget, for the task's Agent and issue, never their text", () => {
     const over = exampleEvents["guideline.over_budget"];
     expect(officeEventSchema.parse(over)).toEqual(over);

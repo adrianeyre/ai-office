@@ -1,6 +1,6 @@
 import type { DesignResult } from "@ai-office/shared";
 
-import { withoutMemory } from "../memory/memory.ts";
+import { withoutProposals } from "../memory/memory.ts";
 import { maxHandoffPart } from "../review/handoff.ts";
 
 // The designer Agent's report (PRD FR-10, FR-18): it ends its run with a
@@ -41,7 +41,7 @@ export function parseDesignReport(
   if (last === undefined) {
     return undefined;
   }
-  const block = withoutMemory(last);
+  const block = withoutProposals(last);
   const found: Partial<Record<"result" | "summary" | "findings", string>> = {};
   let current: keyof typeof found | undefined;
   for (const line of block.split("\n")) {

@@ -51,6 +51,10 @@ import { createDesignFlow } from "../design/design.ts";
 import { createDocsFlow } from "../docs/docs.ts";
 import { createFloors } from "../floors/floors.ts";
 import type { ApprovedGuideline } from "../guidelines/approval.ts";
+import {
+  createGuidelineProposals,
+  type GuidelineProposals,
+} from "../guidelines/proposals.ts";
 import { createTaskGuidelines } from "../guidelines/tasks.ts";
 import { withApprovedIssues } from "../intake/approved.ts";
 import { createIntake, type IntakeQueue } from "../intake/intake.ts";
@@ -187,6 +191,15 @@ export interface ScenarioOptions {
     readonly reviewer?: readonly string[];
     readonly qa?: readonly string[];
   };
+  /**
+   * The `<guideline name="…">` block each Agent ends its Handoff or report
+   * with, line by line (Guidelines PRD, FR-110).
+   */
+  readonly guidelineProposals?: {
+    readonly coder?: readonly string[];
+    readonly qa?: readonly string[];
+    readonly docs?: readonly string[];
+  };
   /** What each Agent proposes for its Role's memory. */
   readonly roleProposals?: {
     readonly coder?: readonly string[];
@@ -242,6 +255,8 @@ export interface Scenario {
   readonly memory: RepositoryMemory;
   /** The office-wide and Role memory, kept whether or not flows have it. */
   readonly sharedMemory: SharedMemory;
+  /** The Guidelines Agents propose, kept for the Owner (FR-110). */
+  readonly guidelineProposals: GuidelineProposals;
   /** What each sandbox had mounted as memory, run by run. */
   readonly mountedMemory: MountedMemory[];
   /** What each sandbox had mounted as Guidelines, run by run. */
@@ -291,11 +306,14 @@ const proposing = (
 interface Proposing {
   readonly memory?: readonly string[] | undefined;
   readonly role?: readonly string[] | undefined;
+  /** A `<guideline name="…">` block's lines, as the Agent writes them. */
+  readonly guideline?: readonly string[] | undefined;
 }
 
 const proposingBoth = (proposed: Proposing | undefined): string[] => [
   ...proposing(proposed?.memory),
   ...proposing(proposed?.role, "role-memory"),
+  ...(proposed?.guideline ?? []),
 ];
 
 /** The Guidelines mounted among `mounts`, by file name. */
@@ -648,6 +666,7 @@ export async function scenario(
       await documenting(context, {
         memory: options.proposals?.docs,
         role: options.roleProposals?.docs,
+        guideline: options.guidelineProposals?.docs,
       });
       return;
     }
@@ -662,7 +681,11 @@ export async function scenario(
           qaRuns.at(-1) ?? {
             result: "pass",
           },
-        { memory: options.proposals?.qa, role: options.roleProposals?.qa },
+        {
+          memory: options.proposals?.qa,
+          role: options.roleProposals?.qa,
+          guideline: options.guidelineProposals?.qa,
+        },
       );
       return;
     }
@@ -674,6 +697,7 @@ export async function scenario(
     await coding(context, prompts.length, written, {
       memory: options.proposals?.coder,
       role: options.roleProposals?.coder,
+      guideline: options.guidelineProposals?.coder,
     });
   });
   // The Decision Model, asked with the Manager's Gateway Key while it is on.
@@ -719,6 +743,18 @@ export async function scenario(
             events: bus,
           }),
         };
+  const guidelineProposals = createGuidelineProposals({
+    floors: stores.floors,
+    agents: stores.agents,
+    store: stores.guidelineProposals,
+    guidelines: stores.guidelines,
+    events: bus,
+    github,
+    gitIdentity: (floorId) => office.floorGitIdentity(floorId),
+    defaultModels,
+    scratchDir: root,
+    pushUrl: () => remote,
+  });
   const sandboxFlow = {
     floors: stores.floors,
     agents: stores.agents,
@@ -735,6 +771,7 @@ export async function scenario(
     reviews: stores.reviews,
     memory,
     roles: stores.roles,
+    guidelineProposals,
     ...shared,
     ...guidelines,
   };
@@ -833,6 +870,7 @@ export async function scenario(
     queue,
     memory,
     sharedMemory,
+    guidelineProposals,
     mountedMemory: mounted,
     mountedGuidelines: guidelinesMounted,
     gitIdentity: () => office.floorGitIdentity("web-shop"),

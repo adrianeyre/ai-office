@@ -14,8 +14,9 @@ them as specified (PRD FR-102 to FR-112). AI Office already reads each
 Floor's `.agents/guidelines/` and settles which versions the Owner
 approved, with the Notice and events described below, the Floor admin's
 [Guidelines card](#seeing-them) shows them with **Approve** and
-**Dismiss**, and each task gets the Guidelines that apply to it, within
-its budget. Proposals and `/guidelines` are still to come. Specs and
+**Dismiss**, each task gets the Guidelines that apply to it, within
+its budget, and Agents' [proposals](#proposing-a-guideline) wait there
+for the Owner. `/guidelines` is still to come. Specs and
 Hooks get their sections here as they ship. A Floor without Guidelines,
 Specs or Hooks behaves exactly as before: every prompt is byte for byte
 what it was.
@@ -228,11 +229,67 @@ even one the Owner labelled `ai-office:auto-merge`. Its Notice says why:
 "PR #2 awaiting your approval: not merged automatically, as it changes
 the Guidelines, which only you approve." (or the Specs, or both). See
 [the Merge Policy](issue-pipeline.md#the-merge-policy).
-An Agent may instead propose a change, with up to one
-`<guideline name="…">` block in its Handoff or QA report. Proposals wait
-in the Floor admin for the Owner, who can open one as a pull request; no
-model accepts one, as no model accepts Role memory
-([ADR 0005](../architectural-decision-record/0005-only-the-owner-accepts-role-memory.md)).
+An Agent may instead [propose a change](#proposing-a-guideline), which
+waits for the Owner.
+
+### Proposing a Guideline
+
+Agents notice when a rule is missing or wrong, and may say so; only the
+Owner changes a Guideline (FR-110, FR-111). The coder (every work Role),
+the docs Agent and QA may end their Handoff, or QA's `<qa-report>`, with
+one `<guideline name="…">` block, just before its closing marker, holding
+the whole file of a new or changed Guideline, front matter and all:
+
+```
+<handoff>
+Changed: Added the orders table and its migration.
+Check: That the migration runs on an empty database.
+Risks: None.
+<guideline name="migrations">
+---
+inclusion: fileMatch
+fileMatchPattern: "packages/db/**"
+description: How migrations are written.
+---
+
+Write each migration as plain SQL, never edited once merged.
+</guideline>
+</handoff>
+```
+
+Agents given Guidelines are told how, in their prompt; one given none is
+not, so its prompt is as it was.
+
+- **Read by plain code, never a model.** The name is the Guideline's file
+  name without `.md`; a name the Floor has no Guideline of proposes a new
+  one. The block's common indentation is taken away. A block with no
+  name, a name that is not lowercase letters, digits and dashes, an empty
+  file, or one that breaks [a Guideline's rules](#what-a-guideline-is)
+  is dropped. One with a line that looks like a credential is dropped
+  whole, never kept redacted: nothing of it is kept, shown, committed or
+  in the Activity Feed. With more than one block, only the last counts.
+- **Kept per Floor, once.** The same version of a Guideline waits once,
+  whichever Agent or issue proposed it again. Each kept proposal is a
+  `guideline.proposed` event, naming the Agent, the issue, the Guideline
+  and its version by hash (never its text), and whether it is new.
+- **Seen by no Agent.** The block is no part of the Handoff the next
+  Agent gets, nor of QA's report on the pull request. No model accepts a
+  proposal, as no model accepts Role memory
+  ([ADR 0005](../architectural-decision-record/0005-only-the-owner-accepts-role-memory.md)).
+- **Opened as a pull request, or rejected, by the Owner** in the
+  [Guidelines card](#seeing-them). **Open as pull request** has the
+  GitHub App commit only that one file, `.agents/guidelines/<name>.md`,
+  on a branch of its own, `ai-office/guideline-<name>-<id>`, made from
+  the default branch, authored as the Owner with the proposing Agent's
+  `Agent:` trailer
+  ([ADR 0002](../architectural-decision-record/0002-github-app-acts-commits-authored-as-owner.md)),
+  and open a pull request for the Owner to merge. It closes no issue and
+  the Merge Policy never merges it. Merging it is the Owner's approval of
+  that version, as for any Guideline
+  ([ADR 0014](../architectural-decision-record/0014-agents-follow-only-guidelines-the-owner-approved.md)):
+  until then no Agent gets it, and a merge by anyone else leaves it
+  awaiting approval. A proposal the default branch already holds opens
+  nothing. **Reject** turns it down.
 
 ### Writing them: `/guidelines`
 
@@ -270,6 +327,13 @@ it opens, and lists each Guideline by name:
   the line that looks like a credential, by number, never what it holds).
   Agents keep the last version approved before it broke.
 
+- **Proposed by Agents**, below the list, while any wait: each by its
+  name, marked **Change** or **New Guideline**, with the Agent and issue
+  that proposed it, shown line by line against the version Agents get
+  (a new one whole), with **Open as pull request** and **Reject**. Once
+  opened, the card links the pull request and says no Agent gets it
+  until the Owner merges it.
+
 How many Guidelines await approval is said above the list. If the version
 on the default branch changed after the card was opened, **Approve** and
 **Dismiss** are refused with the reason ("has changed since: look at its
@@ -299,6 +363,19 @@ nothing. A Floor without Guidelines says so, and how to add them.
   Without the GitHub App every route answers `503 github_not_configured`,
   and with GitHub out of reach `502 github_unavailable`. Each route needs
   the Owner's session.
+- **Proposals API.** `GET /api/floors/:floorId/guideline-proposals`
+  answers `{"proposals"}`, those waiting, oldest first, each
+  `{"id","name","path","content","contentHash","agentId","agentName","issue","proposedAt"}`
+  (`agentName` is `null` for an Agent no longer on the Floor).
+  `POST /api/floors/:floorId/guideline-proposals/:id/open` opens one as a
+  pull request and answers `{"pullRequest":{"number","url"},"proposals"}`;
+  `POST /api/floors/:floorId/guideline-proposals/:id/reject` rejects one
+  and answers `{"proposals"}`. A proposal the Floor does not have is
+  `404 guideline_proposal_not_found`; one opened or rejected already is
+  `409 guideline_proposal_settled`; one the default branch already holds
+  is `409 guideline_proposal_unchanged`; an archived Floor is
+  `409 floor_archived`. Opening needs GitHub, as above; listing and
+  rejecting do not.
 
 Every approval, dismissal, proposal and budget breach is an event in the
 Activity Feed under **Guidelines**: `guideline.approved`,
