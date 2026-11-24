@@ -412,6 +412,9 @@ describe("event text", () => {
     expect(describeEvent({ ...approved, messageId: 41 }, names)).toBe(
       "Approved by your request in Manager chat: version 1 of Batch 3's Plan, by Grace.",
     );
+    expect(describeEvent({ ...approved, specSessionId: 7 }, names)).toBe(
+      "Approved by the tasks you confirmed in the Spec of Grilling Session 7: version 1 of Batch 3's Plan, by Grace.",
+    );
   });
 
   it("names Agents, and never needs more than the event", () => {
