@@ -17,8 +17,10 @@ approved, with the Notice and events described below, the Floor admin's
 **Dismiss**, each task gets the Guidelines that apply to it, within
 its budget, Agents' [proposals](#proposing-a-guideline) wait there
 for the Owner, and [`/guidelines`](#writing-them-guidelines) drafts a
-Floor's Guidelines with its Manager. Specs and
-Hooks get their sections here as they ship. A Floor without Guidelines,
+Floor's Guidelines with its Manager. **Specs are being built next**:
+[`/spec`](#specs) already agrees a feature's requirements, design and
+tasks with the Manager, phase by phase (PRD FR-113). Hooks get their
+section here as they ship. A Floor without Guidelines,
 Specs or Hooks behaves exactly as before: every prompt is byte for byte
 what it was.
 
@@ -419,3 +421,92 @@ Every approval, dismissal, proposal and budget breach is an event in the
 Activity Feed under **Guidelines**: `guideline.approved`,
 `guideline.awaiting`, `guideline.dismissed`, `guideline.proposed` and
 `guideline.over_budget`.
+
+## Specs
+
+A Spec is a feature's requirements, design and tasks, agreed with the
+Owner one step at a time in a
+[Grilling Session](events-and-chat.md#grilling-sessions), whose tasks
+become the issues of one Batch. It is how a Goal becomes issues the
+Owner approved first
+([ADR 0015](../architectural-decision-record/0015-a-spec-is-a-grilling-session.md)).
+
+### Writing one: `/spec`
+
+`/spec <words>` is a Built-in Skill that starts a Grilling Session in
+three phases (FR-113), such as `/spec checkout with saved cards`. It is
+AI Office's own, like `/grilling`
+(`packages/orchestrator/src/skills/built-in/spec/SKILL.md`), and, like
+every Skill that starts a session, no other Skill of its name takes its
+place and the Manager never runs it of its own accord. It is not
+`/to-spec`, which still writes a PRD from the conversation so far.
+
+The session runs the usual rounds of numbered questions with recommended
+answers, and the Manager has facts found in the repository rather than
+asking for them, but each phase has its document, which the Manager
+drafts as the answers come and gives again, whole, whenever they change
+it:
+
+1. **Requirements** (`requirements.md`): user stories ("As a …, I want
+   …, so that …"), each with its Acceptance Criteria, numbered statements
+   such as `R2.3 WHEN a shopper removes a saved card THE SYSTEM SHALL stop
+   offering it at checkout` (requirement 2, criterion 3). The Owner ends
+   it with **"confirm requirements"**.
+2. **Design** (`design.md`): its architecture, data, error handling and
+   testing approach, built on the approved requirements. The Owner ends
+   it with **"confirm design"**, or **"skip design"**, on any Floor, for a
+   change that needs none: the Spec then has no `design.md`.
+3. **Tasks** (`tasks.md`): the work in the order it should be built, each
+   task naming the Acceptance Criteria it meets (by id) and the earlier
+   tasks it depends on. It holds no status: progress is read from the
+   issues. The Owner ends it with **"confirm tasks"** (or "confirm").
+
+Only the Owner moves the Spec on, in those words, read by plain code; the
+Manager never does. A confirmation is refused, saying why, while a
+question of the phase is open, before the phase is drafted, or for a
+phase the Spec is not on; so is "skip design" outside the design.
+Once nothing is left to ask, the chat says which words end the phase.
+
+- **Each confirmation commits its document.** The draft becomes the
+  phase's approved copy, kept with the session, and the GitHub App
+  commits it at once, as plain code writes it from that copy, in
+  `.agents/specs/<slug>/` on the session's branch,
+  `ai-office/grilling-<id>`, authored as the Owner with the Manager's
+  `Agent:` trailer; the chat names the file. The next phase is then
+  drafted. The folder is named from the words given to `/spec`
+  (`checkout-with-saved-cards`), or with the session's number after them
+  when the Floor already has a Spec of that name, or `spec-<id>` with no
+  words.
+- **Reopening a phase.** **"reopen requirements"** or **"reopen design"**
+  (or "go back to the design") returns the Spec to that phase: the
+  Manager redrafts it from its last draft, every later phase is drafted
+  again from nothing once it is confirmed, questions still open are
+  withdrawn, and the approved copies from that phase on are dropped. The
+  session's branch holds exactly the approved documents, so those
+  documents leave it until they are confirmed again.
+- **The approved copy is what counts.** Every later prompt of the session
+  quotes the approved documents word for word, and the Manager's turns
+  can change only the current phase's draft. Agents given the Spec get
+  that copy, never the file as it stands in the repository.
+- **The pull request and the issues.** "confirm tasks" commits
+  `tasks.md`, has the GitHub App open one pull request with the Spec,
+  listing each document as confirmed, skipped or not written, and ends
+  the session. Each task then becomes one of the session's
+  [issue drafts](events-and-chat.md#grilling-sessions), in the tasks'
+  order, with no model asked: its title and description, the Acceptance
+  Criteria it meets quoted from the approved requirements (or named by
+  id, for one they lack), and blocked by the tasks it depends on. The
+  Owner edits and files them as any session's drafts; merging the pull
+  request is the Owner's alone, as the
+  [Merge Policy](issue-pipeline.md#the-merge-policy) never merges a change
+  under `.agents/specs/`.
+- **Ending early.** **End session** opens the pull request with whatever
+  is confirmed, or none if nothing is, and drafts issues only from
+  confirmed tasks.
+- **Reading it.** The session, under **Read** in the Grilling Sessions
+  list, shows the phase it is on and each of `requirements.md`,
+  `design.md` and `tasks.md` as approved, as drafted, skipped or not yet
+  drafted, in place of the PRD's outline. Its API
+  (`GET /api/floors/:floorId/grilling-sessions/:id`) sends it as `spec`:
+  `{"slug","phase","drafts","approved","designSkipped","confirmedAt"}`,
+  null for every other session.
