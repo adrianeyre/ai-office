@@ -992,6 +992,24 @@ Floor's **Merge Policy** is in its settings (`mergePolicy` in `PATCH
   `.claude/`, `.codex/` or `.opencode/`, and every `CLAUDE.md`,
   `CLAUDE.local.md`, `AGENTS.md`, `AGENTS.override.md`, `.mcp.json` and
   `opencode.json`, at any depth and in any case.
+- **The Guidelines and Specs are the Owner's to merge.** An Agent never
+  changes its own rules: a Guideline or Spec an Agent wrote that the
+  Merge Policy merged would bypass the Owner
+  ([ADR 0014](../architectural-decision-record/0014-agents-follow-only-guidelines-the-owner-approved.md)).
+  So a pull request that changes anything under `.agents/guidelines/` or
+  `.agents/specs/` goes to the Owner on any Floor and whatever its label,
+  as one that changes the repository's memory does, and the Notice names
+  them on their own: "… not merged automatically, as it changes the
+  Guidelines, which only you approve.", "… as it changes the Specs, which
+  only you approve." or, for both, "… as it changes the Guidelines and
+  Specs, which only you approve." (Guidelines, Specs and Hooks PRD,
+  FR-110; `changesGuidelines` and `changesSpecs` in `owner-only.ts`).
+  Like the rest, these match a renamed file's old path too (moving a
+  Guideline out of the folder changes the Guidelines), at any depth and
+  in any case; a folder elsewhere called `guidelines/` or `specs/`, such
+  as `docs/guidelines/`, is not among them. Merging such a pull request
+  is the Owner's approval of the Guidelines it changes ([Only the version
+  the Owner approved](guidelines-specs-and-hooks.md#only-the-version-the-owner-approved)).
 - **What a chat request built is the Owner's to merge.** An issue a chat
   request's Batch holds goes to the Owner whatever the Floor's policy,
   "… not merged automatically, as it was filed for a chat request." on an

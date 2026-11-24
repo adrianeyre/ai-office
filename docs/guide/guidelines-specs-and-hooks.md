@@ -223,7 +223,11 @@ to read as they need, are mounted outside the budget.
 
 An Agent's pull request that changes anything under `.agents/guidelines/`
 or `.agents/specs/` is never merged automatically: the Merge Policy sends
-it to the Owner on any Floor, as it does for repository memory (FR-110).
+it to the Owner on any Floor, as it does for repository memory (FR-110),
+even one the Owner labelled `ai-office:auto-merge`. Its Notice says why:
+"PR #2 awaiting your approval: not merged automatically, as it changes
+the Guidelines, which only you approve." (or the Specs, or both). See
+[the Merge Policy](issue-pipeline.md#the-merge-policy).
 An Agent may instead propose a change, with up to one
 `<guideline name="…">` block in its Handoff or QA report. Proposals wait
 in the Floor admin for the Owner, who can open one as a pull request; no
