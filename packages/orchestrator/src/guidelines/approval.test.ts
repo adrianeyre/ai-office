@@ -651,6 +651,50 @@ describe("reading Guidelines at intake and before each task", () => {
     expect(pick(guidelineEvents())).toEqual([["guideline.awaiting", "tech"]]);
   });
 
+  it("makes a guideline:<name> label for each manual Guideline the Owner approved, once", async () => {
+    const { github, floorStore, events, guidelines } = await setUp();
+    github.pushCommit(repository, "main", {
+      files: {
+        ".agents/guidelines/release.md":
+          "---\ninclusion: manual\n---\n\nBump the version.\n",
+        [tech]: "Use pnpm.\n",
+      },
+      pusher: owner,
+    });
+    github.pushCommit(repository, "main", {
+      files: {
+        ".agents/guidelines/hotfix.md":
+          "---\ninclusion: manual\n---\n\nTheirs.\n",
+      },
+      pusher: "mallory",
+    });
+    const intake = createIntake({
+      floors: floorStore,
+      github,
+      pipeline: createPipeline({ github, events }),
+      queue: memoryIntakeQueue(),
+      events,
+      settings: () =>
+        Promise.resolve({ ownerLogin: owner, intervalSeconds: 60 }),
+      guidelines,
+    });
+    expect((await intake.poll()).failed).toEqual([]);
+    const guidelineLabels = () =>
+      github
+        .labels(repository)
+        .filter(({ name }) => name.startsWith("guideline:"))
+        .map(({ name, description }) => ({ name, description }));
+    // Not the one awaiting approval, nor an always one.
+    expect(guidelineLabels()).toEqual([
+      {
+        name: "guideline:release",
+        description: "AI Office: follow the Owner's release Guideline",
+      },
+    ]);
+    await intake.poll();
+    expect(guidelineLabels()).toHaveLength(1);
+  });
+
   it("still takes in a Floor's issues when its Guidelines cannot be read", async () => {
     const { github, floor, floorStore, events } = await setUp();
     const failure = new Error("GitHub is down.");
