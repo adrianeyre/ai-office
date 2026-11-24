@@ -33,6 +33,7 @@ import { selectClass } from "@/lib/utils.ts";
 import { postJson, readApiError, sendJson } from "./api.ts";
 import { FloorSkillsCard } from "./floor-skills-card.tsx";
 import { SaveAsTemplateCard } from "./floor-templates-page.tsx";
+import { GuidelinesCard } from "./guidelines-card.tsx";
 import {
   agentsQuery,
   floorQuery,
@@ -51,7 +52,8 @@ import { floorTokenUsageQuery } from "./token-caps.tsx";
 // their status, current issue and tokens against caps, each editable and
 // removable, and new ones added (FR-12, FR-13); its Skills, its token usage
 // and caps; and archiving it (FR-9), with a link to the Manager chat
-// (FR-24).
+// (FR-24); and its Guidelines, approved or awaiting the Owner's approval
+// (Guidelines, Specs and Hooks PRD, FR-103, FR-111).
 
 /** The settings form's fields, as typed: numbers are text until saved. */
 interface FormValues {
@@ -785,6 +787,7 @@ export function FloorAdminPage({ floorId }: { floorId: string }) {
           </Link>
         </CardContent>
       </Card>
+      <GuidelinesCard floor={floor} />
       <FloorSkillsCard floor={floor} />
       {!archived && <SaveAsTemplateCard floor={floor} />}
       {!archived && (
