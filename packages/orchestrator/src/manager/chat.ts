@@ -17,12 +17,15 @@ import {
   maxGrillingSourceLength,
   maxGrillingTopicLength,
   mentionedFiles,
+  newGrillingSpec,
   readGrillingAnswers,
   readChatControl,
   readGoalCommand,
   readGrillingControl,
   readSkillCommand,
   skillAnnouncement,
+  skipSpecDesignText,
+  specSkillName,
   toTicketsSkillName,
   type ChatAttachment,
   type FloorSkillSource,
@@ -50,6 +53,7 @@ import { FloorError } from "../floors/errors.ts";
 import type { FloorRecord, FloorStore } from "../floors/store.ts";
 import {
   documentsText,
+  slugOf,
   type GrillingDocumentsWriter,
   type WrittenDocuments,
 } from "../grilling/documents.ts";
@@ -82,6 +86,20 @@ import {
   type FoundFact,
   type GrillingSessionRecord,
 } from "../grilling/session.ts";
+import {
+  confirmProblem,
+  confirmSpecPhase,
+  phaseName,
+  reopenProblem,
+  reopenSpecPhase,
+  skipProblem,
+  skipSpecDesign,
+  specConfirmationText,
+  specConfirmWords,
+  specHasApproved,
+  specIssueDrafts,
+  specStanding,
+} from "../grilling/spec.ts";
 import { grillingSkillInstructions } from "../grilling/skill.ts";
 import type { GrillingStore } from "../grilling/store.ts";
 import type { TaskGuidelines } from "../guidelines/tasks.ts";
@@ -177,6 +195,14 @@ import type {
 // `/grilling`'s. "/to-tickets" reads the PRDs and ADRs it names from the
 // repository into the session, writes no documents, and on "confirm" ends
 // and has the issues drafted at once, with no pull request to open.
+// "/spec <words>", AI Office's own (Guidelines, Specs and Hooks PRD,
+// FR-113; ADR 0015), runs the rounds in three phases, the Model drafting
+// each phase's document: "confirm requirements" and "confirm design" (or
+// "skip design") keep the draft as the approved copy, commit it on the
+// session's branch and have the next phase drafted; "reopen …" goes back
+// to an earlier phase, whose later ones are drafted again; and "confirm
+// tasks" opens the pull request with the Spec and has its tasks kept as
+// the issue drafts, in plain code.
 // "/clear" wipes the conversation the Model is given, and "/compact"
 // replaces its older history with a summary the Manager's Model writes
 // (FR-87); the chat also compacts itself before a reply once the
@@ -649,13 +675,15 @@ function endedText(ended: GrillingSessionRecord): string {
 function standing(session: GrillingSessionRecord): string {
   const open = openInRound(session).map(({ number }) => number);
   const decisions = `${String(session.decisions.length)} ${session.decisions.length === 1 ? "decision" : "decisions"} settled`;
+  // A `/spec` session says its phase first (FR-113).
+  const phase = session.spec === null ? "" : `${specStanding(session)} `;
   if (open.length > 0) {
-    return `Round ${String(session.round)} has ${open.length === 1 ? "question" : "questions"} ${numbersInWords(open)} open, and ${decisions}.`;
+    return `${phase}Round ${String(session.round)} has ${open.length === 1 ? "question" : "questions"} ${numbersInWords(open)} open, and ${decisions}.`;
   }
   if (session.awaitingConfirmation) {
-    return `No open questions remain, and ${decisions}: reply "confirm" to end it.`;
+    return `${phase}No open questions remain, and ${decisions}: reply ${session.spec === null ? '"confirm" to end it' : specConfirmWords(session.spec.phase)}.`;
   }
-  return `${decisions[0]?.toUpperCase() ?? ""}${decisions.slice(1)}; send a message for the next round.`;
+  return `${phase}${decisions[0]?.toUpperCase() ?? ""}${decisions.slice(1)}; send a message for the next round.`;
 }
 
 /** What a message is to a Grilling Session, before it is kept. */
@@ -683,6 +711,11 @@ type GrillingRoute =
  */
 type GrillingOutcome =
   | ChatMessageRecord
+  /**
+   * A `/spec` session moved to another phase (FR-113): its documents are
+   * committed, the chat says `said`, and the new phase's turn is written.
+   */
+  | { readonly kind: "spec-step"; readonly said: string }
   | "turn"
   | "close"
   | "draft-issues"
@@ -1702,6 +1735,43 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
         description: clean(guideline.description),
         text: clean(guideline.text),
       })),
+      spec: {
+        ...(value.spec.requirements === undefined
+          ? {}
+          : {
+              requirements: {
+                introduction: clean(value.spec.requirements.introduction),
+                requirements: value.spec.requirements.requirements.map(
+                  ({ title, story, criteria }) => ({
+                    title: clean(title),
+                    story: clean(story),
+                    criteria: criteria.map(clean),
+                  }),
+                ),
+              },
+            }),
+        ...(value.spec.design === undefined
+          ? {}
+          : {
+              design: {
+                overview: clean(value.spec.design.overview),
+                architecture: clean(value.spec.design.architecture),
+                data: clean(value.spec.design.data),
+                errorHandling: clean(value.spec.design.errorHandling),
+                testing: clean(value.spec.design.testing),
+              },
+            }),
+        ...(value.spec.tasks === undefined
+          ? {}
+          : {
+              tasks: value.spec.tasks.map((task) => ({
+                ...task,
+                title: clean(task.title),
+                description: clean(task.description),
+                meets: task.meets.map(clean),
+              })),
+            }),
+      },
     };
   };
 
@@ -1998,7 +2068,13 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
                   roundText(said, saved.round, applied.asked),
                   saved.round,
                 )
-              : reply("reply", confirmationText(said, saved), null);
+              : reply(
+                  "reply",
+                  saved.spec === null
+                    ? confirmationText(said, saved)
+                    : specConfirmationText(said, saved),
+                  null,
+                );
           break;
         }
       }
@@ -2018,6 +2094,64 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
     });
     busy.delete(floor.id);
     publish(floor.id, { type: "message", message });
+  };
+
+  /**
+   * A `/spec` session moved to another phase in answer to `asked`
+   * (FR-113): its approved documents are committed on its branch at once
+   * (and those no longer approved taken out), the chat says so, and the
+   * Manager's Model then writes the new phase's turn. A write that fails
+   * is said, and tried again with the next turn.
+   */
+  const specStep = async (
+    floor: FloorRecord,
+    manager: AgentRecord,
+    team: readonly AgentRecord[],
+    asked: ChatMessageRecord,
+    sessionId: number,
+    said: string,
+    controller: AbortController,
+  ): Promise<void> => {
+    let text = said;
+    try {
+      const grilling = options.grilling;
+      const session = await grilling?.get(floor.id, sessionId);
+      if (grilling === undefined || session === undefined) {
+        throw new Error(`There is no Grilling Session ${String(sessionId)}.`);
+      }
+      if (options.documents !== undefined) {
+        const model = modelOf(manager, await options.defaultModels?.()) ?? "";
+        const written = await options.documents.write({
+          floor,
+          manager: trailerOf(manager, model),
+          session,
+          signal: controller.signal,
+        });
+        await grilling.save({ ...session, documents: written.documents });
+        text = [said, documentsText(written, [])]
+          .filter((part) => part !== "")
+          .join("\n\n");
+      }
+    } catch (error) {
+      text = `${said}\n\nThe Spec's documents could not be written: ${reasonOf(error)}`;
+    }
+    const message = await store.append({
+      floorId: floor.id,
+      kind: "grilling",
+      text: redactor.redactText(text),
+      command: null,
+      replyTo: asked.id,
+      agentId: manager.id,
+      model: null,
+      grilling: { sessionId, round: null },
+      createdAt: now(),
+    });
+    publish(floor.id, { type: "message", message });
+    if (controller.signal.aborted) {
+      busy.delete(floor.id);
+      return;
+    }
+    await turn(floor, manager, team, asked, sessionId, controller);
   };
 
   /**
@@ -2063,7 +2197,10 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
       }
       const model = modelOf(manager, await options.defaultModels?.()) ?? "";
       const proposed =
-        writer === undefined || !grillingWritesDocuments(session.skill)
+        writer === undefined ||
+        !grillingWritesDocuments(session.skill) ||
+        // A Spec ended before anything was confirmed has nothing to propose.
+        (session.spec !== null && !specHasApproved(session.spec))
           ? undefined
           : await writer.propose({
               floor,
@@ -2112,7 +2249,9 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
     const drafting =
       ended !== undefined &&
       options.issues !== undefined &&
-      grillingDraftsIssues(ended.skill);
+      grillingDraftsIssues(ended.skill) &&
+      // A Spec's drafts are its confirmed tasks (FR-113).
+      ended.spec?.approved.tasks !== null;
     if (!drafting) {
       busy.delete(floor.id);
     }
@@ -2172,7 +2311,32 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
       const defaults = await options.defaultModels?.();
       model = modelOf(manager, defaults);
       const cannot = cannotAnswer(manager, model);
-      if (cannot !== undefined || model === undefined) {
+      if (session.spec !== null) {
+        // A Spec's issue drafts are its confirmed tasks, one each, in
+        // their order, with no model asked (FR-113).
+        model = undefined;
+        const issues = specIssueDrafts(session, now());
+        if (issues === undefined) {
+          kept = answer(
+            "error",
+            `The ${sessionName(session)} has no confirmed tasks, so there are no issues to draft: its tasks become its issue drafts once the Owner says "confirm tasks".`,
+          );
+        } else {
+          const saved = await grilling.save({
+            ...session,
+            issues,
+            updatedAt: now(),
+          });
+          kept = answer(
+            "reply",
+            issuesDraftedText(
+              "Each confirmed task of the Spec is one issue draft, in the tasks' order, quoting the Acceptance Criteria it meets.",
+              saved,
+              issues,
+            ),
+          );
+        }
+      } else if (cannot !== undefined || model === undefined) {
         kept = answer(
           "error",
           `${manager.name} could not draft the issues: ${cannot ?? ""} ${draftAgain(session)}`,
@@ -2604,6 +2768,31 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
       ? options.documents !== undefined
       : options.issues !== undefined;
 
+  /**
+   * A new `/spec` session with its Spec's folder settled: named from its
+   * topic, unless the Floor has a Spec of that name already, or it has no
+   * topic, when the session's number names it (FR-113).
+   */
+  const withSpecSlug = async (
+    floor: FloorRecord,
+    session: GrillingSessionRecord,
+  ): Promise<GrillingSessionRecord> => {
+    const { spec } = session;
+    if (spec === null || options.grilling === undefined) {
+      return session;
+    }
+    const numbered = `${spec.slug || "spec"}-${String(session.id)}`;
+    const slug =
+      options.documents === undefined
+        ? spec.slug || numbered
+        : await options.documents
+            .specSlug(floor, spec.slug, session.id)
+            .catch(() => spec.slug || numbered);
+    return slug === spec.slug
+      ? session
+      : options.grilling.save({ ...session, spec: { ...spec, slug } });
+  };
+
   /** Where a message stands with the Floor's Grilling Sessions. */
   const routeGrilling = async (
     floor: FloorRecord,
@@ -2626,9 +2815,10 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
       const sources =
         skill === toTicketsSkillName ? await sourcesOf(floor, given) : [];
       const at = now();
-      const session = await grilling.create({
+      const topic = redactor.redactText(given).slice(0, maxGrillingTopicLength);
+      const created = await grilling.create({
         floorId,
-        topic: redactor.redactText(given).slice(0, maxGrillingTopicLength),
+        topic,
         skill,
         status: "active",
         round: 0,
@@ -2644,12 +2834,13 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
         issues: null,
         sources,
         guidelines: [],
+        spec: skill === specSkillName ? newGrillingSpec(slugOf(topic)) : null,
         startedAt: at,
         updatedAt: at,
         pausedAt: null,
         endedAt: null,
       });
-      return { kind: "start", session };
+      return { kind: "start", session: await withSpecSlug(floor, created) };
     }
     const control =
       skillCommand === undefined ? readGrillingControl(text) : undefined;
@@ -2763,6 +2954,88 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
   };
 
   /**
+   * A `/spec` session's phases (FR-113), in plain code: "confirm
+   * requirements" and "confirm design" approve the phase's draft and move
+   * on, "skip design" goes to the tasks with no design, "reopen …" goes
+   * back to an earlier phase, and "confirm tasks" (or "confirm", on the
+   * tasks) ends the session with its pull request and issue drafts. Each
+   * is refused, saying why, when it cannot be done now.
+   */
+  const specOutcome = async (
+    control: Extract<
+      GrillingControl,
+      {
+        readonly kind: "confirm-phase" | "skip-design" | "reopen" | "confirm";
+      }
+    >,
+    session: GrillingSessionRecord,
+    say: (
+      kind: "hint" | "grilling",
+      text: string,
+    ) => Promise<ChatMessageRecord>,
+  ): Promise<GrillingOutcome> => {
+    const grilling = options.grilling;
+    const { spec } = session;
+    if (grilling === undefined) {
+      return "continue";
+    }
+    if (spec === null) {
+      return say(
+        "hint",
+        `The ${sessionName(session)} is not a /spec session: only a Spec has requirements, a design and tasks to confirm. Reply "confirm" to end it once no open questions remain.`,
+      );
+    }
+    const at = now();
+    if (control.kind === "skip-design") {
+      const problem = skipProblem(session);
+      if (problem !== undefined) {
+        return say("hint", problem);
+      }
+      await grilling.save(skipSpecDesign(session, at));
+      return {
+        kind: "spec-step",
+        said: "Skipped the design: this Spec has no design.md. Now the tasks.",
+      };
+    }
+    if (control.kind === "reopen") {
+      const problem = reopenProblem(session, control.phase);
+      if (problem !== undefined) {
+        return say("hint", problem);
+      }
+      await grilling.save(reopenSpecPhase(session, control.phase, at));
+      return {
+        kind: "spec-step",
+        said: `Reopened ${phaseName(control.phase)}. ${control.phase === "requirements" ? "The design and the tasks are" : "The tasks are"} drafted again once ${control.phase === "design" ? "it is" : "they are"} confirmed, and what was approved from ${phaseName(control.phase)} on leaves the session's branch until then.`,
+      };
+    }
+    const phase = control.kind === "confirm" ? spec.phase : control.phase;
+    if (control.kind === "confirm" && phase !== "tasks") {
+      return say(
+        "hint",
+        `The Spec is on ${phaseName(phase)}: reply ${specConfirmWords(phase)} once ${phase === "design" ? "it is" : "they are"} drafted and no open questions remain.`,
+      );
+    }
+    const problem = confirmProblem(session, phase);
+    if (problem !== undefined) {
+      return say("hint", problem);
+    }
+    const confirmed = await grilling.save(confirmSpecPhase(session, at));
+    if (phase === "tasks") {
+      // The session ends with its pull request; the tasks become its
+      // issue drafts.
+      if (closes(confirmed)) {
+        return "close";
+      }
+      const ended = await grilling.save(endedSession(confirmed, now()));
+      return say("grilling", endedText(ended));
+    }
+    return {
+      kind: "spec-step",
+      said: `Confirmed ${phaseName(phase)}. Now ${phase === "requirements" ? `the design: reply "${skipSpecDesignText}" to go straight to the tasks` : "the tasks"}.`,
+    };
+  };
+
+  /**
    * Carries out a message's part in a Grilling Session, in plain code:
    * pausing, resuming and ending it, and recording the Owner's answers.
    */
@@ -2856,6 +3129,15 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
       }
       if (control.kind === "draft-issues" || control.kind === "file-issues") {
         return issuesOutcome(control, session, say);
+      }
+      if (
+        session !== undefined &&
+        (control.kind === "confirm-phase" ||
+          control.kind === "skip-design" ||
+          control.kind === "reopen" ||
+          (control.kind === "confirm" && session.spec !== null))
+      ) {
+        return specOutcome(control, session, say);
       }
       if (control.kind === "end") {
         if (session === undefined) {
@@ -3051,6 +3333,24 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
         } catch (error) {
           busy.delete(floorId);
           throw error;
+        }
+        if (typeof outcome === "object" && outcome.kind === "spec-step") {
+          const { session } = route;
+          if (session === undefined) {
+            throw new Error("A Spec's phase needs its Grilling Session.");
+          }
+          const { said } = outcome;
+          return inBackground((controller) =>
+            specStep(
+              floor,
+              manager,
+              team,
+              message,
+              session.id,
+              said,
+              controller,
+            ),
+          );
         }
         if (outcome === "turn") {
           const { session } = route;

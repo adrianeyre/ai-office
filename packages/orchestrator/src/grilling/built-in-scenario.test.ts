@@ -113,6 +113,8 @@ function recordingDocuments() {
       proposals.push(input);
       return Promise.resolve(documents(input));
     },
+    specSlug: (_floor, base, sessionId) =>
+      Promise.resolve(base || `spec-${String(sessionId)}`),
   };
   return { writer, writes, proposals };
 }

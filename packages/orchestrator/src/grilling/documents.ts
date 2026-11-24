@@ -8,6 +8,10 @@ import {
   grillingPrdDirectory,
   grillingProcessDirectory,
   grillingWritesGuidelines,
+  grillingWritesSpec,
+  specDocumentPath,
+  specFolder,
+  specPhases,
   type GitIdentity,
   type GrillingAdr,
   type GrillingDocuments,
@@ -26,6 +30,7 @@ import {
   type GrillingSessionRecord,
   type LeftOutGuideline,
 } from "./session.ts";
+import { inSpecFolder, specFiles, specOf } from "./spec.ts";
 
 // A Grilling Session's documents (PRD FR-80). As decisions settle, the
 // Manager keeps the Floor's documents current on a branch of the session's
@@ -48,6 +53,14 @@ import {
 // (FR-102). One of the Floor's own of that name is replaced, which the
 // pull request shows; merging it is the Owner's approval of every one of
 // them (ADR 0014). Until a Guideline is settled there is nothing to write.
+//
+// A `/spec` session (FR-113, ADR 0015) writes only its Spec, in
+// `.agents/specs/<slug>/`: each of `requirements.md`, `design.md` and
+// `tasks.md` the Owner has confirmed, as plain code writes it from the
+// approved copy kept with the session. Its branch holds exactly those, so
+// a document whose phase the Owner reopened is taken out again until it is
+// confirmed anew. Its folder is named from the session's topic, or with
+// the session's number after it when the Floor has a Spec of that name.
 //
 // Plain code writes every file from the session's stored data, so writing
 // them again changes nothing unless the session did. AI Office, as the
@@ -108,6 +121,16 @@ export interface GrillingDocumentsWriter {
    * when they cannot be written or the pull request cannot be opened.
    */
   propose(input: GrillingDocumentsInput): Promise<WrittenDocuments>;
+  /**
+   * The folder name for a new `/spec` session's Spec: `base`, or
+   * `base-<session>` when the Floor's default branch has a Spec there
+   * already (or `spec-<session>` with no `base`).
+   */
+  specSlug(
+    floor: Pick<FloorRecord, "repository" | "defaultBranch">,
+    base: string,
+    sessionId: number,
+  ): Promise<string>;
 }
 
 const reasonOf = (error: unknown): string =>
@@ -335,6 +358,9 @@ export function createGrillingDocuments(
     from: string,
   ): Promise<FileToCommit[]> => {
     const { floor, session } = input;
+    if (grillingWritesSpec(session.skill)) {
+      return specFiles(session);
+    }
     if (grillingWritesGuidelines(session.skill)) {
       return session.guidelines.map((guideline) => ({
         path: guidelinePath(guideline),
@@ -402,8 +428,17 @@ export function createGrillingDocuments(
         ? branch
         : floor.defaultBranch;
     const files = await filesOf(input, from);
-    if (files.length === 0) {
-      // Nothing settled to write yet (`/guidelines` before its first).
+    // A Spec's documents no longer approved leave the branch.
+    const remove = grillingWritesSpec(session.skill)
+      ? (session.documents?.files ?? []).filter(
+          (path) =>
+            inSpecFolder(specOf(session), path) &&
+            !files.some((file) => file.path === path),
+        )
+      : [];
+    if (files.length === 0 && remove.length === 0) {
+      // Nothing settled to write yet (`/guidelines` before its first,
+      // `/spec` before its requirements are confirmed).
       return {
         documents: {
           branch,
@@ -426,7 +461,8 @@ export function createGrillingDocuments(
       from,
       to: branch,
       files,
-      message: `docs: ${sessionTitle(session)}, as settled${session.round === 0 ? "" : ` in round ${String(session.round)}`}\n\n${grillingWritesGuidelines(session.skill) ? "The Guidelines settled so far." : "The PRD, ADRs, glossary terms and process docs settled so far."}`,
+      remove,
+      message: `docs: ${sessionTitle(session)}, as settled${session.round === 0 ? "" : ` in round ${String(session.round)}`}\n\n${grillingWritesSpec(session.skill) ? "The Spec's documents the Owner confirmed so far." : grillingWritesGuidelines(session.skill) ? "The Guidelines settled so far." : "The PRD, ADRs, glossary terms and process docs settled so far."}`,
       identity: await options.gitIdentity(floor.id),
       agent: manager,
       scratchDir: options.scratchDir,
@@ -467,8 +503,9 @@ export function createGrillingDocuments(
   ): string => {
     const { session, manager } = input;
     const guidelines = grillingWritesGuidelines(session.skill);
+    const spec = grillingWritesSpec(session.skill) ? specOf(session) : null;
     return [
-      `${manager.name}, the Floor's Manager, wrote ${guidelines ? "these Guidelines" : "these documents"} in ${sessionTitle(session)} with the Owner, as its decisions settled.`,
+      `${manager.name}, the Floor's Manager, wrote ${guidelines ? "these Guidelines" : spec !== null ? "this Spec" : "these documents"} in ${sessionTitle(session)} with the Owner, as its decisions settled.`,
       "",
       "**Files**",
       "",
@@ -503,20 +540,35 @@ export function createGrillingDocuments(
             ]),
             "",
           ]),
-      ...(guidelines
+      ...(spec !== null
         ? [
-            "**Guidelines**",
+            "**The Spec**",
             "",
-            ...session.guidelines.map(
-              ({ name, inclusion, fileMatchPatterns, description }) =>
-                `- \`${name}\` (${inclusion === "always" ? "always" : `fileMatch: ${fileMatchPatterns.map((pattern) => `\`${pattern}\``).join(", ")}`}): ${description}`,
-            ),
+            ...specPhases.map((phase) => {
+              const path = `\`${specDocumentPath(spec.slug, phase)}\``;
+              return spec.approved[phase] !== null
+                ? `- ${path}: confirmed by the Owner in the session.`
+                : phase === "design" && spec.designSkipped
+                  ? `- ${path}: skipped by the Owner.`
+                  : `- ${path}: not confirmed, so not written.`;
+            }),
             "",
-            "Agents follow a Guideline only in a version you approved. Merging this pull request yourself is your approval of these Guidelines: from the next task on, the Floor's Agents follow them as written here. Change any of them first if they are not your rules.",
+            "Each document is as the Owner confirmed it in the session, phase by phase; Agents are given that approved copy, never the file as it stands. The tasks become the session's issue drafts. Merging is yours: a Manager never merges.",
           ]
-        : [
-            "Review them as you would any change to the Floor's canon. Merging is yours: a Manager never merges.",
-          ]),
+        : guidelines
+          ? [
+              "**Guidelines**",
+              "",
+              ...session.guidelines.map(
+                ({ name, inclusion, fileMatchPatterns, description }) =>
+                  `- \`${name}\` (${inclusion === "always" ? "always" : `fileMatch: ${fileMatchPatterns.map((pattern) => `\`${pattern}\``).join(", ")}`}): ${description}`,
+              ),
+              "",
+              "Agents follow a Guideline only in a version you approved. Merging this pull request yourself is your approval of these Guidelines: from the next task on, the Floor's Agents follow them as written here. Change any of them first if they are not your rules.",
+            ]
+          : [
+              "Review them as you would any change to the Floor's canon. Merging is yours: a Manager never merges.",
+            ]),
       "",
       `Written by ${agentTrailer(manager).replace(/^Agent: /, "")} in AI Office.`,
       "",
@@ -524,6 +576,18 @@ export function createGrillingDocuments(
   };
 
   return {
+    async specSlug(floor, base, sessionId) {
+      const numbered = `${base || "spec"}-${String(sessionId)}`;
+      if (base === "") {
+        return numbered;
+      }
+      const taken = await github
+        .repository(floor.repository)
+        .listDirectory(specFolder(base), floor.defaultBranch)
+        .catch(() => undefined);
+      return taken === undefined || taken.length === 0 ? base : numbered;
+    },
+
     async write(input) {
       try {
         return await writeNow(input);
@@ -550,7 +614,9 @@ export function createGrillingDocuments(
       const { floor, manager, session } = input;
       if (written.documents.files.length === 0) {
         throw new Error(
-          "No Guideline is settled yet, so there is no pull request to open. Settle one first.",
+          grillingWritesSpec(session.skill)
+            ? "No document of the Spec is confirmed yet, so there is no pull request to open."
+            : "No Guideline is settled yet, so there is no pull request to open. Settle one first.",
         );
       }
       const { branch } = written.documents;
@@ -562,7 +628,9 @@ export function createGrillingDocuments(
           title: shorten(
             grillingWritesGuidelines(session.skill)
               ? `docs: the Guidelines of ${sessionTitle(session)}`
-              : `docs: ${sessionTitle(session)}`,
+              : grillingWritesSpec(session.skill)
+                ? `docs: the Spec of ${sessionTitle(session)}`
+                : `docs: ${sessionTitle(session)}`,
             200,
           ),
           body: describe(input, written.documents.files),
@@ -584,7 +652,7 @@ export function createGrillingDocuments(
           ?.raise({
             kind: "info",
             title: shorten(
-              `PR #${String(pullRequest.number)} opened on ${floor.name}: the ${grillingWritesGuidelines(session.skill) ? "Guidelines" : "documents"} of ${sessionTitle(session)}`,
+              `PR #${String(pullRequest.number)} opened on ${floor.name}: the ${grillingWritesGuidelines(session.skill) ? "Guidelines" : grillingWritesSpec(session.skill) ? "Spec" : "documents"} of ${sessionTitle(session)}`,
               200,
             ),
             floorId: floor.id,

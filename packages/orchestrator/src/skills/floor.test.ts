@@ -641,7 +641,9 @@ describe("a Floor's Skills", () => {
       expect(text).not.toContain("setup-matt-pocock-skills");
     }
     for (const name of [
-      ...grillingSkillNames.slice(1).filter((name) => name !== "guidelines"),
+      ...grillingSkillNames
+        .slice(1)
+        .filter((name) => name !== "guidelines" && name !== "spec"),
       "domain-modeling",
     ]) {
       const text = (
@@ -664,6 +666,17 @@ describe("a Floor's Skills", () => {
     expect(text).not.toContain("Matt Pocock");
     expect(text).toContain(".agents/guidelines/<name>.md");
     expect(text).toContain("It writes no PRD, ADRs, glossary or process docs");
+
+    // `/spec` is AI Office's own too (FR-113): no credit to Matt Pocock,
+    // and it writes only its Spec, in three phases the Owner confirms.
+    const spec = await floorSkills.get("web-shop", "spec");
+    expect(spec).toMatchObject({ source: "built-in" });
+    const specText = spec.files.map(({ content }) => content).join("");
+    expect(specText).not.toContain("Matt Pocock");
+    expect(specText).toContain("`.agents/specs/<slug>/`");
+    expect(specText).toContain('"confirm requirements"');
+    expect(specText).toContain('"skip design"');
+    expect(specText).toContain("Only the Spec: no PRD");
   });
 
   it("will not load a built-in Skill that is not a valid Skill", () => {

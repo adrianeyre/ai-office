@@ -18,8 +18,8 @@ import {
 import { grillingSkill, grillingSkillInstructions } from "../grilling/skill.ts";
 
 // AI Office's built-in Skills (PRD FR-77, FR-83b; Guidelines, Specs and
-// Hooks PRD, FR-109), on every Floor: its own `/grilling` and
-// `/guidelines`, and those adapted from Matt Pocock's skills (MIT). Every
+// Hooks PRD, FR-109, FR-113), on every Floor: its own `/grilling`,
+// `/guidelines` and `/spec`, and those adapted from Matt Pocock's skills (MIT). Every
 // one but `/grilling` is a real Agent Skills folder under `built-in/` with
 // its `SKILL.md` and supporting files, read when AI Office starts and
 // checked as every Skill is. Any problem stops the load with the folder at
@@ -27,7 +27,7 @@ import { grillingSkill, grillingSkillInstructions } from "../grilling/skill.ts";
 //
 // Two kinds:
 // - **Session-starting** (`grillingSkillNames`): `/grill-with-docs`,
-//   `/wayfinder`, `/to-tickets`, `/to-spec` and `/guidelines` start a
+//   `/wayfinder`, `/to-tickets`, `/to-spec`, `/guidelines` and `/spec` start a
 //   Grilling Session, as `/grilling` does, and their instructions are
 //   loaded beside `/grilling`'s while it runs. No office or repository Skill of their
 //   name overrides them, and the Manager is never offered them to choose.
