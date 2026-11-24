@@ -16,7 +16,12 @@ import {
   grillingTurnSchema,
   grillingWritesDocuments,
   grillingWritesGuidelines,
+  grillingWritesSpec,
   guidelinesSkillName,
+  confirmSpecPhaseText,
+  reopenSpecPhaseText,
+  skipSpecDesignText,
+  specSkillName,
   isGrillingSkillName,
   toTicketsSkillName,
   pauseGrillingText,
@@ -183,6 +188,44 @@ describe("readGrillingControl", () => {
     ).toEqual({ kind: "file-issues", session: 4 });
   });
 
+  it("reads a /spec session's phases: confirm, skip design and reopen (FR-113)", () => {
+    expect(readGrillingControl("confirm requirements")).toEqual({
+      kind: "confirm-phase",
+      phase: "requirements",
+    });
+    expect(readGrillingControl("Yes, confirm the design.")).toEqual({
+      kind: "confirm-phase",
+      phase: "design",
+    });
+    expect(readGrillingControl(confirmSpecPhaseText("tasks"))).toEqual({
+      kind: "confirm-phase",
+      phase: "tasks",
+    });
+    expect(readGrillingControl(skipSpecDesignText)).toEqual({
+      kind: "skip-design",
+    });
+    expect(readGrillingControl("Please skip the design")).toEqual({
+      kind: "skip-design",
+    });
+    expect(readGrillingControl(reopenSpecPhaseText("requirements"))).toEqual({
+      kind: "reopen",
+      phase: "requirements",
+    });
+    expect(readGrillingControl("go back to the design")).toEqual({
+      kind: "reopen",
+      phase: "design",
+    });
+    expect(readGrillingControl("re-open the tasks please")).toEqual({
+      kind: "reopen",
+      phase: "tasks",
+    });
+    expect(readGrillingControl("confirm the plan")).toBeUndefined();
+    expect(
+      readGrillingControl("skip design for the admin pages"),
+    ).toBeUndefined();
+    expect(readGrillingControl("reopen issue 4")).toBeUndefined();
+  });
+
   it("leaves everything else, the Floor's own pause included", () => {
     expect(
       readGrillingControl("file the issues about the basket"),
@@ -194,7 +237,7 @@ describe("readGrillingControl", () => {
 });
 
 describe("the built-in Skills that start a Grilling Session", () => {
-  it("are /grilling, those adapted from Matt Pocock's and /guidelines, and only /to-tickets writes no documents", () => {
+  it("are /grilling, those adapted from Matt Pocock's, /guidelines and /spec, and only /to-tickets writes no documents", () => {
     expect(grillingSkillNames).toEqual([
       "grilling",
       "grill-with-docs",
@@ -202,6 +245,7 @@ describe("the built-in Skills that start a Grilling Session", () => {
       "to-tickets",
       "to-spec",
       "guidelines",
+      "spec",
     ]);
     expect(isGrillingSkillName("wayfinder")).toBe(true);
     expect(isGrillingSkillName("pr")).toBe(false);
@@ -218,6 +262,17 @@ describe("the built-in Skills that start a Grilling Session", () => {
     expect(
       grillingSkillNames.filter((name) => !grillingDraftsIssues(name)),
     ).toEqual([guidelinesSkillName]);
+  });
+
+  it("has only /spec write a Spec, which drafts issues from its tasks; /to-spec still writes a PRD", () => {
+    expect(isGrillingSkillName(specSkillName)).toBe(true);
+    expect(grillingSkillNames.filter(grillingWritesSpec)).toEqual([
+      specSkillName,
+    ]);
+    expect(grillingDraftsIssues(specSkillName)).toBe(true);
+    expect(grillingWritesDocuments(specSkillName)).toBe(true);
+    expect(grillingWritesSpec("to-spec")).toBe(false);
+    expect(grillingWritesGuidelines(specSkillName)).toBe(false);
   });
 
   it("reads the PRDs and ADRs /to-tickets names, once each, and nothing else", () => {
@@ -247,6 +302,8 @@ describe("the built-in Skills' names", () => {
     expect(isMattPocockSkill("grilling")).toBe(false);
     expect(isMattPocockSkill("guidelines")).toBe(false);
     expect(startsGrillingSession("guidelines")).toBe(true);
+    expect(isMattPocockSkill("spec")).toBe(false);
+    expect(startsGrillingSession("spec")).toBe(true);
     for (const name of mattPocockSkillNames) {
       expect(isMattPocockSkill(name)).toBe(true);
     }

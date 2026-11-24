@@ -2,6 +2,12 @@ import { z } from "zod";
 
 import { grillingIssuesSchema } from "./grilling-issues.ts";
 import { guidelineNamePattern, guidelinesFolder } from "./guidelines.ts";
+import {
+  grillingSpecSchema,
+  specPhases,
+  specTurnSchema,
+  type SpecPhase,
+} from "./spec.ts";
 
 // Grilling Sessions (PRD §6.15, FR-77, FR-78, FR-79, FR-80, FR-82):
 // started in the Manager chat with the built-in `/grilling` Skill, the
@@ -54,6 +60,14 @@ export const toSpecSkillName = "to-spec";
  * approval (ADR 0014). It writes no PRD and drafts no issues.
  */
 export const guidelinesSkillName = "guidelines";
+/**
+ * `/spec <words>`: AI Office's own (Guidelines, Specs and Hooks PRD,
+ * FR-113; ADR 0015). The Manager agrees a Spec with the Owner in three
+ * phases (requirements, design, tasks), each confirmed in the Owner's own
+ * words and committed in `.agents/specs/<slug>/`; the tasks become the
+ * session's issue drafts. It writes no PRD. `/to-spec` is another Skill.
+ */
+export const specSkillName = "spec";
 
 /** Every built-in Skill that starts a Grilling Session, `/grilling` first. */
 export const grillingSkillNames = [
@@ -63,6 +77,7 @@ export const grillingSkillNames = [
   toTicketsSkillName,
   toSpecSkillName,
   guidelinesSkillName,
+  specSkillName,
 ] as const;
 export type GrillingSkillName = (typeof grillingSkillNames)[number];
 
@@ -84,9 +99,17 @@ export const grillingWritesGuidelines = (skill: GrillingSkillName): boolean =>
   skill === guidelinesSkillName;
 
 /**
+ * Whether a session started by `skill` writes a Spec, phase by phase,
+ * rather than the PRD, ADRs, glossary and process docs: only `/spec`
+ * (FR-113).
+ */
+export const grillingWritesSpec = (skill: GrillingSkillName): boolean =>
+  skill === specSkillName;
+
+/**
  * Whether the Manager drafts issues once a session started by `skill`
  * ends (FR-81): every one but `/guidelines`, whose pull request is all
- * it makes.
+ * it makes. A `/spec` session's drafts are its confirmed tasks.
  */
 export const grillingDraftsIssues = (skill: GrillingSkillName): boolean =>
   skill !== guidelinesSkillName;
@@ -389,6 +412,8 @@ export const grillingSessionSchema = grillingSessionSummarySchema.extend({
   sources: z.array(grillingSourceSchema).default([]),
   /** The Guidelines `/guidelines` settled; empty for every other session. */
   guidelines: z.array(grillingGuidelineSchema).default([]),
+  /** A `/spec` session's phase and documents; null for every other session. */
+  spec: grillingSpecSchema.nullable().default(null),
 });
 export type GrillingSession = z.infer<typeof grillingSessionSchema>;
 
@@ -606,6 +631,11 @@ export const grillingTurnSchema = z.object({
     .array(grillingGuidelineTurnSchema)
     .max(maxGrillingGuidelines)
     .default([]),
+  /**
+   * The current phase's document, `/spec` only (FR-113), replacing its
+   * draft; every other session, and every other phase's, is dropped.
+   */
+  spec: specTurnSchema.default({}),
 });
 export type GrillingTurn = z.infer<typeof grillingTurnSchema>;
 
@@ -737,7 +767,16 @@ export type GrillingControl =
    */
   | { readonly kind: "draft-issues"; readonly session: number | null }
   /** The Owner approves the draft issues, and the App files them (FR-81). */
-  | { readonly kind: "file-issues"; readonly session: number | null };
+  | { readonly kind: "file-issues"; readonly session: number | null }
+  /**
+   * A `/spec` session's phase (FR-113): "confirm requirements", "confirm
+   * design" or "confirm tasks" approves the phase's draft.
+   */
+  | { readonly kind: "confirm-phase"; readonly phase: SpecPhase }
+  /** "skip design": a `/spec` session goes from requirements to tasks. */
+  | { readonly kind: "skip-design" }
+  /** "reopen requirements": a `/spec` session drafts that phase again. */
+  | { readonly kind: "reopen"; readonly phase: SpecPhase };
 
 const pausePattern =
   /^(?:please\s+)?pause\s+(?:the\s+)?(?:grilling(?:\s+session)?|session)(?:\s+please)?$/;
@@ -753,6 +792,17 @@ const fileIssuesPattern = new RegExp(
 );
 const endPattern =
   /^(?:please\s+)?(?:end|finish|stop)\s+(?:the\s+)?(?:grilling(?:\s+session)?|session)(?:\s+now)?(?:\s+please)?$/;
+const phases = specPhases.join("|");
+const confirmPhasePattern = new RegExp(
+  `^(?:yes[,\\s]*)?(?:i\\s+)?confirm\\s+(?:the\\s+)?(${phases})(?:\\s+please)?$`,
+);
+const skipDesignPattern =
+  /^(?:please\s+)?skip\s+(?:the\s+)?design(?:\s+please)?$/;
+const reopenPattern = new RegExp(
+  `^(?:please\\s+)?(?:re-?open|go\\s+back\\s+to)\\s+(?:the\\s+)?(${phases})(?:\\s+please)?$`,
+);
+const phaseOf = (word: string | undefined): SpecPhase | undefined =>
+  specPhases.find((phase) => phase === word);
 const confirmPattern =
   /^(?:yes[,\s]*)?(?:i\s+)?confirm(?:ed)?(?:\s*(?:,|and)\s*end(?:\s+(?:the\s+)?(?:grilling\s+)?session)?)?$/;
 
@@ -761,7 +811,10 @@ const confirmPattern =
  * "resume session 3"; "confirm" (the session ends once no open questions
  * remain); "end the session" (it ends now, whatever is still open); and, for an ended session's issues, "draft the issues of
  * session 3" and "file the issues of session 3" (the latest ended session
- * without a number). Undefined for anything else.
+ * without a number). A `/spec` session's phases too: "confirm
+ * requirements", "confirm design", "confirm tasks", "skip design" and
+ * "reopen requirements" (or "go back to the design"). Undefined for
+ * anything else.
  */
 export function readGrillingControl(text: string): GrillingControl | undefined {
   const said = tidy(text).replaceAll(/\s+/g, " ");
@@ -790,6 +843,17 @@ export function readGrillingControl(text: string): GrillingControl | undefined {
       };
     }
   }
+  const confirmed = phaseOf(confirmPhasePattern.exec(said)?.[1]);
+  if (confirmed !== undefined) {
+    return { kind: "confirm-phase", phase: confirmed };
+  }
+  if (skipDesignPattern.test(said)) {
+    return { kind: "skip-design" };
+  }
+  const reopened = phaseOf(reopenPattern.exec(said)?.[1]);
+  if (reopened !== undefined) {
+    return { kind: "reopen", phase: reopened };
+  }
   return confirmPattern.test(said) ? { kind: "confirm" } : undefined;
 }
 
@@ -802,6 +866,14 @@ export const resumeGrillingText = (session: number): string =>
 /** What the session's Issues send: "draft the issues of session 3" (FR-81). */
 export const draftGrillingIssuesText = (session: number): string =>
   `draft the issues of session ${String(session)}`;
+/** What confirms a `/spec` session's phase: "confirm requirements" (FR-113). */
+export const confirmSpecPhaseText = (phase: SpecPhase): string =>
+  `confirm ${phase}`;
+/** What skips a `/spec` session's design (FR-113). */
+export const skipSpecDesignText = "skip design";
+/** What reopens a `/spec` session's earlier phase: "reopen requirements". */
+export const reopenSpecPhaseText = (phase: SpecPhase): string =>
+  `reopen ${phase}`;
 /** "file the issues of session 3": the Owner approves the drafts (FR-81). */
 export const fileGrillingIssuesText = (session: number): string =>
   `file the issues of session ${String(session)}`;
