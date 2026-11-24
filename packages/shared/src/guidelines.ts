@@ -569,9 +569,7 @@ export type GuidelineProposal = z.infer<typeof guidelineProposalSchema>;
 export const guidelineProposalListSchema = z.object({
   proposals: z.array(guidelineProposalSchema),
 });
-export type GuidelineProposalList = z.infer<
-  typeof guidelineProposalListSchema
->;
+export type GuidelineProposalList = z.infer<typeof guidelineProposalListSchema>;
 
 /** `POST …/guideline-proposals/:id/open`: its pull request, and those still waiting. */
 export const openedGuidelineProposalSchema = z.object({
