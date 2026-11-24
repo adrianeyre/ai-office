@@ -52,6 +52,8 @@ import {
   createPipeline,
   createNoAccountLeftNotices,
   createGuidelineApprovals,
+  createTaskGuidelines,
+  plannedFiles,
   withGuidelines,
   createProgressComments,
   createReauthenticationNotices,
@@ -810,6 +812,34 @@ export async function startOffice(
     () => officeSettings.promptBudgetSettings(),
     contextWindow,
   );
+  // Only the Guideline versions the Owner approved reach Agents (ADR
+  // 0014): each Floor's are read from its default branch at intake and
+  // before each task, with one Notice per Floor while any await approval, and the Owner
+  // approves or dismisses them in the Floor admin.
+  const guidelineApprovals = createGuidelineApprovals({
+    github,
+    store: stores.guidelines,
+    floors: stores.floors,
+    notices,
+    events,
+    ownerLogin: async () => (await officeSettings.intakeSettings()).ownerLogin,
+    redactor,
+  });
+  // Each task's Guidelines (Guidelines PRD, FR-105 to FR-108): chosen by
+  // its Stage, the files it is about and the issue's labels, within its
+  // prompt budget; one Notice per Floor while any task's are over it.
+  const taskGuidelines = createTaskGuidelines({
+    approvals: guidelineApprovals,
+    notices,
+    events,
+    planFiles: plannedFiles(stores.batches),
+    onError: (error) => {
+      logger.warn(
+        { err: error },
+        "A task's Guidelines could not be read, or their Notice kept: it goes on without them.",
+      );
+    },
+  });
   // The office-wide and Role memory (PRD FR-54, FR-55), kept in AI Office:
   // mounted read-only into every sandbox and quoted in every reviewer's
   // prompt; Agents propose to their Role's, and the Manager or the Owner
@@ -1126,6 +1156,7 @@ export async function startOffice(
     redactor,
     ...memory,
     promptBudget,
+    guidelines: taskGuidelines,
     // "/skill-name" runs one of the Floor's Skills, and the Manager may
     // choose one (FR-74).
     skills: floorChatSkills(floorSkills),
@@ -1261,19 +1292,6 @@ export async function startOffice(
     () => false,
   );
   const setupToken = passwordSet ? undefined : await writeSetupToken();
-  // Only the Guideline versions the Owner approved reach Agents (ADR
-  // 0014): each Floor's are read from its default branch at intake and
-  // before each task, with one Notice per Floor while any await approval, and the Owner
-  // approves or dismisses them in the Floor admin.
-  const guidelineApprovals = createGuidelineApprovals({
-    github,
-    store: stores.guidelines,
-    floors: stores.floors,
-    notices,
-    events,
-    ownerLogin: async () => (await officeSettings.intakeSettings()).ownerLogin,
-    redactor,
-  });
   const app = await buildApp({
     floorStops,
     logger,
@@ -1491,6 +1509,7 @@ export async function startOffice(
                 ...memory,
                 sharedMemory,
                 promptBudget,
+                guidelines: taskGuidelines,
                 roles: stores.roles,
                 turns,
                 batchBranches,
@@ -1522,6 +1541,7 @@ export async function startOffice(
                 ...memory,
                 sharedMemory,
                 promptBudget,
+                guidelines: taskGuidelines,
                 roles: stores.roles,
                 turns,
                 batchBranches,
@@ -1554,6 +1574,7 @@ export async function startOffice(
                 ...memory,
                 sharedMemory,
                 promptBudget,
+                guidelines: taskGuidelines,
                 roles: stores.roles,
                 batchBranches,
                 onError: (error) => {
@@ -1581,6 +1602,7 @@ export async function startOffice(
                 ...memory,
                 sharedMemory,
                 promptBudget,
+                guidelines: taskGuidelines,
                 roles: stores.roles,
                 batchBranches,
                 onError: (error) => {
@@ -1617,6 +1639,7 @@ export async function startOffice(
                 ...memory,
                 sharedMemory,
                 promptBudget,
+                guidelines: taskGuidelines,
                 batchBranches,
                 onError: (error) => {
                   logger.warn(
@@ -1657,6 +1680,7 @@ export async function startOffice(
     roles: stores.roles,
     redactor,
     ...memory,
+    guidelines: taskGuidelines,
     onError: (error) => {
       logger.warn(
         { err: error },
@@ -1778,6 +1802,7 @@ export async function startOffice(
     publicUrl: config.publicUrl,
     redactor,
     ...memory,
+    guidelines: taskGuidelines,
     // Each issue's tokens and estimated cost, for its Wrap-up (FR-25.6).
     usage: (from, to) => requestHistory.tokenUsage(from, to),
     onError: (error) => {
@@ -2085,6 +2110,7 @@ export async function startOffice(
     reauthentication.stop();
     noAccountLeft.stop();
     guidelineApprovals.stop();
+    taskGuidelines.stop();
     capEnforcement.stop();
     workingAgents.stop();
     await intake.stop();
