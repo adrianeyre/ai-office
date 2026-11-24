@@ -128,6 +128,11 @@ import {
   type GuidelineProposalStore,
 } from "./guidelines/proposal-store.ts";
 import {
+  databaseHookStore,
+  memoryHookStore,
+  type HookStore,
+} from "./hooks/store.ts";
+import {
   databaseRoleStore,
   memoryRoleStore,
   type MemoryRoleStore,
@@ -202,6 +207,8 @@ export interface OfficeStores {
   readonly guidelines: GuidelineStore;
   /** The Guidelines Agents proposed on each Floor, for the Owner (FR-110). */
   readonly guidelineProposals: GuidelineProposalStore;
+  /** Each Floor's Hooks and their runs (Guidelines PRD, FR-118 to FR-121). */
+  readonly hooks: HookStore;
   readonly batches: BatchStore;
   /** The turns of the work Roles a Plan gives an issue (FR-25 (1)). */
   readonly workTurns: WorkTurnsStore;
@@ -219,7 +226,7 @@ export interface OfficeStores {
  * `notices`, `issue_token_caps`, `agent_cap_pauses`, `review_verdicts`,
  * `qa_reports`, `design_reviews`, `handoffs`, `skills`, `floor_skill_toggles`,
  * `repository_skill_reviews`, `approved_guidelines`, `guideline_changes`,
- * `guideline_proposals`,
+ * `guideline_proposals`, `hooks`, `hook_runs`, `hook_push_heads`,
  * `manager_chat_messages`, `grilling_sessions`, `status_updates`, `issue_triage`, `manager_decisions`, `batches`,
  * `plans`, `batch_issues`, `issue_work_turns`, `memory_proposals`,
  * `memory_curations`,
@@ -251,6 +258,7 @@ export const databaseStores = (db: Database): OfficeStores => ({
   repositorySkillReviews: databaseRepositorySkillReviewStore(db),
   guidelines: databaseGuidelineStore(db),
   guidelineProposals: databaseGuidelineProposalStore(db),
+  hooks: databaseHookStore(db),
   batches: databaseBatchStore(db),
   workTurns: databaseWorkTurnsStore(db),
   memory: databaseMemoryStore(db),
@@ -279,6 +287,7 @@ export function memoryStores(): OfficeStores & {
   readonly grilling: ReturnType<typeof memoryGrillingStore>;
   readonly triage: ReturnType<typeof memoryTriageStore>;
   readonly decisions: ReturnType<typeof memoryDecisionStore>;
+  readonly hooks: ReturnType<typeof memoryHookStore>;
   readonly batches: ReturnType<typeof memoryBatchStore>;
   readonly workTurns: ReturnType<typeof memoryWorkTurnsStore>;
   readonly memory: ReturnType<typeof memoryMemoryStore>;
@@ -323,6 +332,7 @@ export function memoryStores(): OfficeStores & {
     repositorySkillReviews: memoryRepositorySkillReviewStore(),
     guidelines: memoryGuidelineStore(),
     guidelineProposals: memoryGuidelineProposalStore(),
+    hooks: memoryHookStore(),
     batches: memoryBatchStore(),
     workTurns: memoryWorkTurnsStore(),
     memory: memoryMemoryStore(),

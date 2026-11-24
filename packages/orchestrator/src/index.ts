@@ -640,6 +640,40 @@ export {
   type GuidelinesAdminOptions,
 } from "./guidelines/admin.ts";
 export {
+  changedHookFields,
+  createHooksAdmin,
+  HookError,
+  hookFieldsOf,
+  type HooksAdmin,
+  type HooksAdminOptions,
+} from "./hooks/admin.ts";
+export {
+  createHookRunner,
+  hookCauses,
+  hookPushPollMs,
+  openHooksAction,
+  type HookOccurrence,
+  type HookRunner,
+  type HookRunnerOptions,
+  type RunNowRefusal,
+} from "./hooks/runner.ts";
+export {
+  hookAnswerTokens,
+  hookPrompt,
+  maxHookEventFiles,
+  skillInstructions,
+  type HookEventDetails,
+} from "./hooks/prompt.ts";
+export {
+  databaseHookStore,
+  keptHookRuns,
+  memoryHookStore,
+  type HookFields,
+  type HookRecord,
+  type HookRunRecord,
+  type HookStore,
+} from "./hooks/store.ts";
+export {
   awaitingCount,
   createGuidelineApprovals,
   guidelineContentHash,
