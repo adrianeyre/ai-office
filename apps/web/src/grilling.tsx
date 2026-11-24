@@ -9,6 +9,7 @@ import {
   grillingSessionListSchema,
   grillingSessionSchema,
   grillingWritesGuidelines,
+  grillingWritesSpec,
   issueDraftsProblem,
   maxGrillingCriterionLength,
   maxGrillingIssueTextLength,
@@ -18,6 +19,9 @@ import {
   endGrillingText,
   pauseGrillingText,
   resumeGrillingText,
+  specDocument,
+  specDocumentPath,
+  specPhases,
   type GrillingAnswer,
   type GrillingIssueDraftEdit,
   type GrillingIssues,
@@ -56,9 +60,10 @@ import { sessionQuery } from "./session.ts";
 
 // Grilling Sessions in the Manager chat (PRD FR-77, FR-78, FR-82). `/grilling`
 // starts one, as do `/grill-with-docs`, `/wayfinder`, `/to-tickets`,
-// `/to-spec` (FR-83b) and `/guidelines` (FR-109, whose session lists the
-// Guidelines it settled and drafts no issues), and each session says which
-// started it; each round's questions are shown as cards, each with its own
+// `/to-spec` (FR-83b), `/guidelines` (FR-109, whose session lists the
+// Guidelines it settled and drafts no issues) and `/spec` (FR-113, whose
+// session shows its phase and each document of the Spec, as the Owner
+// approved it or as drafted), and each session says which started it; each round's questions are shown as cards, each with its own
 // answer box and an "accept recommended" button, and "Recommended to all"
 // accepts the rest of the round. The answers are sent as one chat message
 // ("3: CSV", "4: recommended", "recommended to all"), which AI Office
@@ -450,6 +455,69 @@ export function GrillingBar({
         </Button>
       </div>
     </section>
+  );
+}
+
+/**
+ * A `/spec` session's Spec (FR-113): the phase it is on, then each of its
+ * documents as the Owner approved it, as drafted for the current phase,
+ * skipped, or not yet drafted.
+ */
+function SpecDocuments({ session }: { readonly session: GrillingSession }) {
+  const { spec } = session;
+  if (spec === null) {
+    return null;
+  }
+  return (
+    <>
+      <h4 className="font-medium">The Spec</h4>
+      <p>
+        On the {spec.phase}.{" "}
+        <span className="text-muted-foreground">
+          The Owner confirms each phase in the chat: &quot;confirm
+          requirements&quot;, &quot;confirm design&quot; (or &quot;skip
+          design&quot;) and &quot;confirm tasks&quot;.
+        </span>
+      </p>
+      {specPhases.map((phase) => {
+        const approved = specDocument(
+          session.topic,
+          spec,
+          phase,
+          spec.approved,
+        );
+        const draft =
+          phase === spec.phase && approved === undefined
+            ? specDocument(session.topic, spec, phase, spec.drafts)
+            : undefined;
+        const path = specDocumentPath(spec.slug, phase);
+        const state =
+          approved !== undefined
+            ? "approved"
+            : phase === "design" && spec.designSkipped
+              ? "skipped"
+              : draft !== undefined
+                ? "draft"
+                : "not yet drafted";
+        return (
+          <section
+            key={phase}
+            aria-label={path}
+            className="space-y-1 rounded-md border p-2"
+          >
+            <h5 className="font-medium">
+              <code>{path}</code>{" "}
+              <span className="text-muted-foreground">({state})</span>
+            </h5>
+            {(approved ?? draft) !== undefined && (
+              <pre className="whitespace-pre-wrap font-sans">
+                {approved ?? draft}
+              </pre>
+            )}
+          </section>
+        );
+      })}
+    </>
   );
 }
 
@@ -1248,7 +1316,9 @@ function GrillingSessionDialog({
           <section className="space-y-1">
             <h3 className="font-semibold">The documents</h3>
             <DocumentsState documents={session.documents} />
-            {grillingWritesGuidelines(session.skill) ? (
+            {grillingWritesSpec(session.skill) ? (
+              <SpecDocuments session={session} />
+            ) : grillingWritesGuidelines(session.skill) ? (
               <>
                 <h4 className="font-medium">Guidelines</h4>
                 {session.guidelines.length === 0 ? (

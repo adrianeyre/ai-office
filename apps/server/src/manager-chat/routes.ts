@@ -135,6 +135,7 @@ const sessionBody = (session: GrillingSessionRecord): GrillingSession => ({
     ...guideline,
     fileMatchPatterns: [...guideline.fileMatchPatterns],
   })),
+  spec: session.spec,
 });
 
 /**
