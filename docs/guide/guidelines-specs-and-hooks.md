@@ -15,8 +15,9 @@ Floor's `.agents/guidelines/` and settles which versions the Owner
 approved, with the Notice and events described below, the Floor admin's
 [Guidelines card](#seeing-them) shows them with **Approve** and
 **Dismiss**, each task gets the Guidelines that apply to it, within
-its budget, and Agents' [proposals](#proposing-a-guideline) wait there
-for the Owner. `/guidelines` is still to come. Specs and
+its budget, Agents' [proposals](#proposing-a-guideline) wait there
+for the Owner, and [`/guidelines`](#writing-them-guidelines) drafts a
+Floor's Guidelines with its Manager. Specs and
 Hooks get their sections here as they ship. A Floor without Guidelines,
 Specs or Hooks behaves exactly as before: every prompt is byte for byte
 what it was.
@@ -294,12 +295,49 @@ not, so its prompt is as it was.
 ### Writing them: `/guidelines`
 
 `/guidelines` is a Built-in Skill that starts a
-[Grilling Session](events-and-chat.md#grilling-sessions) (FR-109). The
-Manager reads the repository in its read-only sandbox, asks the Owner to
-confirm the conventions it finds, and writes `product.md`, `tech.md` and
-`structure.md` (all `always`) and any `fileMatch` Guidelines agreed, in
-the session's pull request. Merging it is the Owner's approval. A Floor
-with no Guidelines gets one info Notice suggesting `/guidelines`, once.
+[Grilling Session](events-and-chat.md#grilling-sessions) (FR-109). It is
+AI Office's own, like `/grilling`
+(`packages/orchestrator/src/skills/built-in/guidelines/SKILL.md`), and,
+like every Skill that starts a session, no other Skill of its name takes
+its place and the Manager never runs it of its own accord.
+
+- **Finding the conventions.** The Manager has what the repository does
+  found in its read-only sandbox (the session's facts): the README and
+  docs, the package manifests, the build, lint and test configuration,
+  CI, the top-level folders and a few files of each kind. The clone never
+  shows `.agents/`.
+- **Confirming them.** Its first round puts each convention it found to
+  the Owner as a question with its recommended answer ("Tests sit beside
+  the code they test: is that a rule?"), and asks which areas deserve a
+  `fileMatch` Guideline of their own. A convention the Owner drops is
+  written nowhere.
+- **Writing them.** As answers settle them, the Manager writes
+  `product.md`, `tech.md` and `structure.md`, each `always`, and any
+  `fileMatch` Guidelines agreed, each with its globs, one given again
+  replacing the one of its name. AI Office writes each file in
+  `.agents/guidelines/` on the session's branch, `ai-office/grilling-<id>`,
+  with its front matter (`inclusion`, any `fileMatchPattern` and its
+  `description`), and checks it as it reads every Guideline: a name or
+  header that does not fit is refused before the Model's turn is kept,
+  and one with a line that looks like a credential (even one AI Office
+  has already redacted) is left out of the turn, the chat naming it and
+  the line, never what it held. A Guideline of the Floor's own of that
+  name is replaced, which the pull request shows. The session writes no
+  PRD, ADRs, glossary terms or process docs.
+- **Approving them.** When the Owner confirms, the GitHub App opens one
+  pull request with them, listing each with its inclusion and
+  description, and the Manager drafts no issues. **Merging it is the
+  Owner's approval** ([ADR 0014](../architectural-decision-record/0014-agents-follow-only-guidelines-the-owner-approved.md)):
+  from the next read, at intake or before a task, every Guideline in it
+  is approved as merged by the Owner, and Agents follow it. A merge by
+  anyone else leaves them awaiting approval.
+- **The suggestion.** A Floor that has never had Guidelines (none on its
+  default branch when they are read, and none ever approved or seen
+  awaiting approval) gets one info Notice, "No Guidelines on web-shop
+  yet: run /guidelines in the Manager chat to draft them from the
+  repository". It is raised at most once per Floor, ever: the Floor is
+  kept in `guideline_suggestions`, so neither later reads, a restart nor
+  dismissing it brings it back.
 
 ### Seeing them
 

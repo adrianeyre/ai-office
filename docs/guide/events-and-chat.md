@@ -842,8 +842,15 @@ with the built-in Skill: `/grilling <what to grill>`.
   defaults (`docs/adr/`, `.scratch/`, a local tracker or a setup Skill).
   `@ai-office/shared` exports their commands' names
   (`grillWithDocsSkillName`, `wayfinderSkillName`, `toTicketsSkillName`,
-  `toSpecSkillName`, and `grillingSkillNames` for all five), for anything
-  that sends them, such as a Meeting Room.
+  `toSpecSkillName`, `guidelinesSkillName`, and `grillingSkillNames` for
+  all six), for anything that sends them, such as a Meeting Room.
+
+  `/guidelines` (Guidelines, Specs and Hooks PRD, FR-109), AI Office's
+  own, starts one too, and writes none of those: only the Floor's
+  Guidelines in `.agents/guidelines/` (`grillingWritesGuidelines`), kept
+  with the session (`guidelines`) and shown under **Read** in place of the
+  PRD's outline. It drafts no issues (`grillingDraftsIssues`). See
+  [Writing them: `/guidelines`](guidelines-specs-and-hooks.md#writing-them-guidelines).
 - **`/to-tickets`.** It breaks a plan already written into issues, and
   writes no documents of its own (`grillingWritesDocuments`):
   - **What it reads.** Each path in its arguments under
