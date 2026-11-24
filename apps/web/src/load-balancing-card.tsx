@@ -38,9 +38,9 @@ export const loadBalancingQuery = queryOptions({
 /** What each strategy does, as the Owner reads it. */
 const strategyHints: Record<LoadBalancingStrategy, string> = {
   session:
-    "Each Agent session (a sandbox run), or each of your tools, stays on one account for the session window. New sessions go to the account with the fewest for its priority's weight.",
+    "Each Agent session (a sandbox run), or each of your tools, stays on one account for the session window. New sessions go to the account that has used the least of its five-hour window for its priority's weight, the one with the fewest sessions on a tie.",
   session_affinity:
-    "Each session stays on its account for as long as it is in use; it lets go after the session window without a call. New sessions go to the account with the fewest sessions in use for its priority's weight.",
+    "Each session stays on its account for as long as it is in use; it lets go after the session window without a call. New sessions go to the account that has used the least of its five-hour window for its priority's weight, then the one with the fewest sessions in use.",
   drain_soonest:
     "New sessions go to the account whose usage window resets first, so what is left of it is used before it resets. Sessions stay on their accounts while in use.",
   drain_soonest_strict:

@@ -12,6 +12,7 @@ import {
   sessionAffinityStrategy,
   sessionStrategy,
   soonestReset,
+  windowUsageLoads,
   type Candidate,
   type RoutingChecks,
 } from "./balancing.ts";
@@ -123,6 +124,90 @@ describe("the session strategy", () => {
     strategy.choose(all, session("ada:sbx-1"), at(0));
     expect(strategy.choose(all, session(null), at(minute))).toBe(team);
     expect(sessions.sessionsOn("team", at(minute))).toBe(0);
+  });
+});
+
+describe("new sessions by what each account has spent", () => {
+  // The five-hour window each subscription reports, as the AI Accounts
+  // card shows it: what an account has really used, however big each of
+  // its sessions was.
+  const used = (
+    candidate: Candidate,
+    fiveHourUtilization: number | null,
+    fiveHourResetsAt: Date | null = at(5 * hour),
+  ): Candidate => ({ ...candidate, fiveHourUtilization, fiveHourResetsAt });
+
+  it("starts a session on the better priority that has used less, however many sessions it has", () => {
+    const sessions = createSessionTable();
+    const strategy = sessionStrategy(sessions, 5 * hour);
+    // Work, of priority 1, already has three sessions and spare none, but
+    // spare's few were big ones.
+    for (const key of ["a", "b", "c"]) {
+      sessions.set(key, "work", at(5 * hour));
+    }
+    const accounts = [used(work, 10), used(spare, 40)];
+    expect(strategy.choose(accounts, session("d"), at(minute))?.id).toBe(
+      "work",
+    );
+  });
+
+  it("gives priority 1 about twice priority 2's use, and two of one priority even use", () => {
+    const strategy = sessionStrategy(createSessionTable(), 5 * hour);
+    // Priority 1 at 30% is past twice priority 2's 10%: spare's turn.
+    expect(
+      strategy.choose([used(work, 30), used(spare, 10)], session("a"), at(0))
+        ?.id,
+    ).toBe("spare");
+    // At 15% it is under twice: work's.
+    expect(
+      strategy.choose([used(work, 15), used(spare, 10)], session("b"), at(0))
+        ?.id,
+    ).toBe("work");
+    // Two of one priority: the one that has used less.
+    expect(
+      strategy.choose([used(work, 50), used(team, 20)], session("c"), at(0))
+        ?.id,
+    ).toBe("team");
+  });
+
+  it("spreads sessions started together when accounts are close in use for their weight", () => {
+    const strategy = sessionStrategy(createSessionTable(), 5 * hour);
+    // Within a band of each other once weighted: spare's 5% is half of
+    // priority 1's 15-19%.
+    const accounts = [used(work, 15), used(team, 19), used(spare, 5)];
+    const placed = ["a", "b", "c", "d", "e"].map(
+      (key) => strategy.choose(accounts, session(key), at(0))?.id,
+    );
+    expect(placed).toEqual(["work", "team", "work", "team", "spare"]);
+  });
+
+  it("counts a window that has reset as unused", () => {
+    const strategy = sessionStrategy(createSessionTable(), 5 * hour);
+    const accounts = [used(work, 90, at(-minute)), used(team, 10)];
+    expect(strategy.choose(accounts, session("a"), at(0))?.id).toBe("work");
+  });
+
+  it("counts sessions alone when an account reports no window, such as an API key", () => {
+    const sessions = createSessionTable();
+    const strategy = sessionStrategy(sessions, 5 * hour);
+    sessions.set("a", "work", at(5 * hour));
+    const accounts = [used(work, 0), used(team, null)];
+    expect(windowUsageLoads(accounts, at(0))).toEqual([]);
+    expect(strategy.choose(accounts, session("b"), at(0))?.id).toBe("team");
+  });
+
+  it("starts session-affinity's new sessions the same way", () => {
+    const sessions = createSessionTable();
+    const strategy = sessionAffinityStrategy(
+      sessions,
+      createUsageTracker({ windowMs: 5 * hour }),
+      30 * minute,
+    );
+    for (const key of ["a", "b"]) {
+      sessions.set(key, "work", at(30 * minute));
+    }
+    const accounts = [used(work, 5), used(spare, 25)];
+    expect(strategy.choose(accounts, session("c"), at(0))?.id).toBe("work");
   });
 });
 
