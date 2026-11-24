@@ -18,6 +18,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createAgents } from "../agents/agents.ts";
 import type { AgentRecord } from "../agents/store.ts";
 import { createFloors } from "../floors/floors.ts";
+import type { IssueSpec } from "../grilling/issue-spec.ts";
 import { createIntake, type Intake } from "../intake/intake.ts";
 import { createManagerChat, type ManagerChat } from "../manager/chat.ts";
 import { createTriage } from "../manager/triage.ts";
@@ -86,6 +87,8 @@ interface Setup {
   clear(): string;
   /** Issues the GitHub App filed as the Owner approved them (FR-81). */
   readonly approved: Set<number>;
+  /** The Spec each issue was filed from, as approved (FR-116). */
+  readonly issueSpecs: Map<number, IssueSpec>;
 }
 
 async function setUp(
@@ -160,6 +163,7 @@ async function setUp(
   const usage: TokenUsageRow[] = [];
   const usageAsked: { from: Date; to: Date }[] = [];
   const approved = new Set<number>();
+  const issueSpecs = new Map<number, IssueSpec>();
   const make = () =>
     createBatches({
       floors: stores.floors,
@@ -177,6 +181,7 @@ async function setUp(
       approved: () => Promise.resolve(new Set(approved)),
       publicUrl: "https://office.example",
       redactor,
+      issueSpec: (_floorId, issue) => Promise.resolve(issueSpecs.get(issue)),
       usage: (from, to) => {
         usageAsked.push({ from, to });
         return Promise.resolve(structuredClone(usage));
@@ -251,6 +256,7 @@ async function setUp(
         agentId,
       })),
     approved,
+    issueSpecs,
     clear: () =>
       JSON.stringify({
         clear: true,
@@ -1912,6 +1918,224 @@ const cases: [string, (setup: Setup) => Promise<void>][] = [
           ({ agentId }) => agentId === ada.id,
         ),
       ).toMatchObject({ response: "ok", by: "rules" });
+    },
+  ],
+  [
+    "the Wrap-up of a Spec's Batch compares the merged work with the Spec's design.md, and its report says where the work departs from it",
+    async (setup) => {
+      const { ada, alan, manager } = setup;
+      const batchId = await underWay(setup);
+      const repository = setup.github.repository(webShop);
+      // #1 and #5 were filed from the Spec in .agents/specs/basket, whose
+      // design the Owner approved in Grilling Session 7; #3 from none.
+      const design = [
+        "# Design: basket",
+        "",
+        "## Data",
+        "",
+        "The basket is kept in a baskets table, one row per shopper.",
+      ].join("\n");
+      for (const [issue, task] of [
+        [1, 1],
+        [5, 2],
+      ] as const) {
+        setup.issueSpecs.set(issue, {
+          sessionId: 7,
+          folder: ".agents/specs/basket",
+          task,
+          criteria: [
+            "R1.1 WHEN a shopper adds an item THE SYSTEM SHALL keep it.",
+          ],
+          design,
+        });
+      }
+
+      /**
+       * AI Office merges an issue's pull request, closing the issue. (The
+       * fake GitHub would list a pull request it merged against the base
+       * as it now stands, where GitHub keeps the diff as it merged.)
+       */
+      const merged = async (
+        issue: number,
+        pull: { number: number; url: string },
+      ) => {
+        await repository.closeIssue(issue);
+        await setup.bus.publish({
+          type: "pull_request.merged",
+          version: 1,
+          floorId: "web-shop",
+          issue,
+          pullRequest: pull.number,
+          url: pull.url,
+          sha: "a".repeat(40),
+          by: "app",
+        });
+      };
+
+      // #1's pull request merges, and #2 starts.
+      const first = await openPullRequest(setup, 1, alan.id);
+      await merged(1, first);
+      setup.model.answer(manager.id, setup.clear());
+      expect(await setup.batches.check()).toEqual(new Map([[batchId, [2]]]));
+
+      // #5's pull request, with a credential planted in it, merges; #3 is
+      // closed without one; #2 is handed to the Owner, so #4 never starts.
+      setup.github.pushCommit(webShop, "ai-office/5-footer", {
+        files: {
+          "src/footer.tsx": `export const footer = "${anthropicKey}";\n`,
+        },
+      });
+      const fifthPull = await repository.createPullRequest({
+        title: "Work on #5",
+        body: "Closes #5",
+        head: "ai-office/5-footer",
+        base: "main",
+      });
+      const fifth = { number: fifthPull.number, url: fifthPull.htmlUrl };
+      await setup.bus.publish({
+        type: "pull_request.opened",
+        version: 1,
+        floorId: "web-shop",
+        agentId: ada.id,
+        issue: 5,
+        pullRequest: fifth.number,
+        url: fifth.url,
+        branch: "ai-office/5-footer",
+      });
+      await merged(5, fifth);
+      await repository.closeIssue(3);
+      setup.github.removeLabel(webShop, 2, "needs-work");
+      setup.github.setLabel(webShop, 2, "needs-human");
+
+      // The Manager compares the merged work with the design: its first
+      // answer cannot be read, so it is asked again, once.
+      const departure =
+        "Data: the design keeps the basket in a baskets table, one row per shopper; src/issue-1.ts keeps it in memory.";
+      setup.model.answer(
+        manager.id,
+        "The work mostly follows the design.",
+        JSON.stringify({ departures: [departure, "  "] }),
+      );
+      expect(await setup.batches.check()).toEqual(new Map());
+
+      // 1. The Wrap-up keeps the comparison: the merged pull requests of
+      //    the Spec's issues, and where they depart from its design.
+      const finished = await setup.stores.batches.get(batchId);
+      expect(finished?.status).toBe("finished");
+      expect(finished?.wrapUp?.designChecks).toEqual([
+        {
+          folder: ".agents/specs/basket",
+          sessionId: 7,
+          pullRequests: [first.number, fifth.number],
+          departures: [departure],
+          problem: null,
+        },
+      ]);
+      expect(
+        finished?.wrapUp?.issues.map(({ issue, outcome }) => [issue, outcome]),
+      ).toEqual([
+        [1, "merged"],
+        [3, "closed"],
+        [2, "blocked"],
+        [4, "not_started"],
+        [5, "merged"],
+      ]);
+
+      // 2. The Manager was given the design as the Owner approved it, and
+      //    each merged pull request's diff as data, redacted; asked again
+      //    once its first answer could not be read.
+      const asked = setup.model
+        .requestsOf(manager.id)
+        .filter(({ system }) => system.includes("departs from it"));
+      expect(asked).toHaveLength(2);
+      const prompt = asked[0]?.messages[0]?.content ?? "";
+      expect(prompt).toContain(`<spec>\n${design}\n</spec>`);
+      expect(prompt).toContain(
+        "As the Owner approved it in Grilling Session 7:",
+      );
+      expect(prompt).toContain(
+        `Pull requests #${String(first.number)}, #${String(fifth.number)}.`,
+      );
+      expect(prompt).toContain("- src/issue-1.ts (added)");
+      expect(prompt).toContain("- src/footer.tsx (added)");
+      expect(prompt).toContain("<diff>");
+      expect(prompt).not.toContain(anthropicKey);
+      expect(asked[1]?.messages.at(-1)?.content).toContain(
+        "That answer is not one AI Office can read",
+      );
+
+      // 3. The info Notice says the work departs from the design.
+      const notice = (await setup.notices.open({ floorId: "web-shop" })).find(
+        ({ title }) => title.startsWith(`Batch ${String(batchId)} finished`),
+      );
+      expect(notice?.title).toBe(
+        `Batch ${String(batchId)} finished on web-shop: 2 of 5 issues merged, 1 closed, 1 blocked, 1 not started; 0 tokens; departs from the Spec's design in 1 place`,
+      );
+    },
+  ],
+  [
+    "the Wrap-up of a Spec's Batch says when its work could not be compared with the design, and finishes all the same",
+    async (setup) => {
+      const { alan, manager } = setup;
+      const batchId = await underWay(setup);
+      const repository = setup.github.repository(webShop);
+      setup.issueSpecs.set(1, {
+        sessionId: 7,
+        folder: ".agents/specs/basket",
+        criteria: [],
+        design: "# Design: basket",
+      });
+      // #3 has a Spec with no design: the Owner skipped it.
+      setup.issueSpecs.set(3, {
+        sessionId: 8,
+        folder: ".agents/specs/wish-list",
+        criteria: [],
+      });
+      const first = await openPullRequest(setup, 1, alan.id);
+      await repository.mergePullRequest(first.number, { method: "squash" });
+      const third = await openPullRequest(setup, 3, alan.id);
+      await repository.mergePullRequest(third.number, { method: "squash" });
+      for (const issue of [2, 5]) {
+        await repository.closeIssue(issue);
+      }
+      await repository.closeIssue(4);
+      setup.model.answer(manager.id, new Error("The AI Gateway is down."));
+      expect(await setup.batches.check()).toEqual(new Map());
+
+      const finished = await setup.stores.batches.get(batchId);
+      expect(finished?.status).toBe("finished");
+      expect(finished?.wrapUp?.designChecks).toEqual([
+        {
+          folder: ".agents/specs/basket",
+          sessionId: 7,
+          pullRequests: [first.number],
+          departures: [],
+          problem: `${manager.name} could not be asked: The AI Gateway is down.`,
+        },
+      ]);
+      const notice = (await setup.notices.open({ floorId: "web-shop" })).find(
+        ({ title }) => title.startsWith(`Batch ${String(batchId)} finished`),
+      );
+      expect(notice?.title).toMatch(/; not compared with the Spec's design$/);
+    },
+  ],
+  [
+    "the Wrap-up of a Batch filed from no Spec compares nothing, and asks no model",
+    async (setup) => {
+      const { alan, manager } = setup;
+      const batchId = await underWay(setup);
+      const repository = setup.github.repository(webShop);
+      const first = await openPullRequest(setup, 1, alan.id);
+      await repository.mergePullRequest(first.number, { method: "squash" });
+      for (const issue of [2, 3, 4, 5]) {
+        await repository.closeIssue(issue);
+      }
+      const before = setup.model.requestsOf(manager.id).length;
+      expect(await setup.batches.check()).toEqual(new Map());
+      const finished = await setup.stores.batches.get(batchId);
+      expect(finished?.status).toBe("finished");
+      expect(finished?.wrapUp).not.toHaveProperty("designChecks");
+      expect(setup.model.requestsOf(manager.id)).toHaveLength(before);
     },
   ],
   [

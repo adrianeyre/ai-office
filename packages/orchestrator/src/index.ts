@@ -1056,6 +1056,14 @@ export {
   type IssueRecord,
 } from "./batches/wrap-up.ts";
 export {
+  designCheckLines,
+  designCheckPrompt,
+  designChecksInWords,
+  maxDesignCheckDiff,
+  parseDesignCheck,
+  type DesignCheckInput,
+} from "./batches/design-check.ts";
+export {
   databaseBatchStore,
   memoryBatchStore,
   type AcknowledgementRecord,

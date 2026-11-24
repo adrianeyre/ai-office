@@ -1,7 +1,12 @@
 import type { EventBus, OfficeEvent } from "@ai-office/events";
-import { whiteboardPath, wrapUpOutcomeLabels } from "@ai-office/shared";
+import {
+  amendSpecText,
+  whiteboardPath,
+  wrapUpOutcomeLabels,
+} from "@ai-office/shared";
 
 import type { BatchRecord, BatchStore } from "../batches/store.ts";
+import { designCheckLines } from "../batches/design-check.ts";
 import { wrapUpLine } from "../batches/wrap-up.ts";
 import type { ManagerChat } from "./chat.ts";
 
@@ -12,8 +17,9 @@ import type { ManagerChat } from "./chat.ts";
 // request: when one of its issues is done (its pull request merged) or
 // blocked (handed to the Owner at `needs-human`, which raises its Notice
 // as ever), when one of its Contractors leaves, and its Wrap-up's summary
-// once it finishes. A Contractor's arrival is said as it is added. This is
-// plain code: no model is asked.
+// once it finishes, with where its merged work departs from the design of
+// the Spec its issues were filed from (FR-117). A Contractor's arrival is
+// said as it is added. This is plain code: no model is asked.
 
 export interface ChatReportsOptions {
   readonly events: EventBus;
@@ -123,6 +129,7 @@ export function createChatReports(options: ChatReportsOptions): ChatReports {
               ({ issue, title, outcome, pullRequest }) =>
                 `- #${String(issue)} ${title}: ${wrapUpOutcomeLabels[outcome].toLowerCase()}${pullRequest === null ? "" : ` (pull request #${String(pullRequest.number)})`}`,
             ),
+            ...designCheckLines(wrapUp.designChecks, amendSpecText),
             ...(base === undefined
               ? []
               : [

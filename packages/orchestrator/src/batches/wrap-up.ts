@@ -4,11 +4,13 @@ import type {
   PlanLeftOut,
   TokenUsageRow,
   WrapUp,
+  WrapUpDesignCheck,
   WrapUpIssue,
   WrapUpOutcome,
 } from "@ai-office/shared";
 
 import { positionOf } from "../pipeline/pipeline.ts";
+import { designChecksInWords } from "./design-check.ts";
 
 // The Wrap-up (PRD FR-25.6, FR-60): a Batch finishes once none of its
 // issues can move on without the Owner: each is closed (by its merged pull
@@ -18,7 +20,9 @@ import { positionOf } from "../pipeline/pipeline.ts";
 // in progress. Its results are each issue's outcome, pull request, Review
 // Loop and QA rounds, tokens and estimated cost, and the totals, all from
 // what AI Office recorded: GitHub's issues, the event log and the AI
-// Gateway's request history. Never an issue's text.
+// Gateway's request history. Never an issue's text. For issues filed from
+// a Spec with a design, it also says where the merged work departs from
+// the Spec's `design.md` (FR-117, `design-check.ts`).
 
 /** An issue as GitHub has it now, as much as the Wrap-up reads. */
 export interface IssueNow {
@@ -152,6 +156,8 @@ export function wrapUpOf(input: {
   readonly records: ReadonlyMap<number, IssueRecord>;
   /** The AI Gateway's usage since the Batch was made. */
   readonly usage: readonly TokenUsageRow[];
+  /** The merged work compared with its Specs' designs; none without a Spec. */
+  readonly designChecks?: readonly WrapUpDesignCheck[];
 }): WrapUp {
   const issues: WrapUpIssue[] = input.items.map((item) => {
     const record = input.records.get(item.issue);
@@ -187,6 +193,15 @@ export function wrapUpOf(input: {
         issues.reduce((sum, { estimatedCostUsd }) => sum + estimatedCostUsd, 0),
       ),
     },
+    ...(input.designChecks === undefined || input.designChecks.length === 0
+      ? {}
+      : {
+          designChecks: input.designChecks.map((check) => ({
+            ...check,
+            pullRequests: [...check.pullRequests],
+            departures: [...check.departures],
+          })),
+        }),
   };
 }
 
@@ -201,10 +216,14 @@ export function tokensInWords(tokens: number): string {
   return `${String(tokens)} token${tokens === 1 ? "" : "s"}`;
 }
 
-/** A Wrap-up's results in a line: "3 of 4 issues merged, 1 blocked; 412k tokens". */
+/**
+ * A Wrap-up's results in a line: "3 of 4 issues merged, 1 blocked; 412k
+ * tokens", and, for a Spec's, "; departs from the Spec's design in 2 places".
+ */
 export function wrapUpLine(wrapUp: WrapUp): string {
   const { merged, closed, blocked, notStarted, tokens } = wrapUp.totals;
   const all = wrapUp.issues.length;
+  const design = designChecksInWords(wrapUp.designChecks);
   return [
     `${String(merged)} of ${String(all)} issue${all === 1 ? "" : "s"} merged`,
     ...(closed > 0 ? [`${String(closed)} closed`] : []),
@@ -212,5 +231,6 @@ export function wrapUpLine(wrapUp: WrapUp): string {
     ...(notStarted > 0 ? [`${String(notStarted)} not started`] : []),
   ]
     .join(", ")
-    .concat(`; ${tokensInWords(tokens)}`);
+    .concat(`; ${tokensInWords(tokens)}`)
+    .concat(design === undefined ? "" : `; ${design}`);
 }
