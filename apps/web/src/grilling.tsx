@@ -3,10 +3,12 @@ import {
   draftGrillingIssuesText,
   dropIssueDraft,
   fileGrillingIssuesText,
+  grillingDraftsIssues,
   grillingIssueDraftsRequestSchema,
   grillingSessionDetailSchema,
   grillingSessionListSchema,
   grillingSessionSchema,
+  grillingWritesGuidelines,
   issueDraftsProblem,
   maxGrillingCriterionLength,
   maxGrillingIssueTextLength,
@@ -53,8 +55,10 @@ import { useEventStream } from "./event-stream.ts";
 import { sessionQuery } from "./session.ts";
 
 // Grilling Sessions in the Manager chat (PRD FR-77, FR-78, FR-82). `/grilling`
-// starts one, as do `/grill-with-docs`, `/wayfinder`, `/to-tickets` and
-// `/to-spec` (FR-83b), and each session says which started it; each round's questions are shown as cards, each with its own
+// starts one, as do `/grill-with-docs`, `/wayfinder`, `/to-tickets`,
+// `/to-spec` (FR-83b) and `/guidelines` (FR-109, whose session lists the
+// Guidelines it settled and drafts no issues), and each session says which
+// started it; each round's questions are shown as cards, each with its own
 // answer box and an "accept recommended" button, and "Recommended to all"
 // accepts the rest of the round. The answers are sent as one chat message
 // ("3: CSV", "4: recommended", "recommended to all"), which AI Office
@@ -1244,8 +1248,35 @@ function GrillingSessionDialog({
           <section className="space-y-1">
             <h3 className="font-semibold">The documents</h3>
             <DocumentsState documents={session.documents} />
-            <h4 className="font-medium">The PRD&apos;s outline</h4>
-            <Outline outline={session.outline} level={5} />
+            {grillingWritesGuidelines(session.skill) ? (
+              <>
+                <h4 className="font-medium">Guidelines</h4>
+                {session.guidelines.length === 0 ? (
+                  <p className="text-muted-foreground">None yet.</p>
+                ) : (
+                  <ul className="list-disc space-y-1 pl-6">
+                    {session.guidelines.map((guideline) => (
+                      <li key={guideline.name} aria-label={guideline.name}>
+                        <span className="font-medium">{guideline.name}</span>{" "}
+                        <span className="text-muted-foreground">
+                          (
+                          {guideline.inclusion === "always"
+                            ? "always"
+                            : `fileMatch: ${guideline.fileMatchPatterns.join(", ")}`}
+                          )
+                        </span>
+                        : {guideline.description}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : (
+              <>
+                <h4 className="font-medium">The PRD&apos;s outline</h4>
+                <Outline outline={session.outline} level={5} />
+              </>
+            )}
             {session.adrs.length > 0 && (
               <>
                 <h4 className="font-medium">ADRs</h4>
@@ -1270,15 +1301,17 @@ function GrillingSessionDialog({
               </>
             )}
           </section>
-          <section className="space-y-1">
-            <h3 className="font-semibold">Issues</h3>
-            <GrillingIssuesPart
-              floorId={floorId}
-              session={session}
-              disabled={disabled}
-              onSend={onSend}
-            />
-          </section>
+          {grillingDraftsIssues(session.skill) && (
+            <section className="space-y-1">
+              <h3 className="font-semibold">Issues</h3>
+              <GrillingIssuesPart
+                floorId={floorId}
+                session={session}
+                disabled={disabled}
+                onSend={onSend}
+              />
+            </section>
+          )}
           {rounds.map((round) => (
             <section key={round} className="space-y-1">
               <h3 className="font-semibold">Round {round}</h3>
@@ -1359,7 +1392,8 @@ export function GrillingSessionList({
         <p className="text-xs text-muted-foreground">
           None yet. Run <code>/grilling</code> with what to grill, or{" "}
           <code>/grill-with-docs</code>, <code>/wayfinder</code>,{" "}
-          <code>/to-tickets</code> or <code>/to-spec</code>.
+          <code>/to-tickets</code> or <code>/to-spec</code>; or{" "}
+          <code>/guidelines</code> to draft the Floor&apos;s Guidelines.
         </p>
       )}
       <ul className="space-y-2">

@@ -899,6 +899,7 @@ describe("the whiteboard", () => {
       },
       issues: null,
       sources: [],
+      guidelines: [],
       ...overrides,
     });
     let current = session();
@@ -1068,6 +1069,7 @@ describe("the whiteboard", () => {
       documents: null,
       issues: null,
       sources: [],
+      guidelines: [],
     };
     const batchesServer = globalThis.fetch;
     vi.stubGlobal("fetch", (url: string, init?: RequestInit) => {
