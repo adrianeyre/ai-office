@@ -1853,6 +1853,9 @@ export async function startOffice(
     redactor,
     ...memory,
     guidelines: taskGuidelines,
+    // The Spec an issue was filed from, whose design.md the Wrap-up
+    // compares the merged work with (FR-117).
+    issueSpec: (floorId, issue) => issueSpec(stores.grilling, floorId, issue),
     // Each issue's tokens and estimated cost, for its Wrap-up (FR-25.6).
     usage: (from, to) => requestHistory.tokenUsage(from, to),
     onError: (error) => {
