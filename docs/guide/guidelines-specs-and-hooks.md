@@ -22,8 +22,11 @@ Floor's Guidelines with its Manager. **Specs are being built next**:
 tasks with the Manager, phase by phase (PRD FR-113), its issues are filed
 and start their Batch, and the coder, reviewers and QA
 [get the Spec as the Owner approved it](#what-agents-get-of-a-spec),
-QA proving each Acceptance Criterion with a test (FR-116). Hooks get their
-section here as they ship. A Floor without Guidelines,
+QA proving each Acceptance Criterion with a test (FR-116), and
+[a Spec is kept current](#keeping-a-spec-current): a Spec's Wrap-up says
+where the merged work departs from its design, and `/spec amend <slug>`
+brings it up to date (FR-117). Hooks get their section here as they
+ship. A Floor without Guidelines,
 Specs or Hooks behaves exactly as before: every prompt is byte for byte
 what it was.
 
@@ -515,6 +518,7 @@ Once nothing is left to ask, the chat says which words end the phase.
   drafted, in place of the PRD's outline. Its API
   (`GET /api/floors/:floorId/grilling-sessions/:id`) sends it as `spec`:
   `{"slug","phase","drafts","approved","designSkipped","confirmedAt"}`,
+  and `amends` for a session [amending a Spec](#amending-a-spec-spec-amend),
   null for every other session.
 
 ### Filing a Spec's issues
@@ -668,3 +672,97 @@ Owner approved, not only its own text (FR-116;
 An issue filed from no Spec gets none of this: the coder's, the
 reviewers' and QA's prompts are byte for byte as before, and QA's report
 is read as before, with no `Criteria:` part.
+
+### Keeping a Spec current
+
+Code moves on after a Spec is approved. The Owner hears where it has
+departed from the design, and can bring the Spec up to date (FR-117).
+
+#### The Wrap-up says where the work departs from the design
+
+When a Batch finishes, its [Wrap-up](batches-and-memory.md#the-wrap-up)
+compares the work that merged with the design of the Spec its issues were
+filed from (`packages/orchestrator/src/batches/design-check.ts`):
+
+- **What is compared.** For each Spec with a `design.md` that the
+  Batch's merged issues were filed from, the merged pull requests' diffs
+  (each pull request once, as GitHub lists its files) with `design.md` as
+  the Owner approved it in the `/spec` session, never the file as it
+  stands. An issue closed without merging, blocked or not started adds
+  nothing; a Spec whose design the Owner skipped, and a Batch filed from
+  no Spec, are not compared, and its Wrap-up is exactly as before.
+- **Who compares.** The Batch's Manager, through its own Model and
+  Gateway Key, as it plans. The design is quoted between `<spec>`
+  markers, as the Owner's; the diff (at most 60,000 characters, cut
+  there, saying so) between `<diff>` markers, as the repository's
+  content, never as instructions; both redacted first. Its answer is one
+  JSON object, `{"departures": ["Data: the design keeps saved cards in a
+  saved_cards table; src/db/schema.ts keeps them as a JSON column on
+  users.", …]}`: each departure on one line, its section of the design
+  first, at most 20 of at most 500 characters each, redacted before they
+  are kept. An answer that cannot be read is asked for again once.
+- **What the report says.** The Wrap-up keeps each comparison
+  (`wrapUp.designChecks`: the Spec's folder, its session, the pull
+  requests compared, the departures, and why it could not be compared, if
+  it could not), and says it everywhere it gives its results:
+  - its info Notice ends "; departs from the Spec's design in 2 places"
+    (or "; follows the Spec's design", or "; not compared with the
+    Spec's design");
+  - the whiteboard's Wrap-up lists each departure under "The merged work
+    (pull requests #31, #32) departs from `.agents/specs/<slug>/design.md`
+    in 2 places", with "To bring the Spec up to date, say
+    `/spec amend <slug>`";
+  - a chat request's Batch's Wrap-up post in the Manager chat ends its
+    first line the same way, and lists the departures with the
+    `/spec amend <slug>` to say.
+- **It never holds the Batch up.** A Manager that is paused, has no
+  Model or cannot be asked, or a pull request that cannot be read, leaves
+  the comparison undone, saying why ("not compared with the design …:
+  Grace could not be asked: …"); the Batch finishes all the same. Nothing
+  acts on a departure: it is for the Owner.
+
+Published Wrap-up reports (Confluence, Notion, Google) do not carry the
+departures: they describe code, which never leaves AI Office through a
+Connection.
+
+#### Amending a Spec: `/spec amend`
+
+**`/spec amend <slug>`**, such as `/spec amend checkout-with-saved-cards`
+(the folder's name under `.agents/specs/`), starts a `/spec` session that
+amends the Spec as the Owner approved it last:
+
+- **Back at the requirements, with the earlier documents loaded.** The
+  new session writes to the same folder, on its own branch, and starts at
+  the requirements, nothing approved. The requirements, design and tasks
+  approved in the Spec's latest session are loaded as each phase's draft,
+  and the Manager is told it is amending that session's Spec: it asks
+  what has changed, keeps what still holds, and gives each draft again
+  with the Owner's changes, bringing the design and tasks in line once
+  the requirements change.
+- **Every phase confirmed again.** The Owner confirms each phase as for
+  any Spec, changed or not ("confirm requirements", "confirm design" or
+  "skip design", "confirm tasks"), and may reopen one. Each confirmation
+  commits its document over the one on the default branch; a reopened
+  document goes back to the default branch's version on the session's
+  branch, never deleted.
+- **Its pull request updates the Spec's files.** "confirm tasks" (or
+  **End session**) opens one pull request, "docs: amend the Spec in
+  `.agents/specs/<slug>/`, in Grilling Session 9 on …", which says which
+  session's Spec it amends; a document not confirmed again is left as it
+  was. Merging it is the Owner's, as for any Spec.
+- **Done work is not filed again.** A task the amended tasks keep exactly
+  as it was (its title, description and the criteria it meets) keeps the
+  issue filed for it: `tasks.md` links it, and it becomes no issue draft.
+  Only a new or changed task becomes a draft, a task it depends on that
+  kept its issue named in its description ("It builds on task 1 (#12),
+  filed before the Spec was amended."). Filing them starts their Batch as
+  for any Spec.
+- **What can be amended.** A Spec with a document the Owner approved in
+  an ended session. "/spec amend" of a folder the Floor has no such Spec
+  in is refused, naming the Specs that can be amended; one whose latest
+  session is paused is refused, saying which session to resume. Any
+  other words after `/spec` start a new Spec as before.
+
+Agents given the Spec of an issue get it from the session its issue was
+filed from: an issue filed before the amendment keeps the Spec as it was
+then.

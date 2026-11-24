@@ -859,7 +859,10 @@ with the built-in Skill: `/grilling <what to grill>`.
   ("confirm requirements", "confirm design" or "skip design", "confirm
   tasks", and "reopen …"; `readGrillingControl`), its phase, drafts and
   approved documents kept with the session (`spec`). Its issue drafts are
-  its confirmed tasks, written in plain code. See
+  its confirmed tasks, written in plain code. `/spec amend <slug>`
+  (`readSpecAmend`, FR-117) starts one that amends the Spec in that
+  folder, back at the requirements with the documents approved last
+  loaded as its drafts. See
   [Specs](guidelines-specs-and-hooks.md#specs).
 - **`/to-tickets`.** It breaks a plan already written into issues, and
   writes no documents of its own (`grillingWritesDocuments`):

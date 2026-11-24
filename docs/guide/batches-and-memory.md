@@ -431,6 +431,11 @@ A Batch that finishes:
   Wrap-up on the whiteboard and each pull request (FR-49).
 - is curated as ended by the Manager's repository memory curation, though
   a blocked issue is still open.
+- for issues filed from a Spec with a design, first has the Manager
+  compare the merged pull requests with the Spec's approved `design.md`,
+  keeping where they depart (`designChecks`), which the Notice, the
+  whiteboard and the Manager chat then say: see
+  [Keeping a Spec current](guidelines-specs-and-hooks.md#keeping-a-spec-current).
 
 It finishes once: a later check or a restart changes nothing. The
 whiteboard shows a finished Batch's **Wrap-up** above its Plan: "Wrap-up:
