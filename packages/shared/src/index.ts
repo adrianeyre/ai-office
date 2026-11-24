@@ -996,6 +996,7 @@ export {
   maxSpecTaskCriteria,
   maxSpecTasks,
   maxSpecTextLength,
+  specBudget,
   newGrillingSpec,
   nextSpecPhase,
   specCriterion,

@@ -1,6 +1,7 @@
 import {
   defaultPromptBudgetSettings,
   guidelinesBudget,
+  specBudget,
   type PromptBudgetSettings,
 } from "@ai-office/shared";
 
@@ -10,11 +11,12 @@ import type { AgentMemory } from "./shared.ts";
 // Prompt budgets: the most characters of the repository's memory, the
 // office-wide memory, the Role's memory and the Floor's Skills listing an
 // Agent's prompt carries (the Owner's settings), and of the Floor's
-// Guidelines (12,000, Guidelines PRD FR-108), each lowered further on
-// a small known context window, so they never take more than their share
-// of it: a twentieth for each memory, a tenth for the Skills and for the
-// Guidelines. The defaults are within those shares from a window of about
-// 69,000 tokens (memory), 35,000 (Guidelines) and 115,000 (Skills) up, so
+// Guidelines (12,000, Guidelines PRD FR-108) and of an issue's Spec
+// (12,000, FR-116), each lowered further on a small known context window,
+// so they never take more than their share of it: a twentieth for each
+// memory, a tenth for the Skills, the Guidelines and the Spec. The
+// defaults are within those shares from a window of about 69,000 tokens
+// (memory), 35,000 (Guidelines, the Spec) and 115,000 (Skills) up, so
 // a large window's prompts do not change. A
 // part over its budget is truncated, deterministically, and the prompt
 // says so: the head of a memory file (as the repository's memory always
@@ -27,6 +29,12 @@ export type PromptBudget = PromptBudgetSettings & {
    * setting, but `guidelinesBudget`, lowered on a small window.
    */
   readonly guidelines: number;
+  /**
+   * Of the Spec an issue was filed from (Guidelines, Specs and Hooks PRD,
+   * FR-116): its Acceptance Criteria and approved design, together. Not
+   * the Owner's setting, but `specBudget`, lowered on a small window.
+   */
+  readonly spec: number;
 };
 
 /** The share of the context window, in characters, each part may take. */
@@ -36,6 +44,7 @@ const windowShares: Readonly<Record<keyof PromptBudget, number>> = {
   roleMemory: 1 / 20,
   skills: 1 / 10,
   guidelines: 1 / 10,
+  spec: 1 / 10,
 };
 
 /**
@@ -47,7 +56,11 @@ export function promptBudgetFor(
   settings: PromptBudgetSettings,
   contextWindow: number | null,
 ): PromptBudget {
-  const most: PromptBudget = { ...settings, guidelines: guidelinesBudget };
+  const most: PromptBudget = {
+    ...settings,
+    guidelines: guidelinesBudget,
+    spec: specBudget,
+  };
   if (contextWindow === null) {
     return most;
   }
@@ -62,6 +75,7 @@ export function promptBudgetFor(
     roleMemory: within("roleMemory"),
     skills: within("skills"),
     guidelines: within("guidelines"),
+    spec: within("spec"),
   };
 }
 
@@ -87,6 +101,7 @@ export const promptBudgetOf =
 export const defaultPromptBudget: PromptBudget = {
   ...defaultPromptBudgetSettings,
   guidelines: guidelinesBudget,
+  spec: specBudget,
 };
 
 /**

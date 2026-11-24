@@ -62,6 +62,12 @@ export const maxSpecTaskCriteria = 30;
 export const maxSpecLineLength = 2000;
 /** The longest section of a Spec's document. */
 export const maxSpecTextLength = 8000;
+/**
+ * The most characters of a Spec one Agent's prompt quotes (FR-116): the
+ * issue's Acceptance Criteria first, then the approved `design.md`, cut
+ * at what is left, the prompt saying so.
+ */
+export const specBudget = 12_000;
 
 const timestampSchema = z.iso.datetime({ offset: true });
 

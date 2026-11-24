@@ -1,6 +1,7 @@
 import {
   defaultPromptBudgetSettings,
   guidelinesBudget,
+  specBudget,
 } from "@ai-office/shared";
 import { describe, expect, it } from "vitest";
 
@@ -17,9 +18,14 @@ import { longAgentMemory } from "./testing.ts";
 // window; and what is kept of a memory, or of the Skills, over budget.
 
 describe("the prompt budget for a Model", () => {
-  it("is the Owner's settings, and 12,000 characters of Guidelines, when the context window is unknown or large", () => {
-    const most = { ...defaultPromptBudgetSettings, guidelines: 12_000 };
+  it("is the Owner's settings, and 12,000 characters of Guidelines and of a Spec, when the context window is unknown or large", () => {
+    const most = {
+      ...defaultPromptBudgetSettings,
+      guidelines: 12_000,
+      spec: 12_000,
+    };
     expect(guidelinesBudget).toBe(12_000);
+    expect(specBudget).toBe(12_000);
     expect(promptBudgetFor(defaultPromptBudgetSettings, null)).toEqual(most);
     expect(promptBudgetFor(defaultPromptBudgetSettings, 200_000)).toEqual(most);
     expect(promptBudgetFor(defaultPromptBudgetSettings, 1_048_576)).toEqual(
@@ -29,15 +35,19 @@ describe("the prompt budget for a Model", () => {
     expect(
       promptBudgetFor(defaultPromptBudgetSettings, 35_000).guidelines,
     ).toBe(12_000);
+    expect(promptBudgetFor(defaultPromptBudgetSettings, 35_000).spec).toBe(
+      12_000,
+    );
   });
 
-  it("is lower on a small known window: a twentieth of it for each memory, a tenth for the Skills and the Guidelines, at 3.5 characters a token", () => {
+  it("is lower on a small known window: a twentieth of it for each memory, a tenth for the Skills, the Guidelines and the Spec, at 3.5 characters a token", () => {
     expect(promptBudgetFor(defaultPromptBudgetSettings, 32_768)).toEqual({
       repositoryMemory: 5734,
       officeMemory: 5734,
       roleMemory: 5734,
       skills: 11_468,
       guidelines: 11_468,
+      spec: 11_468,
     });
     // Never more than the Owner set.
     expect(
@@ -56,6 +66,7 @@ describe("the prompt budget for a Model", () => {
     expect(await budgetOf("Claude", "claude-opus-5-5")).toEqual({
       ...defaultPromptBudgetSettings,
       guidelines: 12_000,
+      spec: 12_000,
     });
     expect((await budgetOf("Ollama", "qwen3-coder")).roleMemory).toBe(5734);
   });
