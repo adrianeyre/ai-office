@@ -27,6 +27,7 @@ import { managerGitHub } from "../manager/authority.ts";
 import { issueList } from "../manager/commands.ts";
 import { loads } from "../manager/dispatch.ts";
 import type { Triage, WorkRole } from "../manager/triage.ts";
+import type { TaskGuidelines } from "../guidelines/tasks.ts";
 import type { RepositoryMemory } from "../memory/memory.ts";
 import type { ModelClient, ModelMessage } from "../models/client.ts";
 import { NoticeError, type Notices } from "../notices/notices.ts";
@@ -375,6 +376,11 @@ export interface BatchesOptions {
   /** The repository's memory, which the Manager reads to plan (FR-53). */
   readonly memory?: Pick<RepositoryMemory, "read">;
   /**
+   * The Owner's Guidelines (Guidelines PRD, FR-105): the Manager follows
+   * those for every task in its Plan, told of the rest. None without it.
+   */
+  readonly guidelines?: Pick<TaskGuidelines, "forTask">;
+  /**
    * What requests through the AI Gateway used in [`from`, `to`), for each
    * issue's tokens and estimated cost in a Wrap-up; none without it.
    */
@@ -638,6 +644,11 @@ export function createBatches(options: BatchesOptions): Batches {
     }
     const load = loads(team.active);
     const memory = await options.memory?.read(floor);
+    const guidelines = await options.guidelines?.forTask({
+      floor,
+      task: "plan",
+      agentId: manager.id,
+    });
     const coderName = (agentId: string | null): string | null =>
       team.agents.find(({ id }) => id === agentId)?.name ?? null;
     const roleNames = (ids: readonly string[] | undefined): string[] =>
@@ -661,6 +672,7 @@ export function createBatches(options: BatchesOptions): Batches {
           .filter((coder) => coder.role === role.id)
           .map(({ name }) => name),
       })),
+      ...(guidelines === undefined ? {} : { guidelines }),
       ...(memory === undefined ? {} : { memory }),
       ...(replanning === undefined
         ? {}

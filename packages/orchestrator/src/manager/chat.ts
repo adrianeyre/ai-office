@@ -83,6 +83,7 @@ import {
 } from "../grilling/session.ts";
 import { grillingSkillInstructions } from "../grilling/skill.ts";
 import type { GrillingStore } from "../grilling/store.ts";
+import type { TaskGuidelines } from "../guidelines/tasks.ts";
 import type { PromptBudgetOf } from "../memory/budget.ts";
 import type { RepositoryMemory } from "../memory/memory.ts";
 import type {
@@ -431,6 +432,11 @@ export interface ManagerChatOptions {
    * carries, for its Model (the prompt budget); all of them without it.
    */
   readonly promptBudget?: PromptBudgetOf;
+  /**
+   * The Owner's Guidelines (Guidelines PRD, FR-105): the Manager follows
+   * those for every task in its chat, told of the rest. None without it.
+   */
+  readonly guidelines?: Pick<TaskGuidelines, "forTask">;
   /**
    * The Floor's Skills (FR-74): what `/name` runs, and what the Manager
    * may choose. Without it, the Floor has none.
@@ -1234,6 +1240,13 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
           manager.aiProvider,
           callModel,
         );
+        // The Owner's Guidelines for every task, and the rest named.
+        const guidelines = await options.guidelines?.forTask({
+          floor,
+          task: "chat",
+          agentId: manager.id,
+          ...(budget === undefined ? {} : { budget: budget.guidelines }),
+        });
         const given = await conversationFor(
           floor,
           manager,
@@ -1304,6 +1317,7 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
               ...agent,
               model: modelOf(agent, defaults),
             })),
+            ...(guidelines === undefined ? {} : { guidelines }),
             ...(memory === undefined ? {} : { memory }),
             ...(budget === undefined ? {} : { budget }),
             loadedSkills: prompt.loadedSkills,
@@ -1855,6 +1869,13 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
       } else {
         const memory = await options.memory?.read(floor);
         const budget = await options.promptBudget?.(manager.aiProvider, model);
+        // The Owner's Guidelines for every task, and the rest named.
+        const guidelines = await options.guidelines?.forTask({
+          floor,
+          task: "chat",
+          agentId: manager.id,
+          ...(budget === undefined ? {} : { budget: budget.guidelines }),
+        });
         const given = await conversationFor(
           floor,
           manager,
@@ -1877,6 +1898,7 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
               ...agent,
               model: modelOf(agent, defaults),
             })),
+            ...(guidelines === undefined ? {} : { guidelines }),
             ...(memory === undefined ? {} : { memory }),
             ...(budget === undefined ? {} : { budget }),
             ...(given.summary === undefined ? {} : { summary: given.summary }),
@@ -2150,6 +2172,13 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
           manager.aiProvider,
           callModel,
         );
+        // The Owner's Guidelines for every task, and the rest named.
+        const guidelines = await options.guidelines?.forTask({
+          floor,
+          task: "chat",
+          agentId: manager.id,
+          ...(budget === undefined ? {} : { budget: budget.guidelines }),
+        });
         const given = await conversationFor(
           floor,
           manager,
@@ -2167,6 +2196,7 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
             ...agent,
             model: modelOf(agent, defaults),
           })),
+          ...(guidelines === undefined ? {} : { guidelines }),
           ...(memory === undefined ? {} : { memory }),
           ...(budget === undefined ? {} : { budget }),
           ...(given.summary === undefined ? {} : { summary: given.summary }),

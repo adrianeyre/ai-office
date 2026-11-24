@@ -6,6 +6,10 @@ import {
 } from "@ai-office/shared";
 
 import {
+  withQuotedGuidelines,
+  type GivenGuidelines,
+} from "../guidelines/prompt.ts";
+import {
   skillsLeftOutLine,
   skillsWithin,
   type PromptBudget,
@@ -18,7 +22,10 @@ import type { ChatMessageRecord } from "./store.ts";
 // it is, its Floor and its team, what a Manager may and may not do, and
 // that commands are read by AI Office, not by it, the Skills loaded in the
 // conversation and those it may choose (FR-74), and the repository's
-// memory (FR-53), quoted as untrusted background. Then the conversation so
+// memory (FR-53), quoted as untrusted background, after the Owner's
+// Guidelines for every task, quoted as the Owner's rules between
+// `<guidelines>` markers they cannot close, with the names and
+// descriptions of the rest (Guidelines PRD, FR-105). Then the conversation so
 // far. With the Owner's requests on (ADR 0004), how it decides what each
 // message is and answers a decision. The Owner is trusted; the prompt never holds a credential, and the
 // Owner's own words are redacted before they are kept or sent.
@@ -42,6 +49,11 @@ export interface ManagerPromptInput {
     readonly model: string | undefined;
     readonly enabled: boolean;
   }[];
+  /**
+   * The Owner's Guidelines: those for every task quoted, the rest named
+   * (Guidelines PRD, FR-105 to FR-108); none when absent.
+   */
+  readonly guidelines?: GivenGuidelines;
   /** The repository's memory, redacted, if it has any. */
   readonly memory?: string;
   /**
@@ -242,6 +254,7 @@ export function managerSystemPrompt(input: ManagerPromptInput): string {
     ...skillsSection(input),
     ...(input.requests === undefined ? [] : ["", ...input.requests]),
     ...(input.grilling === undefined ? [] : ["", ...input.grilling]),
+    ...withQuotedGuidelines(input.guidelines),
     ...(input.memory === undefined
       ? []
       : ["", ...memorySection(input.memory, input.budget?.repositoryMemory)]),

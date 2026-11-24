@@ -27,6 +27,7 @@ import type {
   IssueJudgement,
 } from "../decision-model/decision-model.ts";
 import type { FloorRecord, FloorStore } from "../floors/store.ts";
+import type { TaskGuidelines } from "../guidelines/tasks.ts";
 import type { RepositoryMemory } from "../memory/memory.ts";
 import type { ModelClient, ModelMessage } from "../models/client.ts";
 import { NoticeError, type Notices } from "../notices/notices.ts";
@@ -133,6 +134,11 @@ export interface TriageOptions {
   readonly redactor?: Redactor;
   /** The repository's memory, which the Manager reads to triage (FR-53). */
   readonly memory?: Pick<RepositoryMemory, "read">;
+  /**
+   * The Owner's Guidelines (Guidelines PRD, FR-105): the Manager follows
+   * those for every task in its triage, told of the rest. None without it.
+   */
+  readonly guidelines?: Pick<TaskGuidelines, "forTask">;
   /**
    * The Role library, for the names and routing descriptions of the
    * Floor's work Roles; the built-in Roles without it.
@@ -455,6 +461,12 @@ export function createTriage(options: TriageOptions): Triage {
     }
     // Issue text may hold a pasted credential: no prompt may (FR-5).
     const memory = await options.memory?.read(floor);
+    const guidelines = await options.guidelines?.forTask({
+      floor,
+      task: "triage",
+      agentId: manager.id,
+      issue: { number: issue.number, labels: issue.labels },
+    });
     const prompt = triagePrompt({
       floor,
       manager,
@@ -463,6 +475,7 @@ export function createTriage(options: TriageOptions): Triage {
         title: redactor.redactText(issue.title),
         body: redactor.redactText(issue.body),
       },
+      ...(guidelines === undefined ? {} : { guidelines }),
       ...(memory === undefined ? {} : { memory }),
       ...(roles.length > 1 ? { roles } : {}),
     });
