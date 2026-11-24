@@ -51,6 +51,8 @@ import {
   createOfficeSettings,
   createPipeline,
   createNoAccountLeftNotices,
+  createGuidelineApprovals,
+  withGuidelines,
   createProgressComments,
   createReauthenticationNotices,
   createQaFlow,
@@ -1448,163 +1450,190 @@ export async function startOffice(
     github,
     async () => (await officeSettings.intakeSettings()).ownerLogin,
   );
+  // Only the Guideline versions the Owner approved reach Agents (ADR
+  // 0014): each Floor's are read from its default branch at intake and
+  // before each task, with one Notice per Floor while any await approval.
+  const guidelineApprovals = createGuidelineApprovals({
+    github,
+    store: stores.guidelines,
+    floors: stores.floors,
+    notices,
+    events,
+    ownerLogin: async () => (await officeSettings.intakeSettings()).ownerLogin,
+    redactor,
+  });
   const execute: ExecuteWork | undefined =
     runner === undefined
       ? undefined
-      : executeByStage(
+      : withGuidelines(
+          executeByStage(
+            {
+              "needs-work": createCoderFlow({
+                floors: stores.floors,
+                agents: workingAgents,
+                github: stageGitHub,
+                pipeline,
+                notices,
+                events,
+                runner,
+                gitIdentity: (floorId) =>
+                  officeSettings.floorGitIdentity(floorId),
+                defaultModels: () => aiProviders.defaultModels(),
+                scratchDir: workDir,
+                publicUrl: config.publicUrl,
+                // Its review round, once the pull request is ready.
+                queue: { enqueue: (work) => workQueue.enqueue(work) },
+                reviews: stores.reviews,
+                progress,
+                capPaused: (agentId) => capEnforcement.isPaused(agentId),
+                ...memory,
+                sharedMemory,
+                promptBudget,
+                roles: stores.roles,
+                turns,
+                batchBranches,
+                onError: (error) => {
+                  logger.warn(
+                    { err: error },
+                    "The coder flow could not tidy up.",
+                  );
+                },
+              }),
+              "needs-review": createReviewFlow({
+                floors: stores.floors,
+                agents: workingAgents,
+                github: stageGitHub,
+                pipeline,
+                notices,
+                events,
+                models,
+                defaultModels: () => aiProviders.defaultModels(),
+                // How much of a diff each reviewer's Model is shown.
+                contextWindow,
+                capPaused: (agentId) => capEnforcement.isPaused(agentId),
+                // Stalls judged by the Decision Model, while it is on.
+                decisionModel,
+                // The Review Loop: back to the coder, until the Round Cap.
+                reviews: stores.reviews,
+                queue: { enqueue: (work) => workQueue.enqueue(work) },
+                redactor,
+                ...memory,
+                sharedMemory,
+                promptBudget,
+                roles: stores.roles,
+                turns,
+                batchBranches,
+                onError: (error) => {
+                  logger.warn(
+                    { err: error },
+                    "The reviewer flow could not tidy up.",
+                  );
+                },
+              }),
+              // QA (PRD FR-28) checks what the reviewers approved, in a sandbox.
+              "needs-qa": createQaFlow({
+                floors: stores.floors,
+                agents: workingAgents,
+                github: stageGitHub,
+                pipeline,
+                notices,
+                events,
+                runner,
+                models,
+                gitIdentity: (floorId) =>
+                  officeSettings.floorGitIdentity(floorId),
+                defaultModels: () => aiProviders.defaultModels(),
+                scratchDir: workDir,
+                reviews: stores.reviews,
+                queue: { enqueue: (work) => workQueue.enqueue(work) },
+                progress,
+                capPaused: (agentId) => capEnforcement.isPaused(agentId),
+                redactor,
+                ...memory,
+                sharedMemory,
+                promptBudget,
+                roles: stores.roles,
+                batchBranches,
+                onError: (error) => {
+                  logger.warn({ err: error }, "The QA flow could not tidy up.");
+                },
+              }),
+              // The docs Agent (PRD FR-18) documents what passed QA.
+              "needs-docs": createDocsFlow({
+                floors: stores.floors,
+                agents: workingAgents,
+                github: stageGitHub,
+                pipeline,
+                notices,
+                events,
+                runner,
+                gitIdentity: (floorId) =>
+                  officeSettings.floorGitIdentity(floorId),
+                defaultModels: () => aiProviders.defaultModels(),
+                scratchDir: workDir,
+                reviews: stores.reviews,
+                // The Merge Policy's work, once it is ready to merge.
+                queue: { enqueue: (work) => workQueue.enqueue(work) },
+                progress,
+                capPaused: (agentId) => capEnforcement.isPaused(agentId),
+                ...memory,
+                sharedMemory,
+                promptBudget,
+                roles: stores.roles,
+                batchBranches,
+                onError: (error) => {
+                  logger.warn(
+                    { err: error },
+                    "The docs flow could not tidy up.",
+                  );
+                },
+              }),
+              "ready-to-merge": mergeFlow.execute,
+            },
+            {
+              // A designer (PRD FR-10), on a Floor with one, reviews the UI of
+              // what QA passed, at needs-qa, in a sandbox.
+              [designerRole]: createDesignFlow({
+                floors: stores.floors,
+                agents: workingAgents,
+                github: stageGitHub,
+                pipeline,
+                notices,
+                events,
+                runner,
+                models,
+                gitIdentity: (floorId) =>
+                  officeSettings.floorGitIdentity(floorId),
+                defaultModels: () => aiProviders.defaultModels(),
+                scratchDir: workDir,
+                reviews: stores.reviews,
+                // Docs', or the Merge Policy's work, or the coder's changes.
+                queue: { enqueue: (work) => workQueue.enqueue(work) },
+                progress,
+                capPaused: (agentId) => capEnforcement.isPaused(agentId),
+                redactor,
+                ...memory,
+                sharedMemory,
+                promptBudget,
+                batchBranches,
+                onError: (error) => {
+                  logger.warn(
+                    { err: error },
+                    "The designer flow could not tidy up.",
+                  );
+                },
+              }),
+            },
+          ),
           {
-            "needs-work": createCoderFlow({
-              floors: stores.floors,
-              agents: workingAgents,
-              github: stageGitHub,
-              pipeline,
-              notices,
-              events,
-              runner,
-              gitIdentity: (floorId) =>
-                officeSettings.floorGitIdentity(floorId),
-              defaultModels: () => aiProviders.defaultModels(),
-              scratchDir: workDir,
-              publicUrl: config.publicUrl,
-              // Its review round, once the pull request is ready.
-              queue: { enqueue: (work) => workQueue.enqueue(work) },
-              reviews: stores.reviews,
-              progress,
-              capPaused: (agentId) => capEnforcement.isPaused(agentId),
-              ...memory,
-              sharedMemory,
-              promptBudget,
-              roles: stores.roles,
-              turns,
-              batchBranches,
-              onError: (error) => {
-                logger.warn(
-                  { err: error },
-                  "The coder flow could not tidy up.",
-                );
-              },
-            }),
-            "needs-review": createReviewFlow({
-              floors: stores.floors,
-              agents: workingAgents,
-              github: stageGitHub,
-              pipeline,
-              notices,
-              events,
-              models,
-              defaultModels: () => aiProviders.defaultModels(),
-              // How much of a diff each reviewer's Model is shown.
-              contextWindow,
-              capPaused: (agentId) => capEnforcement.isPaused(agentId),
-              // Stalls judged by the Decision Model, while it is on.
-              decisionModel,
-              // The Review Loop: back to the coder, until the Round Cap.
-              reviews: stores.reviews,
-              queue: { enqueue: (work) => workQueue.enqueue(work) },
-              redactor,
-              ...memory,
-              sharedMemory,
-              promptBudget,
-              roles: stores.roles,
-              turns,
-              batchBranches,
-              onError: (error) => {
-                logger.warn(
-                  { err: error },
-                  "The reviewer flow could not tidy up.",
-                );
-              },
-            }),
-            // QA (PRD FR-28) checks what the reviewers approved, in a sandbox.
-            "needs-qa": createQaFlow({
-              floors: stores.floors,
-              agents: workingAgents,
-              github: stageGitHub,
-              pipeline,
-              notices,
-              events,
-              runner,
-              models,
-              gitIdentity: (floorId) =>
-                officeSettings.floorGitIdentity(floorId),
-              defaultModels: () => aiProviders.defaultModels(),
-              scratchDir: workDir,
-              reviews: stores.reviews,
-              queue: { enqueue: (work) => workQueue.enqueue(work) },
-              progress,
-              capPaused: (agentId) => capEnforcement.isPaused(agentId),
-              redactor,
-              ...memory,
-              sharedMemory,
-              promptBudget,
-              roles: stores.roles,
-              batchBranches,
-              onError: (error) => {
-                logger.warn({ err: error }, "The QA flow could not tidy up.");
-              },
-            }),
-            // The docs Agent (PRD FR-18) documents what passed QA.
-            "needs-docs": createDocsFlow({
-              floors: stores.floors,
-              agents: workingAgents,
-              github: stageGitHub,
-              pipeline,
-              notices,
-              events,
-              runner,
-              gitIdentity: (floorId) =>
-                officeSettings.floorGitIdentity(floorId),
-              defaultModels: () => aiProviders.defaultModels(),
-              scratchDir: workDir,
-              reviews: stores.reviews,
-              // The Merge Policy's work, once it is ready to merge.
-              queue: { enqueue: (work) => workQueue.enqueue(work) },
-              progress,
-              capPaused: (agentId) => capEnforcement.isPaused(agentId),
-              ...memory,
-              sharedMemory,
-              promptBudget,
-              roles: stores.roles,
-              batchBranches,
-              onError: (error) => {
-                logger.warn({ err: error }, "The docs flow could not tidy up.");
-              },
-            }),
-            "ready-to-merge": mergeFlow.execute,
-          },
-          {
-            // A designer (PRD FR-10), on a Floor with one, reviews the UI of
-            // what QA passed, at needs-qa, in a sandbox.
-            [designerRole]: createDesignFlow({
-              floors: stores.floors,
-              agents: workingAgents,
-              github: stageGitHub,
-              pipeline,
-              notices,
-              events,
-              runner,
-              models,
-              gitIdentity: (floorId) =>
-                officeSettings.floorGitIdentity(floorId),
-              defaultModels: () => aiProviders.defaultModels(),
-              scratchDir: workDir,
-              reviews: stores.reviews,
-              // Docs', or the Merge Policy's work, or the coder's changes.
-              queue: { enqueue: (work) => workQueue.enqueue(work) },
-              progress,
-              capPaused: (agentId) => capEnforcement.isPaused(agentId),
-              redactor,
-              ...memory,
-              sharedMemory,
-              promptBudget,
-              batchBranches,
-              onError: (error) => {
-                logger.warn(
-                  { err: error },
-                  "The designer flow could not tidy up.",
-                );
-              },
-            }),
+            floors: stores.floors,
+            guidelines: guidelineApprovals,
+            onError: (error) => {
+              logger.warn(
+                { err: error },
+                "A Floor's Guidelines could not be read before a task: it goes on with those approved before.",
+              );
+            },
           },
         );
   // The Manager's triage (PRD FR-23): before work starts, each picked-up
@@ -1843,6 +1872,8 @@ export async function startOffice(
     triage,
     // The issues a Batch holds are the Batch's to start.
     held: (floorId: string) => batches.held(floorId),
+    // Each round reads each Floor's Guidelines (ADR 0014).
+    guidelines: guidelineApprovals,
     onReport: (report) => {
       const log = logger.child({ component: "intake" });
       for (const { floorId, issue } of report.pickedUp) {
@@ -2051,6 +2082,7 @@ export async function startOffice(
     clearInterval(keepCachesWarm);
     reauthentication.stop();
     noAccountLeft.stop();
+    guidelineApprovals.stop();
     capEnforcement.stop();
     workingAgents.stop();
     await intake.stop();

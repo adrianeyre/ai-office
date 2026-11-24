@@ -10,9 +10,11 @@ that have an Agent run a Skill when an event happens. Part of the
 They ship in that order, each useful on its own, as the
 [Guidelines, Specs and Hooks PRD](../product-requirements-document/guidelines-specs-and-hooks.md)
 sets out. **Guidelines are being built now**, and this page describes
-them as specified (PRD FR-102 to FR-112): until they ship, AI Office reads
-nothing from `.agents/guidelines/`. Specs and Hooks get their sections
-here as they ship. A Floor without Guidelines, Specs or Hooks behaves
+them as specified (PRD FR-102 to FR-112). AI Office already reads each
+Floor's `.agents/guidelines/` and settles which versions the Owner
+approved, with the Notice and events described below; Agents get them
+once giving each task its Guidelines ships. Specs and Hooks get their
+sections here as they ship. A Floor without Guidelines, Specs or Hooks behaves
 exactly as before.
 
 ## Guidelines
@@ -82,9 +84,17 @@ version of a Guideline is **approved** when:
 
 Who merged or pushed is what GitHub records, never a commit's author:
 AI Office authors every commit as the Owner (ADR 0002), and anyone can
-put any name in a commit. The Owner is the GitHub login in General
-Settings' **Intake** card, as for intake. An automatic merge by the
-Merge Policy never approves a Guideline.
+put any name in a commit. The last commit is the newest on the default
+branch that changed the file, as `git log -1 -- <file>` finds it; who
+merged its pull request is GitHub's record of that pull request, and who
+pushed it is the default branch's activity on GitHub (its newest hundred
+pushes; an older push, or one GitHub no longer keeps, waits for the
+Owner's approval in the Floor admin). **Approve and merge** in AI Office
+counts as the Owner's merge, as AI Office's own record of it says. The
+Owner is the GitHub login in General Settings' **Intake** card, as for
+intake. An automatic merge by the Merge Policy never approves a
+Guideline. The GitHub App needs no more permissions for this than
+**Contents** and **Pull requests**, which it has.
 
 Any other version is **awaiting approval**:
 
@@ -93,16 +103,29 @@ Any other version is **awaiting approval**:
 - The Floor admin shows the difference from the approved version, with
   **Approve** and **Dismiss**.
 - The Owner gets one action Notice per Floor, such as "Guidelines changed
-  on web-shop: 2 awaiting approval", until none is left.
+  on web-shop: 2 awaiting approval", until none is left. Its **Open
+  Guidelines** opens the Floor's settings. When the count changes, a new
+  Notice takes the old one's place; once none waits (each approved,
+  dismissed or deleted), it leaves the Notice Board. One the Owner
+  dismisses is not raised again until the count changes.
+- A dismissed version waits no more, and stays dismissed should it come
+  back; Agents keep the last approved version.
 
-Approved versions are kept in AI Office's database with their content
-hash, so a later read of the same content needs no new approval, and a
-file put back as it was approved is approved again. A file deleted on the
+Approved versions are kept in AI Office's database
+(`approved_guidelines`) with their content hash (the SHA-256 of the whole
+file) and how they were approved (`owner_merge`, `owner_push` or
+`owner_admin`), so a later read of the same content needs no new
+approval, and a file put back as it was approved is approved again.
+Versions awaiting approval or dismissed are kept beside them
+(`guideline_changes`), so each is raised once, as an event and in the
+Notice, however often the folder is read. A file deleted on the
 default branch, by anyone, stops reaching Agents at once: a deletion gives
 them nothing new to follow.
 
 A Guideline with a line that looks like a credential is never approved:
-the Floor admin names the line, never what it holds (FR-112).
+the Floor admin names the line, never what it holds (FR-112). Nor is a
+file that breaks the other rules of FR-102; for either, Agents keep the
+last version of it the Owner approved.
 
 ### Which Guidelines a task gets
 
