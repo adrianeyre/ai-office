@@ -1,6 +1,7 @@
 import {
   approvedGuidelines,
   guidelineChanges,
+  guidelineSuggestions,
   type Database,
 } from "@ai-office/db";
 import { guidelineApprovals, type GuidelineApproval } from "@ai-office/shared";
@@ -10,7 +11,9 @@ import { and, asc, eq } from "drizzle-orm";
 // those that wait for the Owner's approval or that the Owner dismissed
 // (Guidelines, Specs and Hooks PRD, FR-103; ADR 0014): the
 // `approved_guidelines` and `guideline_changes` tables, or memory for
-// tests. Each version is known by the SHA-256 of its whole file.
+// tests. Each version is known by the SHA-256 of its whole file. The
+// Floors that were suggested `/guidelines` once (FR-109) are kept in
+// `guideline_suggestions`.
 
 /** A version of a Guideline the Owner approved, and how. */
 export interface GuidelineApprovalRecord {
@@ -86,6 +89,11 @@ export interface GuidelineStore {
     contentHash: string,
     at: Date,
   ): Promise<boolean>;
+  /**
+   * Keeps that the Floor was suggested `/guidelines` (FR-109); false when
+   * it was already, ever, so it is suggested at most once.
+   */
+  suggest(floorId: string, at: Date): Promise<boolean>;
 }
 
 const key = (floorId: string, name: string, contentHash: string): string =>
@@ -110,6 +118,7 @@ export function memoryGuidelineStore(): GuidelineStore {
       dismissedAt: Date | null;
     }
   >();
+  const suggested = new Set<string>();
   return {
     approvals(floorId) {
       return Promise.resolve(
@@ -199,6 +208,13 @@ export function memoryGuidelineStore(): GuidelineStore {
       known.dismissedAt = at;
       return Promise.resolve(true);
     },
+    suggest(floorId) {
+      if (suggested.has(floorId)) {
+        return Promise.resolve(false);
+      }
+      suggested.add(floorId);
+      return Promise.resolve(true);
+    },
   };
 }
 
@@ -213,7 +229,10 @@ const approvalOf = (value: string): GuidelineApproval => {
 const statusOf = (value: string): GuidelineChangeStatus =>
   value === "dismissed" ? "dismissed" : "awaiting";
 
-/** Keeps them in `approved_guidelines` and `guideline_changes`. */
+/**
+ * Keeps them in `approved_guidelines` and `guideline_changes`, and the
+ * suggestions in `guideline_suggestions`.
+ */
 export function databaseGuidelineStore(db: Database): GuidelineStore {
   const approvedRow = (floorId: string, name: string, contentHash: string) =>
     and(
@@ -323,6 +342,14 @@ export function databaseGuidelineStore(db: Database): GuidelineStore {
         )
         .returning({ name: guidelineChanges.name });
       return dismissed.length > 0;
+    },
+    async suggest(floorId, at) {
+      const inserted = await db
+        .insert(guidelineSuggestions)
+        .values({ floorId, suggestedAt: at })
+        .onConflictDoNothing()
+        .returning({ floorId: guidelineSuggestions.floorId });
+      return inserted.length > 0;
     },
   };
 }

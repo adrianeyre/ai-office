@@ -816,7 +816,8 @@ export async function startOffice(
   // Only the Guideline versions the Owner approved reach Agents (ADR
   // 0014): each Floor's are read from its default branch at intake and
   // before each task, with one Notice per Floor while any await approval, and the Owner
-  // approves or dismisses them in the Floor admin.
+  // approves or dismisses them in the Floor admin. A Floor with none is
+  // suggested `/guidelines` once (FR-109).
   const guidelineApprovals = createGuidelineApprovals({
     github,
     store: stores.guidelines,
@@ -825,6 +826,12 @@ export async function startOffice(
     events,
     ownerLogin: async () => (await officeSettings.intakeSettings()).ownerLogin,
     redactor,
+    onError: (error) => {
+      logger.warn(
+        { err: error },
+        "The Notice suggesting /guidelines could not be raised.",
+      );
+    },
   });
   // The Guidelines Agents propose in their Handoffs and QA reports (FR-110):
   // kept for the Owner, who opens one as a pull request, which the GitHub

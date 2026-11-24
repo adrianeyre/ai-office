@@ -8,8 +8,8 @@ import { databaseStores, memoryStores, type OfficeStores } from "../stores.ts";
 import { guidelineContentHash } from "./approval.ts";
 
 // Where the Guideline versions the Owner approved, and those awaiting
-// approval or dismissed, are kept (ADR 0014): in memory and in Postgres
-// 18, alike.
+// approval or dismissed, are kept (ADR 0014), and the Floors suggested
+// `/guidelines` (FR-109): in memory and in Postgres 18, alike.
 
 const at = (minute: number) =>
   new Date(`2026-11-24T09:${String(minute).padStart(2, "0")}:00.000Z`);
@@ -130,6 +130,11 @@ async function run(stores: OfficeStores): Promise<void> {
     }),
   ]);
   expect(await guidelines.changes("blog")).toEqual([]);
+
+  // `/guidelines` is suggested to each Floor once, ever (FR-109).
+  expect(await guidelines.suggest("web-shop", at(9))).toBe(true);
+  expect(await guidelines.suggest("web-shop", at(10))).toBe(false);
+  expect(await guidelines.suggest("blog", at(10))).toBe(true);
 }
 
 describe("the Guideline store", () => {

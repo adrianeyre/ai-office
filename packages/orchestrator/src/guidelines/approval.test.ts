@@ -17,6 +17,7 @@ import {
   createGuidelineApprovals,
   guidelineContentHash,
   GuidelineVersionError,
+  guidelinesSuggestionTitle,
   openGuidelinesAction,
   withGuidelines,
   type FloorGuidelineApprovals,
@@ -617,7 +618,7 @@ describe("Guidelines only as the Owner approved them", () => {
     ]);
   });
 
-  it("changes nothing for a Floor without Guidelines", async () => {
+  it("changes nothing for a Floor without Guidelines but suggest /guidelines", async () => {
     const { floor, guidelines, guidelineEvents, noticeEvents } = await setUp();
     expect(await guidelines.sync(floor)).toEqual({
       approved: [],
@@ -625,7 +626,13 @@ describe("Guidelines only as the Owner approved them", () => {
       refused: [],
     });
     expect(guidelineEvents()).toEqual([]);
-    expect(noticeEvents()).toEqual([]);
+    expect(noticeEvents()).toEqual([
+      expect.objectContaining({
+        type: "notice.raised",
+        kind: "info",
+        title: guidelinesSuggestionTitle("web-shop"),
+      }),
+    ]);
   });
 });
 

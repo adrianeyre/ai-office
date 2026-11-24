@@ -50,6 +50,11 @@ import type {
 // the Owner dismisses one. While any wait, the Floor has one action
 // Notice, "Guidelines changed on <floor>: N awaiting approval", taken off
 // the Notice Board once none does.
+//
+// A Floor that has never had Guidelines (none on its default branch when
+// they are read, and none ever approved or seen awaiting) gets one info
+// Notice suggesting `/guidelines` (FR-109), which drafts them with its
+// Manager: once, ever, as the store keeps.
 
 /** The action of the Notice: it opens the Floor admin's Guidelines. */
 export const openGuidelinesAction = "open_guidelines";
@@ -100,6 +105,10 @@ export const awaitingCount = (state: FloorGuidelineApprovals): number =>
 export const guidelinesNoticeTitle = (floorName: string, count: number) =>
   `Guidelines changed on ${floorName}: ${String(count)} awaiting approval`;
 
+/** The info Notice that suggests `/guidelines` to a Floor with none (FR-109). */
+export const guidelinesSuggestionTitle = (floorName: string): string =>
+  `No Guidelines on ${floorName.length > 100 ? `${floorName.slice(0, 99)}…` : floorName} yet: run /guidelines in the Manager chat to draft them from the repository`;
+
 /** Why the Owner's approval or dismissal of a version was refused. */
 export class GuidelineVersionError extends Error {
   /**
@@ -136,6 +145,8 @@ export interface GuidelineApprovalsOptions {
   /** Finds lines that look like a credential (FR-112). */
   readonly redactor?: Redactor;
   readonly now?: () => Date;
+  /** Told when the Notice suggesting `/guidelines` could not be raised. */
+  readonly onError?: (error: unknown) => void;
 }
 
 export interface GuidelineApprovals {
@@ -531,12 +542,55 @@ export function createGuidelineApprovals(
       }
     });
 
+  /** The Floors known to have been suggested `/guidelines` already. */
+  const suggested = new Set<string>();
+
+  /**
+   * One info Notice suggesting `/guidelines` to a Floor that has never had
+   * Guidelines (FR-109), raised once ever: the store says whether it was
+   * before, so a restart or two reads at once raise it no more.
+   */
+  const suggest = async (floor: FloorRecord): Promise<void> => {
+    if (suggested.has(floor.id)) {
+      return;
+    }
+    // The Guidelines were read; a suggestion that fails undoes none of it.
+    try {
+      const [approvals, changes] = await Promise.all([
+        store.approvals(floor.id),
+        store.changes(floor.id),
+      ]);
+      // One that had Guidelines, since deleted, knows of them already.
+      const first =
+        approvals.length === 0 &&
+        changes.length === 0 &&
+        (await store.suggest(floor.id, now()));
+      suggested.add(floor.id);
+      if (first) {
+        await notices.raise({
+          kind: "info",
+          title: guidelinesSuggestionTitle(floor.name),
+          floorId: floor.id,
+        });
+      }
+    } catch (error) {
+      options.onError?.(error);
+    }
+  };
+
   /** What each Floor's latest read settled Agents get. */
   const latest = new Map<string, readonly ApprovedGuideline[]>();
 
   const sync = async (floor: FloorRecord): Promise<FloorGuidelineApprovals> => {
     const state = await settle(floor);
     latest.set(floor.id, state.approved);
+    if (
+      state.approved.length === 0 &&
+      state.unapproved.length === 0 &&
+      state.refused.length === 0
+    ) {
+      await suggest(floor);
+    }
     const count = awaitingCount(state);
     // Nothing to raise, and nothing raised before: no Notice to look for.
     if (count > 0 || (waiting.get(floor.id) ?? -1) !== 0) {

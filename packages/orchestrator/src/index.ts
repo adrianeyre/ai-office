@@ -644,6 +644,7 @@ export {
   createGuidelineApprovals,
   guidelineContentHash,
   guidelinesNoticeTitle,
+  guidelinesSuggestionTitle,
   GuidelineVersionError,
   openGuidelinesAction,
   withGuidelines,
