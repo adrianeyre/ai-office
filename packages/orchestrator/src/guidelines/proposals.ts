@@ -255,8 +255,8 @@ export function createGuidelineProposals(
     );
     const path = pathOf(proposal.name);
     const branch = guidelineProposalBranch(proposal.name, proposal.id);
-    const client = github.repository(floor.repository);
     const pullRequest = await onGitHub(async () => {
+      const client = github.repository(floor.repository);
       const [repository, writable] = await Promise.all([
         client.get(),
         client.installationToken(),
