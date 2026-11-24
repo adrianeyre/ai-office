@@ -81,7 +81,9 @@ import { ownerOnly } from "./owner-only.ts";
 //   So does one that changes what later Agents read as memory, Skills or
 //   their agent tool's instructions and settings (P1-3): the memory
 //   changes only by the Owner's merge (FR-53), and a Skill only with the
-//   Owner's review (FR-76).
+//   Owner's review (FR-76). And so does one that changes the Floor's
+//   Guidelines or Specs (FR-110; ADR 0014), the Notice naming them: an
+//   Agent never changes its own rules.
 // - An issue a chat request's Batch holds always goes to the Owner (P2-3,
 //   the Owner's decision in #199): the Plan behind it was written by the
 //   Manager's session, after reading content anyone may have planted, and

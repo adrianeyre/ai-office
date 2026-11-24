@@ -1,5 +1,9 @@
 import type { PullRequestFile } from "@ai-office/github";
-import { memoryPath, repositorySkillFolders } from "@ai-office/shared";
+import {
+  guidelinesFolder,
+  memoryPath,
+  repositorySkillFolders,
+} from "@ai-office/shared";
 
 import { notShownInFull, type DiffLimit } from "../review/prompt.ts";
 
@@ -17,6 +21,11 @@ import { notShownInFull, type DiffLimit } from "../review/prompt.ts";
 //   the Owner's merge (FR-53), and a Skill reaches Agents only once the
 //   Owner has reviewed it (FR-76), so an Agent's own pull request does not
 //   change either by policy.
+// - a pull request that changes the Floor's Guidelines or Specs (Guidelines,
+//   Specs and Hooks PRD, FR-110; ADR 0014): they are the rules Agents
+//   follow and the requirements they work to, so an Agent never changes
+//   its own. They are among what later Agents read too, but the Notice
+//   names them on their own.
 //
 // These are plain rules on the paths the pull request changes, a renamed
 // file's old path too, matched whatever their case and at any depth, so a
@@ -183,11 +192,37 @@ export function readByAgents(path: string): boolean {
   return parts.some((part) => agentFolders.has(part)) || agentFiles.has(name);
 }
 
+/** Where a Floor's Specs live, from the top of its repository (FR-113). */
+export const specsFolder = ".agents/specs";
+
+/** Whether `path` is `folder` or in it, at any depth and in any case. */
+const inFolder = (path: string, folder: string): boolean =>
+  `/${path.toLowerCase()}/`.includes(`/${folder.toLowerCase()}/`);
+
+/** Whether a change to `path` changes the Floor's Guidelines. */
+export const changesGuidelines = (path: string): boolean =>
+  inFolder(path, guidelinesFolder);
+
+/** Whether a change to `path` changes the Floor's Specs. */
+export const changesSpecs = (path: string): boolean =>
+  inFolder(path, specsFolder);
+
 /** Every path a pull request's files change: a renamed one's old path too. */
 const pathsOf = (files: readonly PullRequestFile[]): string[] =>
   files.flatMap(({ path, previousPath }) =>
     previousPath === undefined ? [path] : [path, previousPath],
   );
+
+/** Why a pull request that changes the Guidelines goes to the Owner. */
+export const guidelinesReason =
+  "it changes the Guidelines, which only you approve";
+
+/** Why a pull request that changes the Specs goes to the Owner. */
+export const specsReason = "it changes the Specs, which only you approve";
+
+/** Why a pull request that changes both goes to the Owner. */
+export const guidelinesAndSpecsReason =
+  "it changes the Guidelines and Specs, which only you approve";
 
 /**
  * Why the pull request must go to the Owner whatever its reviewers and CI
@@ -211,9 +246,25 @@ export function ownerOnly(
   if (paths.some(runByCi)) {
     reasons.push("it changes what CI runs");
   }
-  if (paths.some(readByAgents)) {
+  if (
+    paths.some(
+      (path) =>
+        readByAgents(path) && !changesGuidelines(path) && !changesSpecs(path),
+    )
+  ) {
     reasons.push(
       "it changes what later Agents read as memory, Skills or instructions",
+    );
+  }
+  const guidelines = paths.some(changesGuidelines);
+  const specs = paths.some(changesSpecs);
+  if (guidelines || specs) {
+    reasons.push(
+      guidelines && specs
+        ? guidelinesAndSpecsReason
+        : guidelines
+          ? guidelinesReason
+          : specsReason,
     );
   }
   // An approval counts only for a pull request its reviewer was shown in
