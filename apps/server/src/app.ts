@@ -43,7 +43,7 @@ import {
   type Pricing,
   type RequestHistory,
 } from "@ai-office/gateway";
-import type { GitHubApp } from "@ai-office/github";
+import { GitHubNotConfiguredError, type GitHubApp } from "@ai-office/github";
 import {
   createAgents,
   workingAgentStore,
@@ -63,6 +63,8 @@ import {
   createOfficeSettings,
   createTokenCaps,
   createFloorSkills,
+  createGuidelineApprovals,
+  createGuidelinesAdmin,
   floorChatSkills,
   createRepositoryMemoryShelf,
   createSharedMemory,
@@ -91,6 +93,7 @@ import {
   type ManagerChat,
   type StatusUpdates,
   type ModelClient,
+  type GuidelineApprovals,
   type Notices,
   type OfficeStores,
   type SharedMemory,
@@ -165,6 +168,7 @@ import { registerTokenCapRoutes } from "./token-caps/routes.ts";
 import { registerAnalyticsRoutes } from "./analytics/routes.ts";
 import { registerDirectChatRoutes } from "./direct-chats/routes.ts";
 import { directChatUsageOf } from "./direct-chats/usage.ts";
+import { registerGuidelineRoutes } from "./guidelines/routes.ts";
 import { registerManagerChatRoutes } from "./manager-chat/routes.ts";
 import { registerMemoryRoutes } from "./memory/routes.ts";
 import {
@@ -266,6 +270,12 @@ export interface AppOptions {
    * from `stores` and `events` when not given.
    */
   readonly notices?: Notices;
+  /**
+   * Which of each Floor's Guideline versions the Owner approved (ADR
+   * 0014): the server's, which intake and each task read too. Made from
+   * `stores`, `github` and `notices` when not given (in tests).
+   */
+  readonly guidelineApprovals?: GuidelineApprovals;
   /**
    * Each Floor's AI Office branches, for the Branches page. Made from
    * `stores`, the work queue, `github` and `events` when not given.
@@ -910,6 +920,38 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     now,
   });
   registerFloorSkillRoutes(app, { floorSkills });
+  // Each Floor's Guidelines (FR-103, FR-111): the Owner approves or
+  // dismisses, in the Floor admin, the versions awaiting approval.
+  const guidelineApprovals =
+    options.guidelineApprovals ??
+    (options.github === undefined
+      ? undefined
+      : createGuidelineApprovals({
+          github: options.github,
+          store: stores.guidelines,
+          floors: stores.floors,
+          notices,
+          events,
+          ownerLogin: async () =>
+            (await officeSettings.intakeSettings()).ownerLogin,
+          ...(options.redactor === undefined
+            ? {}
+            : { redactor: options.redactor }),
+          now,
+        }));
+  const noGitHub = () => Promise.reject(new GitHubNotConfiguredError());
+  registerGuidelineRoutes(app, {
+    guidelines: createGuidelinesAdmin({
+      floors: stores.floors,
+      approvals: guidelineApprovals ?? {
+        sync: noGitHub,
+        approve: noGitHub,
+        dismiss: noGitHub,
+      },
+      store: stores.guidelines,
+      ...(options.redactor === undefined ? {} : { redactor: options.redactor }),
+    }),
+  });
   registerAgentRoutes(app, {
     agents,
     defaultModels,
@@ -1196,6 +1238,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.addHook("onClose", (_instance, done) => {
     endRemovedFloors();
     agentKeys.stop();
+    if (options.guidelineApprovals === undefined) {
+      guidelineApprovals?.stop();
+    }
     if (options.workingAgents === undefined) {
       workingAgents.stop();
     }

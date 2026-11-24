@@ -1261,6 +1261,19 @@ export async function startOffice(
     () => false,
   );
   const setupToken = passwordSet ? undefined : await writeSetupToken();
+  // Only the Guideline versions the Owner approved reach Agents (ADR
+  // 0014): each Floor's are read from its default branch at intake and
+  // before each task, with one Notice per Floor while any await approval, and the Owner
+  // approves or dismisses them in the Floor admin.
+  const guidelineApprovals = createGuidelineApprovals({
+    github,
+    store: stores.guidelines,
+    floors: stores.floors,
+    notices,
+    events,
+    ownerLogin: async () => (await officeSettings.intakeSettings()).ownerLogin,
+    redactor,
+  });
   const app = await buildApp({
     floorStops,
     logger,
@@ -1275,6 +1288,7 @@ export async function startOffice(
     events,
     stores,
     notices,
+    guidelineApprovals,
     aiAccounts,
     combos,
     modelMappings,
@@ -1450,18 +1464,6 @@ export async function startOffice(
     github,
     async () => (await officeSettings.intakeSettings()).ownerLogin,
   );
-  // Only the Guideline versions the Owner approved reach Agents (ADR
-  // 0014): each Floor's are read from its default branch at intake and
-  // before each task, with one Notice per Floor while any await approval.
-  const guidelineApprovals = createGuidelineApprovals({
-    github,
-    store: stores.guidelines,
-    floors: stores.floors,
-    notices,
-    events,
-    ownerLogin: async () => (await officeSettings.intakeSettings()).ownerLogin,
-    redactor,
-  });
   const execute: ExecuteWork | undefined =
     runner === undefined
       ? undefined
