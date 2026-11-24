@@ -411,6 +411,40 @@ export function parseGuideline(
   };
 }
 
+/**
+ * A Guideline's whole file, as AI Office writes one (FR-102, FR-109): its
+ * front matter (its inclusion, any file patterns, and its description,
+ * each quoted so YAML reads them as written), then its rules.
+ * `parseGuideline` reads it back as given.
+ */
+export function guidelineDocument(guideline: {
+  readonly inclusion: GuidelineInclusion;
+  readonly fileMatchPatterns: readonly string[];
+  readonly description: string | null;
+  readonly body: string;
+}): string {
+  // A JSON string is a YAML double-quoted scalar, escapes and all.
+  const quoted = (line: string) => JSON.stringify(line.trim());
+  const description = guideline.description?.trim() ?? "";
+  return [
+    "---",
+    `inclusion: ${guideline.inclusion}`,
+    ...(guideline.fileMatchPatterns.length === 0
+      ? []
+      : [
+          "fileMatchPattern:",
+          ...guideline.fileMatchPatterns.map(
+            (pattern) => `  - ${quoted(pattern)}`,
+          ),
+        ]),
+    ...(description === "" ? [] : [`description: ${quoted(description)}`]),
+    "---",
+    "",
+    guideline.body.trim(),
+    "",
+  ].join("\n");
+}
+
 // The Floor admin's Guidelines card (FR-103, FR-111): `GET
 // /api/floors/:floorId/guidelines` lists each Guideline on the Floor's
 // default branch, the version the Owner approved and any awaiting

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  guidelineDocument,
   guidelineLabel,
   guidelinesBudget,
   guidelinesLabelled,
@@ -487,5 +488,51 @@ describe("the Guidelines' prompt budget (FR-108)", () => {
   it("is 12,000 characters: one Guideline at its longest always fits", () => {
     expect(guidelinesBudget).toBe(12_000);
     expect(guidelinesBudget).toBe(maxGuidelineLength);
+  });
+});
+
+describe("a Guideline's file, as AI Office writes one (FR-109)", () => {
+  it("is read back as written: an always Guideline", () => {
+    const content = guidelineDocument({
+      inclusion: "always",
+      fileMatchPatterns: [],
+      description: 'What the product is: "tea", for #shops.',
+      body: "Sell tea.\n\n- Never coffee.",
+    });
+    expect(content).toBe(
+      file(
+        "---",
+        "inclusion: always",
+        'description: "What the product is: \\"tea\\", for #shops."',
+        "---",
+        "",
+        "Sell tea.",
+        "",
+        "- Never coffee.",
+        "",
+      ),
+    );
+    expect(accepted("product.md", content)).toMatchObject({
+      name: "product",
+      inclusion: "always",
+      fileMatchPatterns: [],
+      description: 'What the product is: "tea", for #shops.',
+      body: "Sell tea.\n\n- Never coffee.",
+    });
+  });
+
+  it("is read back as written: a fileMatch Guideline, its patterns quoted", () => {
+    const content = guidelineDocument({
+      inclusion: "fileMatch",
+      fileMatchPatterns: ["packages/db/**", "*.sql", "!{a,b}/[x]*"],
+      description: null,
+      body: "Plain SQL.",
+    });
+    expect(accepted("migrations.md", content)).toMatchObject({
+      inclusion: "fileMatch",
+      fileMatchPatterns: ["packages/db/**", "*.sql", "!{a,b}/[x]*"],
+      description: null,
+      body: "Plain SQL.",
+    });
   });
 });

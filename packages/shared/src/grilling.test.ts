@@ -10,9 +10,13 @@ import {
   composeGrillingAnswers,
   draftGrillingIssuesText,
   fileGrillingIssuesText,
+  grillingDraftsIssues,
   grillingSkillNames,
   grillingSourcePaths,
+  grillingTurnSchema,
   grillingWritesDocuments,
+  grillingWritesGuidelines,
+  guidelinesSkillName,
   isGrillingSkillName,
   toTicketsSkillName,
   pauseGrillingText,
@@ -190,19 +194,30 @@ describe("readGrillingControl", () => {
 });
 
 describe("the built-in Skills that start a Grilling Session", () => {
-  it("are /grilling and those adapted from Matt Pocock's, and only /to-tickets writes no documents", () => {
+  it("are /grilling, those adapted from Matt Pocock's and /guidelines, and only /to-tickets writes no documents", () => {
     expect(grillingSkillNames).toEqual([
       "grilling",
       "grill-with-docs",
       "wayfinder",
       "to-tickets",
       "to-spec",
+      "guidelines",
     ]);
     expect(isGrillingSkillName("wayfinder")).toBe(true);
     expect(isGrillingSkillName("pr")).toBe(false);
     expect(
       grillingSkillNames.filter((name) => !grillingWritesDocuments(name)),
     ).toEqual([toTicketsSkillName]);
+  });
+
+  it("has only /guidelines write Guidelines, and draft no issues", () => {
+    expect(isGrillingSkillName(guidelinesSkillName)).toBe(true);
+    expect(grillingSkillNames.filter(grillingWritesGuidelines)).toEqual([
+      guidelinesSkillName,
+    ]);
+    expect(
+      grillingSkillNames.filter((name) => !grillingDraftsIssues(name)),
+    ).toEqual([guidelinesSkillName]);
   });
 
   it("reads the PRDs and ADRs /to-tickets names, once each, and nothing else", () => {
@@ -230,11 +245,100 @@ describe("the built-in Skills that start a Grilling Session", () => {
 describe("the built-in Skills' names", () => {
   it("credit Matt Pocock for every built-in Skill but /grilling, and say which start a session", () => {
     expect(isMattPocockSkill("grilling")).toBe(false);
+    expect(isMattPocockSkill("guidelines")).toBe(false);
+    expect(startsGrillingSession("guidelines")).toBe(true);
     for (const name of mattPocockSkillNames) {
       expect(isMattPocockSkill(name)).toBe(true);
     }
     expect(startsGrillingSession("to-tickets")).toBe(true);
     expect(startsGrillingSession("domain-modeling")).toBe(false);
     expect(instructionSkillNames).toContain("pr");
+  });
+});
+
+describe("a /guidelines turn's Guidelines (FR-109)", () => {
+  const turn = (guidelines: unknown[]) =>
+    grillingTurnSchema.safeParse({ guidelines });
+  const problems = (guidelines: unknown[]) => {
+    const parsed = turn(guidelines);
+    return parsed.success
+      ? []
+      : parsed.error.issues.map(({ message }) => message);
+  };
+
+  it("are always by default, with a name, a description and rules", () => {
+    const parsed = grillingTurnSchema.parse({
+      guidelines: [
+        {
+          name: " Tech ",
+          description: "The stack and its tools.",
+          text: "Use pnpm, never npm.",
+        },
+        {
+          name: "migrations",
+          inclusion: "fileMatch",
+          fileMatchPatterns: ["packages/db/**"],
+          description: "How migrations are written.",
+          text: "Plain SQL.",
+        },
+      ],
+    });
+    expect(parsed.guidelines).toEqual([
+      {
+        name: "tech",
+        inclusion: "always",
+        fileMatchPatterns: [],
+        description: "The stack and its tools.",
+        text: "Use pnpm, never npm.",
+      },
+      {
+        name: "migrations",
+        inclusion: "fileMatch",
+        fileMatchPatterns: ["packages/db/**"],
+        description: "How migrations are written.",
+        text: "Plain SQL.",
+      },
+    ]);
+  });
+
+  it("keep FR-102's rules: a fileMatch one needs patterns, an always one takes none, and names are lowercase letters, digits and dashes", () => {
+    const base = { description: "A line.", text: "Rules." };
+    expect(
+      problems([{ ...base, name: "web", inclusion: "fileMatch" }]),
+    ).toEqual([
+      "The web Guideline is fileMatch, so it needs fileMatchPatterns: the globs of the files it applies to.",
+    ]);
+    expect(
+      problems([{ ...base, name: "web", fileMatchPatterns: ["apps/**"] }]),
+    ).toEqual([
+      "The web Guideline is always, so it takes no fileMatchPatterns; make it fileMatch to apply it only to those files.",
+    ]);
+    expect(problems([{ ...base, name: "web_app" }])).toEqual([
+      "A Guideline's name is lowercase letters, digits and dashes, such as migrations.",
+    ]);
+    expect(problems([{ ...base, name: "web", inclusion: "manual" }])).toEqual([
+      "A Guideline's inclusion is always or fileMatch.",
+    ]);
+    expect(
+      problems([{ ...base, name: "web", description: "Two\nlines." }]),
+    ).toEqual(["A Guideline's description is one line."]);
+  });
+
+  it("keep product, tech and structure always", () => {
+    for (const name of ["product", "tech", "structure"]) {
+      expect(
+        problems([
+          {
+            name,
+            inclusion: "fileMatch",
+            fileMatchPatterns: ["src/**"],
+            description: "A line.",
+            text: "Rules.",
+          },
+        ]),
+      ).toEqual([
+        `The ${name} Guideline is always: product, tech and structure apply to every task.`,
+      ]);
+    }
   });
 });
