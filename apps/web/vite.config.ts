@@ -73,6 +73,10 @@ export default defineConfig(({ mode }) => {
       name: "@ai-office/web",
       environment: "jsdom",
       setupFiles: ["./src/test-setup.ts"],
+      // user-event typing in jsdom runs several times slower on CI, where
+      // these share the runner with the sandbox suites; Vitest's 5s default
+      // flakes there.
+      testTimeout: 15_000,
     },
   };
 });

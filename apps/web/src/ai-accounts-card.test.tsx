@@ -492,7 +492,7 @@ describe("the AI Accounts in AI Settings", () => {
     ]);
     const row = await view.findByRole("listitem", { name: "Work" });
     expect(row.textContent).toContain(
-      "WorkActiveAnthropic Console API key · Priority 1",
+      "Priority P1WorkActiveAnthropic Console API key",
     );
     expect(keyField.value).toBe("");
     expect(document.body.innerHTML).not.toContain(key);
@@ -540,6 +540,10 @@ describe("the AI Accounts in AI Settings", () => {
         .getAllByRole("listitem")
         .map((item) => item.getAttribute("aria-label")),
     ).toEqual(["Work", "Personal"]);
+    // Each leads with a badge of its priority, top left.
+    expect(
+      within(list).getByRole("listitem", { name: "Personal" }).textContent,
+    ).toMatch(/^Priority P2Personal/);
     expect(
       within(list).getByRole("listitem", { name: "Personal" }).textContent,
     ).toContain("https://proxy.example/anthropic");
@@ -568,6 +572,9 @@ describe("the AI Accounts in AI Settings", () => {
         .getAllByRole("listitem")
         .map((item) => item.getAttribute("aria-label")),
     ).toEqual(["Personal", "Work (team)"]);
+    expect(
+      view.getByRole("listitem", { name: "Work (team)" }).textContent,
+    ).toMatch(/^Priority P3Work \(team\)/);
     expect(sent.map(({ method, url, body }) => [method, url, body])).toEqual([
       ["PATCH", "/api/ai-accounts/account-work", { paused: true }],
       ["PATCH", "/api/ai-accounts/account-work", { paused: false }],
@@ -656,7 +663,7 @@ describe("the AI Accounts in AI Settings", () => {
     const row = await view.findByRole("listitem", { name: "Claude Max" });
     expect(row.textContent).toContain("Token valid until");
     expect(row.textContent).toContain(
-      "Claude subscription (Pro or Max) · Priority 1 · Serves only Claude Code",
+      "Claude subscription (Pro or Max) · Serves only Claude Code",
     );
     expect(document.body.innerHTML).not.toContain("the-code-from-the-page");
   });

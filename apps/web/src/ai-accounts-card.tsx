@@ -1152,6 +1152,16 @@ function AccountRow({
       {/* Full width, so its actions always sit directly below it. */}
       <div className="w-full space-y-0.5 text-sm">
         <p className="flex flex-wrap items-center gap-2">
+          {/* First, top left, so the order the AI Gateway uses them in stands out. */}
+          <Badge
+            tone="primary"
+            title={`Priority ${String(account.priority)}; 1 is used first`}
+            className="tabular-nums"
+          >
+            <span className="sr-only">Priority </span>
+            <span aria-hidden="true">P</span>
+            {account.priority}
+          </Badge>
           <span className="font-medium">{account.name}</span>
           <Badge tone={account.paused ? "neutral" : "indigo"}>
             {account.paused ? "Paused" : "Active"}
@@ -1162,8 +1172,7 @@ function AccountRow({
         <p className="text-muted-foreground">
           {subscriptionPlanOf(account)?.label ??
             kind?.label ??
-            `${account.aiProvider} (${account.accountType})`}{" "}
-          · Priority {account.priority}
+            `${account.aiProvider} (${account.accountType})`}
           {account.endpointUrl !== null && (
             <>
               {" "}
