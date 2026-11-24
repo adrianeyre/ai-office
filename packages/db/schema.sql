@@ -527,6 +527,26 @@ CREATE TABLE "guideline_changes" (
 	CONSTRAINT "guideline_changes_status" CHECK ("guideline_changes"."status" IN ('awaiting', 'dismissed') AND ("guideline_changes"."status" = 'dismissed') = ("guideline_changes"."dismissed_at" IS NOT NULL))
 );
 
+CREATE TABLE "guideline_proposals" (
+	"id" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "guideline_proposals_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1),
+	"floor_id" text NOT NULL,
+	"name" text NOT NULL,
+	"content_hash" text NOT NULL,
+	"content" text NOT NULL,
+	"agent_id" text NOT NULL,
+	"issue" integer NOT NULL,
+	"status" text DEFAULT 'proposed' NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"decided_at" timestamp with time zone,
+	"pull_request" integer,
+	"url" text,
+	CONSTRAINT "guideline_proposals_name" CHECK ("guideline_proposals"."name" ~ '^[a-z0-9-]+$' AND length("guideline_proposals"."name") <= 255),
+	CONSTRAINT "guideline_proposals_content_hash" CHECK ("guideline_proposals"."content_hash" ~ '^[0-9a-f]{64}$'),
+	CONSTRAINT "guideline_proposals_content" CHECK (length("guideline_proposals"."content") BETWEEN 1 AND 12000),
+	CONSTRAINT "guideline_proposals_issue" CHECK ("guideline_proposals"."issue" > 0),
+	CONSTRAINT "guideline_proposals_status" CHECK ("guideline_proposals"."status" IN ('proposed', 'opened', 'rejected') AND ("guideline_proposals"."status" = 'proposed') = ("guideline_proposals"."decided_at" IS NULL) AND ("guideline_proposals"."status" = 'opened') = ("guideline_proposals"."pull_request" IS NOT NULL AND "guideline_proposals"."url" IS NOT NULL))
+);
+
 CREATE TABLE "handoffs" (
 	"id" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "handoffs_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1),
 	"floor_id" text NOT NULL,
@@ -1043,6 +1063,7 @@ ALTER TABLE "gateway_requests" ADD CONSTRAINT "gateway_requests_ai_account_id_ai
 ALTER TABLE "gateway_requests" ADD CONSTRAINT "gateway_requests_gateway_key_id_gateway_keys_id_fk" FOREIGN KEY ("gateway_key_id") REFERENCES "public"."gateway_keys"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "grilling_sessions" ADD CONSTRAINT "grilling_sessions_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "guideline_changes" ADD CONSTRAINT "guideline_changes_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "guideline_proposals" ADD CONSTRAINT "guideline_proposals_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "handoffs" ADD CONSTRAINT "handoffs_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "issue_token_caps" ADD CONSTRAINT "issue_token_caps_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "issue_triage" ADD CONSTRAINT "issue_triage_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
@@ -1103,6 +1124,8 @@ CREATE INDEX "gateway_requests_floor_issue_idx" ON "gateway_requests" USING btre
 CREATE UNIQUE INDEX "github_connections_app_id_unique" ON "github_connections" USING btree ("app_id");
 CREATE INDEX "grilling_sessions_floor_idx" ON "grilling_sessions" USING btree ("floor_id","id");
 CREATE UNIQUE INDEX "grilling_sessions_one_active" ON "grilling_sessions" USING btree ("floor_id") WHERE "grilling_sessions"."status" = 'active';
+CREATE INDEX "guideline_proposals_floor" ON "guideline_proposals" USING btree ("floor_id","status");
+CREATE UNIQUE INDEX "guideline_proposals_waiting" ON "guideline_proposals" USING btree ("floor_id","name","content_hash") WHERE "guideline_proposals"."status" = 'proposed';
 CREATE INDEX "handoffs_issue_idx" ON "handoffs" USING btree ("floor_id","issue","stage","created_at");
 CREATE INDEX "manager_chat_attachments_message_idx" ON "manager_chat_attachments" USING btree ("message_id");
 CREATE INDEX "manager_chat_attachments_unsent_idx" ON "manager_chat_attachments" USING btree ("created_at") WHERE "manager_chat_attachments"."message_id" IS NULL;
