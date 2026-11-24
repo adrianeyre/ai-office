@@ -8,7 +8,8 @@
 | **Date** | 2026-11-24 |
 | **Parent PRD** | [`ai-office.md`](./ai-office.md) |
 | **Glossary** | [`GLOSSARY.md`](../../GLOSSARY.md) |
-| **Decisions** | ADR 0014 (Guidelines), ADR 0015 (Specs) and ADR 0016 (Hooks), to come with each release |
+| **Decisions** | [ADR 0014](../architectural-decision-record/0014-agents-follow-only-guidelines-the-owner-approved.md) (Guidelines); ADR 0015 (Specs) and ADR 0016 (Hooks) to come with their releases |
+| **Guide** | [Guidelines, Specs and Hooks](../guide/guidelines-specs-and-hooks.md) |
 
 ## 1. Summary
 
@@ -106,4 +107,4 @@ They ship in that order, each useful on its own.
 
 ## 8. Rollout
 
-Each release is its own pull request with its ADR, glossary terms and guide section in `docs/guide/guidelines-specs-and-hooks.md`. A Floor without `.agents/guidelines/`, Specs or Hooks behaves exactly as before.
+Each release is its own pull request with its ADR, glossary terms and guide section in [`docs/guide/guidelines-specs-and-hooks.md`](../guide/guidelines-specs-and-hooks.md). A Floor without `.agents/guidelines/`, Specs or Hooks behaves exactly as before.
