@@ -2282,6 +2282,96 @@ export const repositorySkillReviews = pgTable(
   ],
 );
 
+// The versions of a Floor's Guidelines the Owner approved (Guidelines,
+// Specs and Hooks PRD, FR-103; ADR 0014): each Guideline (`name`, its file
+// in `.agents/guidelines/` without `.md`) in each version (`content`, the
+// whole file, by the SHA-256 of it, `content_hash`), and how the Owner
+// approved it (`approval`): the last commit that changed it reached the
+// default branch through a pull request the Owner merged (`owner_merge`),
+// or the Owner pushed it (`owner_push`), or the Owner approved it in the
+// Floor admin (`owner_admin`). A later read of an approved hash needs no
+// new approval; Agents keep the newest approved version of a file whose
+// version on the default branch is not approved. Rows are kept, so a file
+// put back as it was approved is approved again.
+export const approvedGuidelines = pgTable(
+  "approved_guidelines",
+  {
+    floorId: text("floor_id")
+      .notNull()
+      .references(() => floors.id),
+    name: text("name").notNull(),
+    contentHash: text("content_hash").notNull(),
+    content: text("content").notNull(),
+    approval: text("approval").notNull(),
+    approvedAt: timestamp("approved_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.floorId, table.name, table.contentHash],
+    }),
+    check(
+      "approved_guidelines_name",
+      sql`${table.name} ~ '^[a-z0-9-]+$' AND length(${table.name}) <= 255`,
+    ),
+    check(
+      "approved_guidelines_content_hash",
+      sql`${table.contentHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "approved_guidelines_content",
+      sql`length(${table.content}) <= 12000`,
+    ),
+    check(
+      "approved_guidelines_approval",
+      sql`${table.approval} IN ('owner_merge', 'owner_push', 'owner_admin')`,
+    ),
+  ],
+);
+
+// The versions of a Floor's Guidelines that reached its default branch
+// without the Owner's approval (FR-103; ADR 0014): `awaiting` the Owner's
+// approval, which Agents do not get meanwhile, or `dismissed` by the Owner.
+// `commit_sha` is the last commit that changed the file to it, as it was
+// last checked: the same commit is not asked about again. Each is raised
+// once, as an event and in the Floor's Notice.
+export const guidelineChanges = pgTable(
+  "guideline_changes",
+  {
+    floorId: text("floor_id")
+      .notNull()
+      .references(() => floors.id),
+    name: text("name").notNull(),
+    contentHash: text("content_hash").notNull(),
+    content: text("content").notNull(),
+    commitSha: text("commit_sha"),
+    status: text("status").notNull().default("awaiting"),
+    seenAt: timestamp("seen_at", { withTimezone: true }).notNull(),
+    dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.floorId, table.name, table.contentHash],
+    }),
+    check(
+      "guideline_changes_name",
+      sql`${table.name} ~ '^[a-z0-9-]+$' AND length(${table.name}) <= 255`,
+    ),
+    check(
+      "guideline_changes_content_hash",
+      sql`${table.contentHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check("guideline_changes_content", sql`length(${table.content}) <= 12000`),
+    check(
+      "guideline_changes_commit_sha",
+      sql`${table.commitSha} IS NULL OR ${table.commitSha} ~ '^[0-9a-f]{40,64}$'`,
+    ),
+    check(
+      "guideline_changes_status",
+      sql`${table.status} IN ('awaiting', 'dismissed') AND (${table.status} = 'dismissed') = (${table.dismissedAt} IS NOT NULL)`,
+    ),
+  ],
+);
+
 // Batches (PRD FR-25, §5 scenario 1): the issues the Owner handed a
 // Floor's Manager in one command, such as "complete issues 1 to 5", in the
 // order named (1 to 50 of them), or those the Manager filed for one of the

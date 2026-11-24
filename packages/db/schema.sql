@@ -108,6 +108,20 @@ CREATE TABLE "ai_provider_settings" (
 	CONSTRAINT "ai_provider_settings_default_model" CHECK (length("ai_provider_settings"."default_model") BETWEEN 1 AND 200)
 );
 
+CREATE TABLE "approved_guidelines" (
+	"floor_id" text NOT NULL,
+	"name" text NOT NULL,
+	"content_hash" text NOT NULL,
+	"content" text NOT NULL,
+	"approval" text NOT NULL,
+	"approved_at" timestamp with time zone NOT NULL,
+	CONSTRAINT "approved_guidelines_floor_id_name_content_hash_pk" PRIMARY KEY("floor_id","name","content_hash"),
+	CONSTRAINT "approved_guidelines_name" CHECK ("approved_guidelines"."name" ~ '^[a-z0-9-]+$' AND length("approved_guidelines"."name") <= 255),
+	CONSTRAINT "approved_guidelines_content_hash" CHECK ("approved_guidelines"."content_hash" ~ '^[0-9a-f]{64}$'),
+	CONSTRAINT "approved_guidelines_content" CHECK (length("approved_guidelines"."content") <= 12000),
+	CONSTRAINT "approved_guidelines_approval" CHECK ("approved_guidelines"."approval" IN ('owner_merge', 'owner_push', 'owner_admin'))
+);
+
 CREATE TABLE "batch_acknowledgements" (
 	"batch_id" bigint NOT NULL,
 	"agent_id" text NOT NULL,
@@ -494,6 +508,23 @@ CREATE TABLE "grilling_sessions" (
 	CONSTRAINT "grilling_sessions_skill" CHECK ("grilling_sessions"."skill" IN ('grilling', 'grill-with-docs', 'wayfinder', 'to-tickets', 'to-spec')),
 	CONSTRAINT "grilling_sessions_paused" CHECK (("grilling_sessions"."status" = 'paused') = ("grilling_sessions"."paused_at" IS NOT NULL)),
 	CONSTRAINT "grilling_sessions_ended" CHECK (("grilling_sessions"."status" = 'ended') = ("grilling_sessions"."ended_at" IS NOT NULL))
+);
+
+CREATE TABLE "guideline_changes" (
+	"floor_id" text NOT NULL,
+	"name" text NOT NULL,
+	"content_hash" text NOT NULL,
+	"content" text NOT NULL,
+	"commit_sha" text,
+	"status" text DEFAULT 'awaiting' NOT NULL,
+	"seen_at" timestamp with time zone NOT NULL,
+	"dismissed_at" timestamp with time zone,
+	CONSTRAINT "guideline_changes_floor_id_name_content_hash_pk" PRIMARY KEY("floor_id","name","content_hash"),
+	CONSTRAINT "guideline_changes_name" CHECK ("guideline_changes"."name" ~ '^[a-z0-9-]+$' AND length("guideline_changes"."name") <= 255),
+	CONSTRAINT "guideline_changes_content_hash" CHECK ("guideline_changes"."content_hash" ~ '^[0-9a-f]{64}$'),
+	CONSTRAINT "guideline_changes_content" CHECK (length("guideline_changes"."content") <= 12000),
+	CONSTRAINT "guideline_changes_commit_sha" CHECK ("guideline_changes"."commit_sha" IS NULL OR "guideline_changes"."commit_sha" ~ '^[0-9a-f]{40,64}$'),
+	CONSTRAINT "guideline_changes_status" CHECK ("guideline_changes"."status" IN ('awaiting', 'dismissed') AND ("guideline_changes"."status" = 'dismissed') = ("guideline_changes"."dismissed_at" IS NOT NULL))
 );
 
 CREATE TABLE "handoffs" (
@@ -994,6 +1025,7 @@ ALTER TABLE "agents" ADD CONSTRAINT "agents_floor_id_floors_id_fk" FOREIGN KEY (
 ALTER TABLE "agents" ADD CONSTRAINT "agents_role_id_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "public"."roles"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "agents" ADD CONSTRAINT "agents_contractor_batch_id_batches_id_fk" FOREIGN KEY ("contractor_batch_id") REFERENCES "public"."batches"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "ai_account_usage" ADD CONSTRAINT "ai_account_usage_ai_account_id_ai_accounts_id_fk" FOREIGN KEY ("ai_account_id") REFERENCES "public"."ai_accounts"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "approved_guidelines" ADD CONSTRAINT "approved_guidelines_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "batch_acknowledgements" ADD CONSTRAINT "batch_acknowledgements_batch_id_batches_id_fk" FOREIGN KEY ("batch_id") REFERENCES "public"."batches"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "batch_issues" ADD CONSTRAINT "batch_issues_batch_id_batches_id_fk" FOREIGN KEY ("batch_id") REFERENCES "public"."batches"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "batches" ADD CONSTRAINT "batches_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
@@ -1010,6 +1042,7 @@ ALTER TABLE "gateway_request_bodies" ADD CONSTRAINT "gateway_request_bodies_requ
 ALTER TABLE "gateway_requests" ADD CONSTRAINT "gateway_requests_ai_account_id_ai_accounts_id_fk" FOREIGN KEY ("ai_account_id") REFERENCES "public"."ai_accounts"("id") ON DELETE set null ON UPDATE no action;
 ALTER TABLE "gateway_requests" ADD CONSTRAINT "gateway_requests_gateway_key_id_gateway_keys_id_fk" FOREIGN KEY ("gateway_key_id") REFERENCES "public"."gateway_keys"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "grilling_sessions" ADD CONSTRAINT "grilling_sessions_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "guideline_changes" ADD CONSTRAINT "guideline_changes_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "handoffs" ADD CONSTRAINT "handoffs_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "issue_token_caps" ADD CONSTRAINT "issue_token_caps_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "issue_triage" ADD CONSTRAINT "issue_triage_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
