@@ -152,8 +152,9 @@ export interface Intake {
    */
   trigger(): Promise<void>;
   /**
-   * Checks the Floor's repository for every pipeline label and its work
-   * Roles' `role:<name>` labels again in the next round, as when one was
+   * Checks the Floor's repository for every pipeline label, its work
+   * Roles' `role:<name>` labels and its `manual` Guidelines'
+   * `guideline:<name>` labels again in the next round, as when one was
    * deleted on GitHub.
    */
   recheckLabels(floorId: string): void;

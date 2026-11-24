@@ -155,6 +155,16 @@ describe("choosing a task's Guidelines (FR-105)", () => {
     }
   });
 
+  it("ignores a guideline:<name> label naming no manual Guideline", () => {
+    for (const task of ["work", "review", "qa", "docs", "design"] as const) {
+      const labels = ["guideline:nothing", "guideline:migrations"];
+      expect(
+        chooseGuidelines(floor, { task, files: [], labels }),
+        task,
+      ).toEqual(chooseGuidelines(floor, { task, files: [], labels: [] }));
+    }
+  });
+
   it("gives the Manager's triage, Plan and chat the always Guidelines, and tells them of the rest, whatever the labels and files", () => {
     for (const task of ["triage", "plan", "chat"] as const) {
       const chosen = chooseGuidelines(floor, {
