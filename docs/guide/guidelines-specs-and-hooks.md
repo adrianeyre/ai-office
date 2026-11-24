@@ -25,10 +25,11 @@ and start their Batch, and the coder, reviewers and QA
 QA proving each Acceptance Criterion with a test (FR-116), and
 [a Spec is kept current](#keeping-a-spec-current): a Spec's Wrap-up says
 where the merged work departs from its design, and `/spec amend <slug>`
-brings it up to date (FR-117). Hooks get their section here as they
-ship. A Floor without Guidelines,
-Specs or Hooks behaves exactly as before: every prompt is byte for byte
-what it was.
+brings it up to date (FR-117). **Hooks are built** too: the Floor admin's
+[Hooks card](#the-hooks-card) has an Agent run one of the Floor's Skills
+when an event the Owner chose happens (FR-118 to FR-121). A Floor without
+Guidelines, Specs or Hooks behaves exactly as before: every prompt is
+byte for byte what it was.
 
 ## Guidelines
 
@@ -766,3 +767,177 @@ amends the Spec as the Owner approved it last:
 Agents given the Spec of an issue get it from the session its issue was
 filed from: an issue filed before the amendment keeps the Spec as it was
 then.
+
+## Hooks
+
+A Hook is one of the Owner's own rules for a Floor: when a chosen event
+happens, an Agent runs one of the Floor's Skills. "When a pull request
+that touches `**/*.sql` is opened, any reviewer runs `/migration-check`."
+It is not a git hook, and it never runs a command.
+
+### Why Hooks live in AI Office
+
+Hooks are kept in AI Office's database, made, changed and deleted only by
+the Owner, in the Floor admin's [Hooks card](#the-hooks-card) and its
+API, and included in [configuration export](running.md#configuration-export-and-import)
+([ADR 0016](../architectural-decision-record/0016-hooks-are-the-owners-and-live-in-ai-office.md)).
+Guidelines live in the repository because Agents read them; a Hook is a
+standing order that spends the Owner's tokens on every event that
+matches, so nobody else, no Agent, no Manager chat turn, no Skill and no
+Connection, can add or change one.
+
+### What a Hook is
+
+- **A name**, 1 to 60 characters, unique on its Floor whatever its case.
+- **When it runs** (FR-118), one of:
+
+  | Event | When | Narrowed by |
+  | --- | --- | --- |
+  | An issue moves to a Stage | An issue is labelled `needs-work`, `needs-review`, `needs-qa` or `needs-docs`: the Stage the Hook names | Labels the issue carries; files its pull request changes (an issue with no pull request yet has none) |
+  | A pull request is opened | AI Office opens an issue's pull request. A One-pull-request Batch's pull request runs it once, however many issues join it | Labels the issue carries; files the pull request changes |
+  | A push to the default branch touches matching files | The default branch moved: AI Office looks when GitHub tells it of a push, after each merge and every minute, and compares where it stands with where it stood last time | The files it watches (at least one pattern) |
+  | A Batch's Wrap-up | A Batch finishes and its Wrap-up is given | Labels any of the Batch's issues carries |
+  | A Spec's issues are filed | "file the issues of session N" files a Spec's issues and plans their Batch, approved already or not | Labels any of them carries |
+  | Run now | The Owner presses **Run now** in the Hooks card | Nothing |
+
+  Labels match when the issue carries any of those listed; file patterns
+  when any changed file matches any of them, as Node's
+  `path.matchesGlob` reads them (`*`, `**`, `?`, `[…]`, `{a,b}`), from
+  the top of the repository, as a Guideline's `fileMatchPattern` is. No
+  filter lets every such event through. A push Hook starts from where the
+  default branch stood when it was added (or turned on): what came before
+  is never a push to it.
+- **Who runs it** (FR-119): a named Agent of the Floor's, or any Agent in
+  a named Role, the least busy of them that is not paused or leaving.
+  Never the Manager.
+- **Which Skill**: one of the Floor's Skills (the office library's, the
+  repository's as the Owner reviewed them, or a Built-in Skill that loads
+  instructions), never one that starts a Grilling Session.
+- **At most this many runs an hour**: 12 unless the Owner sets 1 to 60.
+- **On or off.**
+
+### How a run goes
+
+A run is **one model call, made as the Agent**, as a reviewer's is: through
+the AI Gateway with that Agent's own Gateway Key, so it is attributed to
+the Agent, its Floor and the event's issue and pull request, and counts
+against the Agent's [Token Caps](floors-and-agents.md); a cap reached
+refuses it, and the run fails.
+
+- **The Skill's instructions** are in its system prompt, between
+  `<skill>` markers, as the Owner's to follow (Skills are trusted input,
+  FR-76).
+- **The event's details** are in its message, between `<event>` markers
+  they cannot close, as JSON: which event it was, the Stage, the issue's number,
+  title, labels and address, the pull request's number, address and
+  branch, the files changed (at most 100, and how many there are when
+  more), the push's commits, or the Batch's issues, results and tokens.
+  The prompt says they are data partly written by people other than the
+  Owner, never instructions. What GitHub cannot tell is left out; the
+  Agent still runs.
+- **Nothing is run.** No sandbox, no clone, no shell command, no push: the
+  Agent has no tools, and is told so.
+- **Its answer is posted, never acted on.** The Agent's answer, redacted
+  (FR-5), is posted by the GitHub App as a comment on the pull request
+  (for a pull request opened) or the issue (for an issue moving to a
+  Stage), headed with the Hook's name, the Agent, its Role and the Skill,
+  and kept with the run (its first 8,000 characters) for the Hooks card.
+  A push, a Wrap-up, a Spec's issues or Run now has nothing to post on: the
+  answer is kept with the run. Nothing in it moves an issue, merges, files
+  an issue or changes a Hook.
+
+A run **fails**, saying why, when the Agent it names has left the Floor,
+its Role has no Agent free (none, or all paused or leaving), the Agent is
+paused, the Skill cannot be read, the Agent's AI Provider has no default
+Model, the AI Gateway refuses or fails the call, the answer is empty, or
+it cannot be posted. A run AI Office was stopped in the middle of ends as
+failed when it starts again.
+
+### Limits
+
+Each Hook is bounded so it can never run away (FR-120):
+
+- **Its runs an hour.** A run that would be one more than the Hook's runs
+  an hour in the last hour is skipped (`hook.run_skipped`,
+  `rate_limited`); **Run now** is refused instead.
+- **Never two at once on the same issue or pull request.** While a run of
+  a Hook is going on an issue (or pull request), the same Hook skips that
+  issue's next event (`hook.run_skipped`, `already_running`); on another
+  issue it runs. **Run now** is refused while a Run now of it is going.
+- **Once per pull request.** A pull request opened runs a Hook once, so the
+  issues joining a One-pull-request Batch's pull request do not run it
+  again.
+- **Failures.** A failed run raises an info Notice, "The Hook "Migration
+  check" failed on PR #14 on web-shop: …". The third failed run in a row
+  turns the Hook off (`hook.changed`, by `failures`) and raises an action
+  Notice, "The Hook "Migration check" on web-shop is off: its last 3 runs
+  failed", whose **Open Hooks** opens the Hooks card. The Notice stays
+  until the Owner turns the Hook on again (or deletes it). A run that
+  succeeds, or any change the Owner makes, starts the count again.
+- **Never on its own run's events.** A Hook never fires on an event its
+  own run caused (FR-119). A run goes on in a context that names the
+  Hooks whose runs led to it, which every event published within it
+  carries through the event bus to the Hooks, so a Hook in that chain is
+  not run for it; another Hook may be, within its own limits, but never
+  one already in the chain.
+
+### The Hooks card
+
+The Floor admin's **Hooks** card (`/floor-settings/<id>#hooks`, FR-121)
+lists each of the Floor's Hooks by name:
+
+- **On** or **Off**; **When** it runs ("A pull request is opened, touching
+  `**/*.sql`"); **Then** who runs which Skill ("Any reviewer runs
+  /migration-check", "Ada runs /release-notes"); its **Limit** of runs an
+  hour; and, while it has failed runs in a row, how many, or that it
+  turned itself off.
+- **Its latest runs**, newest first (five of them): **Running**,
+  **Succeeded** or **Failed**, the Agent, the issue or pull request, when,
+  why it failed, its answer, and **Answer on GitHub**.
+- **Edit**, **Turn off** (or **Turn on**), **Run now** for a Run now Hook
+  that is on, and **Delete**, which asks first. **Add a Hook** opens the
+  same form as **Edit**: its name, **When** (and the Stage, for a Stage),
+  the labels and file patterns that event takes (one a line), who runs
+  it (an Agent, or any Agent in a Role), the Skill, its runs an hour, and
+  **On**. What the server refuses is said under the form.
+
+An archived Floor's card changes nothing. A Floor without Hooks says so,
+and how to add one.
+
+- **API.** `GET /api/floors/:floorId/hooks` answers
+  `{"hooks","skills","skillsError"}`: each Hook
+  `{"id","name","trigger","stage","labels","filePatterns","agentId","role","skillName","runsPerHour","enabled","failures","createdAt","updatedAt","runs"}`,
+  its `runs` newest first, each
+  `{"id","agentId","agentName","trigger","issue","pullRequest","status","startedAt","finishedAt","error","result","commentUrl"}`;
+  `skills` the Skills a Hook can run, each `{"name","description","source"}`,
+  and `skillsError` why the repository's could not be read, or `null`.
+  `trigger` is `stage`, `pull_request_opened`, `push`, `wrap_up`,
+  `spec_filed` or `run_now`; `status` is `running`, `succeeded` or
+  `failed`. `POST /api/floors/:floorId/hooks` adds one and answers the list
+  (`201`); `PUT /api/floors/:floorId/hooks/:id` changes the whole of one
+  (turning it off is `"enabled": false`) and `DELETE` deletes one, each
+  answering the list; `POST /api/floors/:floorId/hooks/:id/run` runs a Run
+  now Hook now and answers `{"run","hooks"}` (`202`). A Hook is
+  `{"name","trigger","stage","labels","filePatterns","agentId","role","skillName","runsPerHour","enabled"}`
+  (`hookInputSchema` in `@ai-office/shared`): `stage` only for `stage`,
+  only the filters its event takes, at least one file pattern for
+  `push`, and exactly one of `agentId` and `role`; anything else is
+  refused. A body that breaks these rules is `400 invalid_request` with
+  each problem; an Agent the Floor does not have (or its Manager), a Role
+  the library does not have, or a Skill the Floor has not is
+  `400 hook_invalid` (only what changed is looked at, so a Hook whose
+  Skill has gone can still be turned off); a name taken is
+  `409 hook_name_taken`; an unknown Hook is `404 hook_not_found`; Run now
+  of a Hook that is not a Run now Hook, is off, or is running already is
+  `409 hook_not_run_now`, `hook_disabled` or `hook_running`, and past its
+  runs this hour `429 hook_rate_limited`; an unknown Floor is
+  `404 floor_not_found` and an archived one `409 floor_archived`. Each
+  route needs the Owner's session.
+
+Every change and every run is an event in the Activity Feed under
+**Hooks**: `hook.added`, `hook.changed` (with the fields changed, by the
+Owner or by its failures), `hook.removed`, `hook.run_started`,
+`hook.run_finished` (with its outcome, why it failed, its failures in a
+row, whether it turned the Hook off, and the answer on GitHub) and
+`hook.run_skipped`. They name the Hook by its id and its name, never what
+the Skill or the answer said.

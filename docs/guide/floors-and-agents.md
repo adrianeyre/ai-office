@@ -11,7 +11,8 @@ Floors in use, each with the [Floor Template](#floor-templates) it
 started from, and the repositories the App is installed on; **Add Floor**
 makes one from the template picked above them. Each Floor's admin page (`/floor-settings/<id>`, PRD FR-66) has
 its settings, its team and Agents (see [A Floor's team](#a-floors-team)),
-its [Guidelines](guidelines-specs-and-hooks.md#seeing-them), its Skills,
+its [Guidelines](guidelines-specs-and-hooks.md#seeing-them), its
+[Hooks](guidelines-specs-and-hooks.md#the-hooks-card), its Skills,
 its token usage and caps, and an **Archive** action.
 
 [Setting up the GitHub App and your Floors](../../docs/processes/setting-up-a-floor.md) is the
