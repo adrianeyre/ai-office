@@ -209,7 +209,10 @@ import type {
 // session's branch and have the next phase drafted; "reopen …" goes back
 // to an earlier phase, whose later ones are drafted again; and "confirm
 // tasks" opens the pull request with the Spec and has its tasks kept as
-// the issue drafts, in plain code.
+// the issue drafts, in plain code. "file the issues of session 3" files a
+// Spec's issues, writes tasks.md again with their links, and starts their
+// Batch in the tasks' order (`specBatch`; FR-115, FR-117), "… in one PR"
+// in one pull request.
 // "/clear" wipes the conversation the Model is given, and "/compact"
 // replaces its older history with a summary the Manager's Model writes
 // (FR-87); the chat also compacts itself before a reply once the

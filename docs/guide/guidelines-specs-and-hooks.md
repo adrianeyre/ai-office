@@ -498,8 +498,9 @@ Once nothing is left to ask, the chat says which words end the phase.
   order, with no model asked: its title and description, the Acceptance
   Criteria it meets quoted from the approved requirements (or named by
   id, for one they lack), and blocked by the tasks it depends on. The
-  Owner edits and files them as any session's drafts; merging the pull
-  request is the Owner's alone, as the
+  Owner edits them as any session's drafts, and
+  [files them](#filing-a-specs-issues), which starts their Batch; merging
+  the pull request is the Owner's alone, as the
   [Merge Policy](issue-pipeline.md#the-merge-policy) never merges a change
   under `.agents/specs/`.
 - **Ending early.** **End session** opens the pull request with whatever
@@ -512,6 +513,58 @@ Once nothing is left to ask, the chat says which words end the phase.
   (`GET /api/floors/:floorId/grilling-sessions/:id`) sends it as `spec`:
   `{"slug","phase","drafts","approved","designSkipped","confirmedAt"}`,
   null for every other session.
+
+### Filing a Spec's issues
+
+**"file the issues of session 7"** (or **Approve** under the session's
+Issues) files a Spec's issue drafts and starts their Batch at once
+(FR-115, FR-117):
+
+- **One task, one issue.** The GitHub App files each, labelled
+  `ai-office`, after the issues it is blocked by. Its body is written by
+  plain code (`specIssueBody` in
+  `packages/orchestrator/src/grilling/issues.ts`):
+  - **Spec**: a link to `.agents/specs/<slug>/` on the session's branch,
+    the Spec's pull request, and which task of `tasks.md` it is;
+  - **What to build**: the task's description;
+  - **Acceptance criteria**: `Meets: R2.1, R2.2`, the ids of the criteria
+    it meets, then those criteria quoted as its task list
+    (`- [ ] R2.1 WHEN …`);
+  - **Blocked by**: the issues filed for the tasks it depends on, or
+    "None: it can start at once."
+- **`tasks.md` links them.** Once every issue is filed, `tasks.md` is
+  committed again on the session's branch with `- **Issue:** [#12](…)`
+  under each task, so the pull request shows them. It still holds no
+  status: progress is read from the issues.
+- **The Batch.** Its Plan follows `tasks.md`: the tasks' order, each issue
+  after the issues its task depends on, the rest in parallel. AI Office's
+  rules draft it, with no model asked, and share it out across the
+  Floor's coders; the Kickoff and Wrap-up are as for any Batch. The tasks
+  the Owner confirmed stand as the Plan's approval, recorded as the
+  Owner's: `batch.approved` names the session (`specSessionId`), and the
+  Activity Feed says "Approved by the tasks you confirmed in the Spec of
+  Grilling Session 7". Work starts at once, whatever the Floor's plan
+  approval says.
+- **Drafts edited after confirming the tasks.** If the Owner changed,
+  added, dropped or reordered any draft after "confirm tasks", the drafts
+  are no longer what was confirmed, so the Plan follows the Floor's
+  [plan approval](batches-and-memory.md) as a "complete issues …" Batch
+  does: on, it waits on the whiteboard for the Owner's approval; off,
+  work starts with no approval recorded. Its order is then the drafts'.
+- **"… in one PR".** **"file the issues of session 7 in one PR"** starts a
+  [One-pull-request Batch](batches-and-memory.md): the issues are worked
+  one at a time, in the Plan's order, on one branch. It goes only with a
+  Spec's issues; for another session's, file them, then say "complete
+  issues … in one PR".
+- **Triage asks no model.** An issue filed from a Spec is clear by
+  construction, so the Manager's triage takes it as clear, at normal
+  priority, by AI Office's rules: neither the Manager's Model nor the
+  Decision Model is asked, and its triage comment says why.
+
+If filing stops part-way, the issues filed are kept and the Batch waits
+until "file the issues of session 7" has filed the rest. If the Batch
+cannot be started, the chat says why and which "complete issues …" starts
+it.
 
 ### Acceptance Criteria are checked
 

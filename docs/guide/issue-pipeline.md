@@ -143,7 +143,10 @@ checks it is clear enough to work, and sets its priority (PRD FR-23;
   `reason`, and the `questions` an unclear issue asks (1 to 5). An answer
   that is not one is sent back once.
 - **Plain code decides what it can.** An issue with no description is
-  unclear, and no model is asked. When the Manager's Model cannot be asked
+  unclear, and no model is asked. An issue the GitHub App filed from one
+  of the Floor's [Specs](guidelines-specs-and-hooks.md#filing-a-specs-issues)
+  is clear by construction, at `normal` priority, and no model is asked
+  either, not even the Decision Model. When the Manager's Model cannot be asked
   (the Manager is paused or has no Model, or the Gateway refuses the
   call, say at a Token Cap or with no AI Account), or it answers twice
   with no valid triage, AI Office's own rules judge: clear, at `normal`
