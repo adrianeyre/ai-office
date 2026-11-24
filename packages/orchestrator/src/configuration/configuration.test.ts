@@ -268,6 +268,51 @@ async function configure(source: Office): Promise<void> {
       createdAt: at,
     },
   ]);
+  // The Owner's Hooks (FR-121): one any reviewer runs, one the coder
+  // runs, turned off. Their runs are no part of the configuration.
+  const migrationCheck = await stores.hooks.create(
+    "web-shop",
+    {
+      name: "Migration check",
+      trigger: "pull_request_opened",
+      stage: null,
+      labels: [],
+      filePatterns: ["**/*.sql"],
+      agentId: null,
+      role: "reviewer",
+      skillName: "migration-check",
+      runsPerHour: 12,
+      enabled: true,
+    },
+    at,
+  );
+  await stores.hooks.create(
+    "web-shop",
+    {
+      name: "QA notes",
+      trigger: "stage",
+      stage: "needs-qa",
+      labels: ["database"],
+      filePatterns: [],
+      agentId: coder.id,
+      role: null,
+      skillName: "release-notes",
+      runsPerHour: 3,
+      enabled: false,
+    },
+    at,
+  );
+  if (migrationCheck !== "name_taken") {
+    await stores.hooks.startRun({
+      hookId: migrationCheck.id,
+      floorId: "web-shop",
+      agentId: coder.id,
+      trigger: "pull_request_opened",
+      issue: 4,
+      pullRequest: 14,
+      startedAt: at,
+    });
+  }
   // The docs Floor is archived.
   await floors.archive("docs");
 }
@@ -593,6 +638,149 @@ const cases: Case[] = [
         changes: [],
         problems: [],
       });
+    },
+  ],
+  [
+    "carries each Floor's Hooks, and an import adds and changes them by name",
+    async (source, target) => {
+      await configure(source);
+      const exported = asFile(await source.configuration.export());
+      const hooksOf = (configuration: Configuration) =>
+        configuration.floors.find(({ id }) => id === "web-shop")?.hooks;
+      const coders = exported.floors
+        .find(({ id }) => id === "web-shop")
+        ?.agents.filter(({ role }) => role === "coder")
+        .map(({ id }) => id);
+      expect(coders).toContain(hooksOf(exported)?.[1]?.agentId);
+      expect(hooksOf(exported)).toEqual([
+        {
+          name: "Migration check",
+          trigger: "pull_request_opened",
+          stage: null,
+          labels: [],
+          filePatterns: ["**/*.sql"],
+          agentId: null,
+          role: "reviewer",
+          skillName: "migration-check",
+          runsPerHour: 12,
+          enabled: true,
+        },
+        {
+          name: "QA notes",
+          trigger: "stage",
+          stage: "needs-qa",
+          labels: ["database"],
+          filePatterns: [],
+          agentId: expect.any(String) as unknown,
+          role: null,
+          skillName: "release-notes",
+          runsPerHour: 3,
+          enabled: false,
+        },
+      ]);
+      // Never its runs.
+      expect(JSON.stringify(exported)).not.toContain("issuecomment");
+
+      const preview = await target.configuration.preview(exported);
+      expect(preview.problems).toEqual([]);
+      expect(preview.changes.filter(({ area }) => area === "hook")).toEqual([
+        {
+          area: "hook",
+          subject: "web-shop: Migration check",
+          action: "add",
+          fields: [],
+          note: "Its Skill /migration-check is looked for when it runs.",
+        },
+        {
+          area: "hook",
+          subject: "web-shop: QA notes",
+          action: "add",
+          fields: [],
+          note: "Its Skill /release-notes is looked for when it runs.",
+        },
+      ]);
+      await target.configuration.import(exported);
+      expect(hooksOf(asFile(await target.configuration.export()))).toEqual(
+        hooksOf(exported),
+      );
+      const events = async () =>
+        (await target.bus.eventsAfter(0))
+          .map(({ event }) => event)
+          .filter(({ type }) => type.startsWith("hook."));
+      expect((await events()).map(({ type }) => type)).toEqual([
+        "hook.added",
+        "hook.added",
+      ]);
+
+      // Changed there: changed here, by its name, whatever its case.
+      const changed = {
+        ...exported,
+        floors: exported.floors.map((floor) =>
+          floor.id === "web-shop"
+            ? {
+                ...floor,
+                hooks: floor.hooks.map((hook) =>
+                  hook.name === "Migration check"
+                    ? { ...hook, name: "MIGRATION CHECK", runsPerHour: 6 }
+                    : hook,
+                ),
+              }
+            : floor,
+        ),
+      };
+      expect(
+        (await target.configuration.preview(changed)).changes.filter(
+          ({ area }) => area === "hook",
+        ),
+      ).toEqual([
+        {
+          area: "hook",
+          subject: "web-shop: MIGRATION CHECK",
+          action: "change",
+          fields: ["name", "runsPerHour"],
+          note: null,
+        },
+      ]);
+      await target.configuration.import(changed);
+      expect(hooksOf(asFile(await target.configuration.export()))).toEqual(
+        hooksOf(changed),
+      );
+      expect((await events()).at(-1)).toMatchObject({
+        type: "hook.changed",
+        fields: ["name", "runsPerHour"],
+        by: "owner",
+      });
+
+      // A Hook naming an Agent or Role the Floor will not have stops it.
+      const [first] = hooksOf(exported) ?? [];
+      if (first === undefined) {
+        throw new Error("web-shop has Hooks.");
+      }
+      const strange = {
+        ...exported,
+        floors: exported.floors.map((floor) =>
+          floor.id === "web-shop"
+            ? {
+                ...floor,
+                hooks: [
+                  {
+                    ...first,
+                    name: "Nobody's",
+                    agentId: "nobody",
+                    role: null,
+                  },
+                  { ...first, name: "Astronaut", role: "astronaut" },
+                ],
+              }
+            : floor,
+        ),
+      };
+      expect(
+        (await target.configuration.preview(asFile(strange))).problems,
+      ).toEqual([
+        `web-shop's Hook "Nobody's" names nobody, not one of its Agents.`,
+        `web-shop's Hook "Astronaut" names the astronaut Role, in neither the Role library here nor the document.`,
+      ]);
     },
   ],
   [

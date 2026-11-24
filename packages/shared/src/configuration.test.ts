@@ -48,6 +48,20 @@ const floor = {
   requiredReviewerAgentIds: ["grace"],
   issueTokenCaps: [],
   skillToggles: [],
+  hooks: [
+    {
+      name: "Migration check",
+      trigger: "pull_request_opened" as const,
+      stage: null,
+      labels: [],
+      filePatterns: ["**/*.sql"],
+      agentId: null,
+      role: "reviewer",
+      skillName: "migration-check",
+      runsPerHour: 12,
+      enabled: true,
+    },
+  ],
   roleMemory: [],
 };
 
@@ -119,6 +133,32 @@ describe("a configuration export", () => {
       configurationSchema.parse({ ...configuration, floors: [before] })
         .floors[0]?.hourlyStatusUpdates,
     ).toBe(true);
+  });
+
+  it("carries each Floor's Hooks, reads an export made before them as having none, and names each once", () => {
+    const before = Object.fromEntries(
+      Object.entries(floor).filter(([key]) => key !== "hooks"),
+    );
+    expect(
+      configurationSchema.parse({ ...configuration, floors: [before] })
+        .floors[0]?.hooks,
+    ).toEqual([]);
+    const [hook] = floor.hooks;
+    expect(
+      problems({
+        ...configuration,
+        floors: [
+          { ...floor, hooks: [hook, { ...hook, name: "MIGRATION CHECK" }] },
+        ],
+      }),
+    ).toEqual(["web-shop has two Hooks named migration check."]);
+    // A Hook is checked as when the Owner makes one: no shell command.
+    expect(
+      problems({
+        ...configuration,
+        floors: [{ ...floor, hooks: [{ ...hook, command: "rm -rf /" }] }],
+      }),
+    ).toHaveLength(1);
   });
 
   it("carries each Floor's chosen name, and reads older exports' names as they were", () => {
