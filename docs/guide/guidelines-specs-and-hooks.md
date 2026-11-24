@@ -12,8 +12,9 @@ They ship in that order, each useful on its own, as the
 sets out. **Guidelines are being built now**, and this page describes
 them as specified (PRD FR-102 to FR-112). AI Office already reads each
 Floor's `.agents/guidelines/` and settles which versions the Owner
-approved, with the Notice and events described below; Agents get them
-once giving each task its Guidelines ships. Specs and Hooks get their
+approved, with the Notice and events described below, and the Floor
+admin's [Guidelines card](#seeing-them) shows them with **Approve** and
+**Dismiss**; Agents get them once giving each task its Guidelines ships. Specs and Hooks get their
 sections here as they ship. A Floor without Guidelines, Specs or Hooks behaves
 exactly as before.
 
@@ -104,7 +105,8 @@ Any other version is **awaiting approval**:
   **Approve** and **Dismiss**.
 - The Owner gets one action Notice per Floor, such as "Guidelines changed
   on web-shop: 2 awaiting approval", until none is left. Its **Open
-  Guidelines** opens the Floor's settings. When the count changes, a new
+  Guidelines** opens the Floor admin at its
+  [Guidelines card](#seeing-them) (`/floor-settings/<id>#guidelines`). When the count changes, a new
   Notice takes the old one's place; once none waits (each approved,
   dismissed or deleted), it leaves the Notice Board. One the Owner
   dismisses is not raised again until the count changes.
@@ -189,9 +191,61 @@ with no Guidelines gets one info Notice suggesting `/guidelines`, once.
 
 ### Seeing them
 
-The Floor admin's **Guidelines** card lists each Guideline with its
-inclusion, patterns and approved version, and any version awaiting
-approval or error (FR-111). Every approval, dismissal, proposal and
-budget breach is an event in the Activity Feed under **Guidelines**:
-`guideline.approved`, `guideline.awaiting`, `guideline.dismissed`,
-`guideline.proposed` and `guideline.over_budget`.
+The Floor admin's **Guidelines** card (`/floor-settings/<id>#guidelines`,
+FR-103, FR-111) reads the Floor's `.agents/guidelines/` afresh each time
+it opens, and lists each Guideline by name:
+
+- **When it applies**: **Always**, **File match** with its patterns, or
+  **Manual** with its `guideline:<name>` label, and its description, as
+  Agents get it (for one never approved, as the version awaiting approval
+  says).
+- **The approved version**: "Agents get version 1a2b3c4", with how the
+  Owner approved it (in a pull request the Owner merged, pushed by the
+  Owner, or approved here), and whether a later version on the default
+  branch is waiting; or "No version approved: Agents get nothing from it."
+- **A version awaiting approval**, marked **Awaiting approval**: its
+  commit, and its difference from the approved version line by line
+  (lines taken out with `-`, lines put in with `+`; a new Guideline is all
+  put in), with **Approve** and **Dismiss**. **Approve** makes exactly the
+  version shown the one Agents get. **Dismiss** leaves Agents with the
+  approved one and stops counting it as waiting; a dismissed version
+  stays on the card, and can still be approved.
+- **An error**, marked **Invalid**: why the file on the default branch
+  reaches no Agent (a name or header that does not fit, too long, or
+  the line that looks like a credential, by number, never what it holds).
+  Agents keep the last version approved before it broke.
+
+How many Guidelines await approval is said above the list. If the version
+on the default branch changed after the card was opened, **Approve** and
+**Dismiss** are refused with the reason ("has changed since: look at its
+version now") and the card shows the version as it is now, so the Owner
+never approves a version unseen. An archived Floor's card changes
+nothing. A Floor without Guidelines says so, and how to add them.
+
+- **API.** `GET /api/floors/:floorId/guidelines` answers
+  `{"guidelines","awaitingCount"}`, a Guideline each by name:
+  `{"name","path","inclusion","fileMatchPatterns","description","approved","awaiting","error"}`.
+  `approved` is `{"contentHash","approval","content","current"}` or
+  `null` (`approval` is `owner_merge`, `owner_push` or `owner_admin`;
+  `current` says whether it is the version on the default branch);
+  `awaiting` is `{"contentHash","status","content","commitSha"}` or `null`
+  (`status` is `awaiting` or `dismissed`); `error` is
+  `{"refusal","reason","secretLines"}` or `null` (`refusal` is
+  `holds_secret` or `invalid`). `inclusion` is `null` when no version can
+  be read. `POST /api/floors/:floorId/guidelines/:name/approve` and
+  `POST /api/floors/:floorId/guidelines/:name/dismiss`, each with
+  `{"contentHash"}` (the SHA-256 of the whole file the Owner saw, 64
+  hexadecimal characters), approve or dismiss that version and answer the
+  list as `GET` does. A hash that is not the version waiting (it changed
+  meanwhile, was approved already, or, for dismiss, was dismissed
+  already) is `409 guideline_changed`; a Guideline the default branch
+  does not have is `404 guideline_not_found`; an unknown Floor is
+  `404 floor_not_found`; a body without a hash is `400 invalid_request`.
+  Without the GitHub App every route answers `503 github_not_configured`,
+  and with GitHub out of reach `502 github_unavailable`. Each route needs
+  the Owner's session.
+
+Every approval, dismissal, proposal and budget breach is an event in the
+Activity Feed under **Guidelines**: `guideline.approved`,
+`guideline.awaiting`, `guideline.dismissed`, `guideline.proposed` and
+`guideline.over_budget`.
