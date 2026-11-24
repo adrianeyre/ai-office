@@ -633,6 +633,7 @@ export {
   type RepositorySkills,
   type SkillFolderReader,
 } from "./skills/repository.ts";
+export { readFloorGuidelines, readGuidelines } from "./guidelines/read.ts";
 export {
   databaseRepositorySkillReviewStore,
   memoryRepositorySkillReviewStore,
