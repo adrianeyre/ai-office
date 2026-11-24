@@ -1147,6 +1147,15 @@ export {
   type GuidelineTask,
   type ParsedGuideline,
   type RefusedGuideline,
+  guidelineProposalBranch,
+  guidelineProposalListSchema,
+  guidelineProposalSchema,
+  guidelineProposalStatuses,
+  openedGuidelineProposalSchema,
+  type GuidelineProposal,
+  type GuidelineProposalList,
+  type GuidelineProposalStatus,
+  type OpenedGuidelineProposal,
 } from "./guidelines.ts";
 export {
   looksLikeSecret,

@@ -509,6 +509,78 @@ export const guidelineErrorCodes = {
    * approved or dismissed already.
    */
   guidelineChanged: "guideline_changed",
+  /** The Floor has no proposal of that id. */
+  proposalNotFound: "guideline_proposal_not_found",
+  /** The proposal was opened as a pull request or rejected already. */
+  proposalSettled: "guideline_proposal_settled",
+  /** The default branch already holds the Guideline as proposed. */
+  proposalUnchanged: "guideline_proposal_unchanged",
 } as const;
 export type GuidelineErrorCode =
   (typeof guidelineErrorCodes)[keyof typeof guidelineErrorCodes];
+
+// Guidelines Agents propose (FR-110, FR-111): the coder (every work Role),
+// the docs Agent and QA may end their Handoff, or QA's report, with one
+// `<guideline name="…">` block holding a new or changed Guideline. It is
+// kept per Floor for the Owner, and no model accepts one: from the
+// Guidelines card the Owner opens it as a pull request, which the GitHub
+// App commits on a branch of its own, or rejects it. Nothing proposed
+// reaches an Agent until the Owner merges that pull request, which is then
+// the Owner's approval of it (ADR 0014). `GET /api/floors/:floorId/
+// guideline-proposals` lists those waiting; `POST …/guideline-proposals/
+// :id/open` and `…/reject` settle one.
+
+/**
+ * What became of a proposal: waiting for the Owner (`proposed`), opened
+ * as a pull request (`opened`) or rejected by the Owner (`rejected`).
+ */
+export const guidelineProposalStatuses = [
+  "proposed",
+  "opened",
+  "rejected",
+] as const;
+export type GuidelineProposalStatus =
+  (typeof guidelineProposalStatuses)[number];
+
+/** The branch a proposal is opened on: one of its own. */
+export const guidelineProposalBranch = (name: string, id: number): string =>
+  `ai-office/guideline-${name}-${String(id)}`;
+
+/** One proposal waiting for the Owner, as the Guidelines card shows it. */
+export const guidelineProposalSchema = z.object({
+  id: z.number().int().positive(),
+  /** The Guideline it adds or changes, by name. */
+  name: z.string(),
+  /** Its file from the top of the repository. */
+  path: z.string(),
+  /** The whole file proposed, front matter and all, redacted. */
+  content: z.string(),
+  contentHash: z.string(),
+  /** The Agent that proposed it, and its name when it is still on the Floor. */
+  agentId: z.string(),
+  agentName: z.string().nullable(),
+  /** The issue whose Handoff, or QA report, proposed it. */
+  issue: z.number().int().positive(),
+  proposedAt: z.iso.datetime(),
+});
+export type GuidelineProposal = z.infer<typeof guidelineProposalSchema>;
+
+/** `GET /api/floors/:floorId/guideline-proposals`: those waiting, oldest first. */
+export const guidelineProposalListSchema = z.object({
+  proposals: z.array(guidelineProposalSchema),
+});
+export type GuidelineProposalList = z.infer<
+  typeof guidelineProposalListSchema
+>;
+
+/** `POST …/guideline-proposals/:id/open`: its pull request, and those still waiting. */
+export const openedGuidelineProposalSchema = z.object({
+  pullRequest: z.object({
+    number: z.number().int().positive(),
+    url: z.url(),
+  }),
+  proposals: z.array(guidelineProposalSchema),
+});
+export type OpenedGuidelineProposal = z.infer<
+  typeof openedGuidelineProposalSchema
+>;
