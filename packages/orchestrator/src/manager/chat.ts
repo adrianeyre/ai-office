@@ -3,6 +3,7 @@ import {
   createRedactor,
   draftGrillingIssuesText,
   endGrillingText,
+  fileGrillingIssuesText,
   floorErrorCodes,
   grillingErrorCodes,
   grillingSkillName,
@@ -25,6 +26,7 @@ import {
   readSkillCommand,
   skillAnnouncement,
   skipSpecDesignText,
+  specFolder,
   specSkillName,
   toTicketsSkillName,
   type ChatAttachment,
@@ -32,6 +34,7 @@ import {
   type GrillingControl,
   type GrillingErrorCode,
   type GrillingIssueDraftEdit,
+  type GrillingIssues,
   type GrillingIssuesTurn,
   type GrillingMessageRef,
   type GrillingSkillName,
@@ -47,6 +50,7 @@ import {
 
 import { modelOf } from "../agents/agents.ts";
 import type { AgentRecord, AgentStore } from "../agents/store.ts";
+import type { SpecBatchRequest } from "../batches/batches.ts";
 import type { DefaultModels } from "../ai-providers/ai-providers.ts";
 import type { ContextUsage, ContextUsageState } from "../context/usage.ts";
 import { FloorError } from "../floors/errors.ts";
@@ -96,8 +100,11 @@ import {
   skipSpecDesign,
   specConfirmationText,
   specConfirmWords,
+  specBatchIssues,
+  specDraftsEdited,
   specHasApproved,
   specIssueDrafts,
+  specOf,
   specStanding,
 } from "../grilling/spec.ts";
 import { grillingSkillInstructions } from "../grilling/skill.ts";
@@ -491,6 +498,17 @@ export interface ManagerChatOptions {
    * (FR-81). Without it, no issues are drafted when a session ends.
    */
   readonly issues?: GrillingIssuesFiler;
+  /**
+   * Starts the Batch of a Spec's issues once every one is filed
+   * (Guidelines, Specs and Hooks PRD, FR-115), in one pull request with
+   * `onePullRequest`, answering what it did in words. Without it, a Spec's
+   * issues are filed and wait, as any session's do.
+   */
+  readonly specBatch?: (
+    floorId: string,
+    spec: SpecBatchRequest,
+    options: { readonly onePullRequest: boolean },
+  ) => Promise<string>;
   /**
    * The Agents' Context Usage (FR-84): the chat compacts itself at the
    * Manager's threshold, and ends a conversation's session when it is
@@ -2443,6 +2461,71 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
   };
 
   /**
+   * Writes a Spec's `tasks.md` again on the session's branch, each task
+   * linking the issue filed for it (FR-117), and keeps where the documents
+   * stand; answers what the chat says of it.
+   */
+  const linkTasks = async (
+    floor: FloorRecord,
+    manager: AgentRecord,
+    session: GrillingSessionRecord,
+    grilling: GrillingStore,
+    controller: AbortController,
+  ): Promise<string[]> => {
+    if (options.documents === undefined) {
+      return [];
+    }
+    try {
+      const model = modelOf(manager, await options.defaultModels?.()) ?? "";
+      const written = await options.documents.write({
+        floor,
+        manager: trailerOf(manager, model),
+        session,
+        signal: controller.signal,
+      });
+      await grilling.save({ ...session, documents: written.documents });
+      return [documentsText(written, [])];
+    } catch (error) {
+      controller.signal.throwIfAborted();
+      return [
+        `tasks.md could not be updated with the issues' links: ${reasonOf(error)}`,
+      ];
+    }
+  };
+
+  /**
+   * Starts the Batch of a Spec's issues, all filed (FR-115): its Plan
+   * follows the tasks, approved already unless the Owner edited the drafts
+   * after confirming them; answers what the chat says of it.
+   */
+  const startSpecBatch = async (
+    floor: FloorRecord,
+    session: GrillingSessionRecord,
+    issues: GrillingIssues,
+    onePullRequest: boolean,
+  ): Promise<string> => {
+    const batch = specBatchIssues(issues);
+    const command = `complete issues ${batch.map(({ issue }) => String(issue)).join(", ")}${onePullRequest ? " in one PR" : ""}`;
+    if (options.specBatch === undefined) {
+      return `They are ready to become a Batch: say "${command}".`;
+    }
+    try {
+      return await options.specBatch(
+        floor.id,
+        {
+          sessionId: session.id,
+          folder: specFolder(specOf(session).slug),
+          issues: batch,
+          approved: !specDraftsEdited(session),
+        },
+        { onePullRequest },
+      );
+    } catch (error) {
+      return `Their Batch could not be started: ${reasonOf(error)} Say "${command}" to start it.`;
+    }
+  };
+
+  /**
    * Files the draft issues of the ended session `sessionId`, as the Owner
    * approved them in `asked` (FR-81): the GitHub App files each after
    * those it is blocked by, and the chat lists them, or says why filing
@@ -2456,6 +2539,7 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
     filer: GrillingIssuesFiler,
     grilling: GrillingStore,
     controller: AbortController,
+    onePullRequest: boolean,
   ): Promise<void> => {
     let kept: Omit<NewChatMessage, "createdAt">;
     const answer = (
@@ -2486,9 +2570,19 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
           latest = await grilling.save({ ...latest, issues: current });
         },
       });
+      // A Spec's issues, all filed, start their Batch (FR-115).
+      const ofSpec = latest.spec !== null && issues.problem === null;
+      const parts = [issuesFiledText(latest, issues, ofSpec)];
+      if (ofSpec) {
+        parts.push(
+          ...(await linkTasks(floor, manager, latest, grilling, controller)),
+        );
+        latest = (await grilling.get(floor.id, sessionId)) ?? latest;
+        parts.push(await startSpecBatch(floor, latest, issues, onePullRequest));
+      }
       kept = answer(
         issues.problem === null ? "grilling" : "error",
-        issuesFiledText(latest, issues),
+        parts.filter((part) => part !== "").join("\n\n"),
       );
     } catch (error) {
       kept = answer(
@@ -2942,6 +3036,12 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
       return say(
         "hint",
         `The issues of the ${sessionName(session)} are filed already: ${filed.join(", ")}.`,
+      );
+    }
+    if (control.onePullRequest === true && session.spec === null) {
+      return say(
+        "hint",
+        `"in one PR" goes only with a Spec's issues, which start their Batch as they are filed. File these with "${fileGrillingIssuesText(session.id)}", then say "complete issues … in one PR".`,
       );
     }
     const problem = issueDraftsProblem(drafts);
@@ -3412,6 +3512,10 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
           ) {
             throw new Error("Filing needs the Grilling Session's issues.");
           }
+          const onePullRequest =
+            route.kind === "control" &&
+            route.control.kind === "file-issues" &&
+            route.control.onePullRequest === true;
           return inBackground((controller) =>
             fileIssues(
               floor,
@@ -3421,6 +3525,7 @@ export function createManagerChat(options: ManagerChatOptions): ManagerChat {
               filer,
               grilling,
               controller,
+              onePullRequest,
             ),
           );
         }
