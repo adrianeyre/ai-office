@@ -592,6 +592,31 @@ describe("Guidelines only as the Owner approved them", () => {
     expect((await guidelines.sync(floor)).approved).toEqual([]);
   });
 
+  it("gives each task what the Floor's latest read settled, reading it only when it has not been read", async () => {
+    const { github, floor, guidelines } = await setUp();
+    github.pushCommit(repository, "main", {
+      files: { [tech]: "Use pnpm.\n" },
+      pusher: owner,
+    });
+    // Not read since AI Office started: read now.
+    expect((await guidelines.approved(floor)).map(({ body }) => body)).toEqual([
+      "Use pnpm.",
+    ]);
+    // A change on the default branch reaches tasks at the next read, at
+    // intake or before a task, not before.
+    github.pushCommit(repository, "main", {
+      files: { [tech]: "Use pnpm 12.\n" },
+      pusher: owner,
+    });
+    expect((await guidelines.approved(floor)).map(({ body }) => body)).toEqual([
+      "Use pnpm.",
+    ]);
+    await guidelines.sync(floor);
+    expect((await guidelines.approved(floor)).map(({ body }) => body)).toEqual([
+      "Use pnpm 12.",
+    ]);
+  });
+
   it("changes nothing for a Floor without Guidelines", async () => {
     const { floor, guidelines, guidelineEvents, noticeEvents } = await setUp();
     expect(await guidelines.sync(floor)).toEqual({

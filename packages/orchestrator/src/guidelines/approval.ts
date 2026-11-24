@@ -147,6 +147,13 @@ export interface GuidelineApprovals {
    */
   sync(floor: FloorRecord): Promise<FloorGuidelineApprovals>;
   /**
+   * What Agents on the Floor get: its Guidelines in the versions the Owner
+   * approved, as its latest read settled them (at intake and before each
+   * task, FR-103), so a task needs no read of its own; read now when the
+   * Floor has not been read since AI Office started.
+   */
+  approved(floor: FloorRecord): Promise<readonly ApprovedGuideline[]>;
+  /**
    * The Owner approves, in the Floor admin, the version of a Guideline on
    * the default branch with `contentHash`, for exactly the content seen.
    * A `GuidelineVersionError` when that is not its version there, or it is
@@ -524,8 +531,12 @@ export function createGuidelineApprovals(
       }
     });
 
+  /** What each Floor's latest read settled Agents get. */
+  const latest = new Map<string, readonly ApprovedGuideline[]>();
+
   const sync = async (floor: FloorRecord): Promise<FloorGuidelineApprovals> => {
     const state = await settle(floor);
+    latest.set(floor.id, state.approved);
     const count = awaitingCount(state);
     // Nothing to raise, and nothing raised before: no Notice to look for.
     if (count > 0 || (waiting.get(floor.id) ?? -1) !== 0) {
@@ -578,6 +589,10 @@ export function createGuidelineApprovals(
 
   return {
     sync,
+
+    async approved(floor) {
+      return latest.get(floor.id) ?? (await sync(floor)).approved;
+    },
 
     async approve(floorId, name, contentHash) {
       const floor = await floorOf(floorId);

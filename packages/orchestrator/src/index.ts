@@ -654,6 +654,28 @@ export {
   type UnapprovedGuideline,
 } from "./guidelines/approval.ts";
 export {
+  chooseGuidelines,
+  guidelinesWithin,
+  matchesPattern,
+  type ChosenGuidelines,
+  type GuidelineChoice,
+  type GuidelinesWithin,
+} from "./guidelines/choose.ts";
+export {
+  guidelineFiles,
+  type GivenGuidelines,
+  type GuidelineFile,
+} from "./guidelines/prompt.ts";
+export {
+  createTaskGuidelines,
+  guidelinesBudgetAction,
+  guidelinesOverBudgetTitle,
+  plannedFiles,
+  type GuidelinesRequest,
+  type TaskGuidelines,
+  type TaskGuidelinesOptions,
+} from "./guidelines/tasks.ts";
+export {
   databaseGuidelineStore,
   guidelineChangeStatuses,
   memoryGuidelineStore,
