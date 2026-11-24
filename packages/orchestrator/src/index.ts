@@ -662,6 +662,15 @@ export {
   type GuidelinesWithin,
 } from "./guidelines/choose.ts";
 export {
+  droppedProposalReasons,
+  proposedGuideline,
+  proposingGuidelines,
+  withoutGuidelineProposals,
+  type DroppedProposalReason,
+  type ProposalTag,
+  type ProposedGuideline,
+} from "./guidelines/proposal.ts";
+export {
   guidelineFiles,
   type GivenGuidelines,
   type GuidelineFile,
@@ -1042,7 +1051,7 @@ export {
   proposedMemory,
   proposingMemory,
   readMemoryFile,
-  withoutMemory,
+  withoutProposals,
   type RepositoryMemory,
   type RepositoryMemoryOptions,
 } from "./memory/memory.ts";

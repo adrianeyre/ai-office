@@ -7,6 +7,7 @@ import {
 } from "@ai-office/shared";
 
 import { guidelineCharacters, isManagerTask } from "./choose.ts";
+import { proposingGuidelines } from "./proposal.ts";
 
 // How a task's Guidelines reach its Agent (Guidelines, Specs and Hooks PRD,
 // FR-104, FR-106, FR-107, FR-108):
@@ -268,3 +269,16 @@ export const withQuotedGuidelines = (
   const section = given === undefined ? [] : quotedGuidelinesSection(given);
   return section.length === 0 ? [] : ["", ...section];
 };
+
+/**
+ * How to propose a Guideline (FR-110), after a blank line, for a coder, QA
+ * or docs Agent given Guidelines; none for one given none, whose prompt is
+ * as it was before Guidelines.
+ */
+export const withGuidelineProposals = (
+  given: GivenGuidelines | undefined,
+  where: "Handoff" | "report",
+): string[] =>
+  given === undefined || !holdsGuidelines(given)
+    ? []
+    : ["", ...proposingGuidelines(where)];
