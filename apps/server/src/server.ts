@@ -19,6 +19,7 @@ import {
   agentName,
   approvedIssues,
   specIssues,
+  issueSpec,
   createAiProviders,
   createBatchBranches,
   createBatches,
@@ -1542,6 +1543,10 @@ export async function startOffice(
                 promptBudget,
                 guidelines: taskGuidelines,
                 guidelineProposals,
+                // The Spec an issue was filed from, as the Owner approved
+                // it in its session (FR-116).
+                specs: (floorId, issue) =>
+                  issueSpec(stores.grilling, floorId, issue),
                 roles: stores.roles,
                 turns,
                 batchBranches,
@@ -1574,6 +1579,10 @@ export async function startOffice(
                 sharedMemory,
                 promptBudget,
                 guidelines: taskGuidelines,
+                // The criteria of the Spec an issue was filed from, as
+                // the Owner approved them (FR-116).
+                specs: (floorId, issue) =>
+                  issueSpec(stores.grilling, floorId, issue),
                 roles: stores.roles,
                 turns,
                 batchBranches,
