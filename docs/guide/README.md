@@ -16,4 +16,5 @@ and getting started.
 | [GitHub, events and the Manager chat](events-and-chat.md) | The GitHub App client, the event bus, the Activity Feed, the Agent live view, the Manager chat (clearing and compacting it) and its Grilling Sessions. |
 | [Batches, Plans and memory](batches-and-memory.md) | Batches and Plans on the whiteboard, the Kickoff and the Wrap-up, and repository, office-wide and Role memory. |
 | [Notices, the wall board and Skills](notices-and-skills.md) | The Notice Board, browser notifications, the Communications Agent and its Connections (with Wrap-up reports to Confluence, Notion, Google Docs, Slides and Drive, a work log in Google Sheets and an event per Batch in Google Calendar, through Google sign-in for Google), the wall board and the Skill library. |
+| [Guidelines, Specs and Hooks](guidelines-specs-and-hooks.md) | How the Owner steers a Floor's Agents up front: Guidelines, the Owner's rules for a repository that Agents follow only as the Owner approved them; Specs and Hooks to follow. |
 | [The web app and the 3D Office](web-app.md) | The company logo, link previews, accessibility, running the web app, the 3D Office and phones. |
