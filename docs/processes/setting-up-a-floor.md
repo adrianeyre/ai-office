@@ -537,6 +537,17 @@ Notice when it cannot tell (see
 A Role renamed in the library gets a label under its new name; the old
 one stays on the repository.
 
+Intake also creates a `guideline:<name>` label (`#d4c5f9`, "AI Office:
+follow the Owner's <name> Guideline") for each `manual` Guideline the
+Owner approved on the Floor, such as `guideline:release`, and one for a
+`manual` Guideline approved later. Add one to an issue to give its
+tasks that Guideline (see
+[Guidelines, Specs and Hooks](../guide/guidelines-specs-and-hooks.md)).
+`always` and `fileMatch` Guidelines get no label: they reach the tasks
+they apply to without one. A Guideline still awaiting your approval gets
+none until you approve it, and a `guideline:<name>` label that names no
+approved `manual` Guideline gives nothing.
+
 A Floor Template may bring labels of its own, such as a store's
 `product`. They are created when the Floor is added from it, and mean
 nothing to the pipeline. None of the built-in templates brings any.

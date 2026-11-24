@@ -149,8 +149,9 @@ Batch's Plan holds (one intake took on its own), or whose Plan names no
 files, matches no `fileMatch` Guideline, so its work Stage and designer
 have every one of them listed instead. Intake creates a
 `guideline:<name>` label for each `manual` Guideline the Owner approved
-on the Floor's repository, as it does `role:<name>` labels; the label
-asks for the Guideline in any case.
+on the Floor's repository, as it does `role:<name>` labels, and one for
+a `manual` Guideline approved later; the label asks for the Guideline in
+any case, and one naming no approved `manual` Guideline is ignored.
 
 - **Patterns** are globs from the top of the repository, read as Node's
   `path.matchesGlob` reads them: `*` within one folder, `**` across
