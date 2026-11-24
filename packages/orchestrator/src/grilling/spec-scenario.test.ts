@@ -641,6 +641,104 @@ const cases: Case[] = [
     },
   ],
   [
+    "the requirements are not confirmed while any Acceptance Criterion fails the check, every failing one named and why, and the Manager is told them",
+    async (stores, root) => {
+      const s = await setUp(stores, root);
+      // A draft whose criteria break the form: a duplicate id, prose with
+      // no id, two behaviours in one, and an id of another requirement.
+      const broken = {
+        requirements: [
+          {
+            ...requirements.requirements[0],
+            criteria: [
+              requirements.requirements[0]?.criteria[0],
+              "R1.1 WHEN a card is saved THE SYSTEM SHALL show its last four digits.",
+              "Saved cards are kept safe.",
+            ],
+          },
+          {
+            ...requirements.requirements[1],
+            criteria: [
+              "R2.1 WHEN a shopper checks out THE SYSTEM SHALL offer saved cards and SHALL preselect the newest.",
+              "R1.4 IF a saved card is declined THEN THE SYSTEM SHALL ask for another card.",
+            ],
+          },
+        ],
+      };
+      s.model.turn({
+        message: "The requirements.",
+        spec: { requirements: broken },
+      });
+      const drafted = await s.answered(`/${specSkillName} ${topic}`);
+      expect(drafted).toContain(
+        "The requirements are drafted, and no open questions remain, but they cannot be confirmed yet: 5 Acceptance Criteria fail the check.",
+      );
+      expect(drafted).not.toContain('Reply "confirm requirements"');
+
+      // "confirm requirements" is refused in plain code, naming all five.
+      const calls = s.model.requests.length;
+      const refused = await s.answered(confirmSpecPhaseText("requirements"));
+      expect(refused.split("\n")).toEqual([
+        expect.stringMatching(
+          /^The requirements cannot be confirmed yet: 5 Acceptance Criteria fail the check\. /,
+        ),
+        "",
+        expect.stringMatching(
+          /^- Requirement 1, criterion 1 \(R1\.1\), .*: its id R1\.1 is also requirement 1's criterion 2's: each id is used once\.$/,
+        ),
+        expect.stringMatching(
+          /^- Requirement 1, criterion 2 \(R1\.1\), .*: its id R1\.1 is also requirement 1's criterion 1's: each id is used once\.$/,
+        ),
+        expect.stringMatching(
+          /^- Requirement 1, criterion 3, "Saved cards are kept safe\.": it has no id: start it with one, such as R1\.3; it is not in a criterion's form: /,
+        ),
+        expect.stringMatching(
+          /^- Requirement 2, criterion 1 \(R2\.1\), .*: it says SHALL more than once: give each behaviour a criterion of its own\.$/,
+        ),
+        expect.stringMatching(
+          /^- Requirement 2, criterion 2 \(R1\.4\), .*: its id R1\.4 is not one of requirement 2's: they are R2\.1, R2\.2 and on\.$/,
+        ),
+        "",
+        "Say what to change, or ask for them to be fixed, and the Manager drafts them again.",
+      ]);
+      expect(s.model.requests).toHaveLength(calls);
+      expect((await s.session()).spec).toMatchObject({
+        phase: "requirements",
+        approved: { requirements: null },
+        confirmedAt: { requirements: null },
+      });
+      await expect(gitIn(s.remote, "rev-parse", branch)).rejects.toThrow();
+
+      // Asked to fix them, the Manager is told each failing criterion.
+      s.model.turn({ ...requirementsDone, decisions: [] });
+      const fixed = await s.answered("Please fix the criteria.");
+      const told = s.model.system();
+      expect(told).toContain(
+        "#### Acceptance Criteria in your draft that fail the check\n\n5 Acceptance Criteria fail the check.",
+      );
+      expect(told).toContain(
+        '- Requirement 1, criterion 3, "Saved cards are kept safe.": it has no id',
+      );
+      expect(fixed).toContain(
+        'The requirements are drafted, and no open questions remain. Reply "confirm requirements" to move on to the design, or say what to change.',
+      );
+
+      // Every criterion passes now: confirmed, and committed.
+      s.model.turn(designDone);
+      const confirmed = await s.say(confirmSpecPhaseText("requirements"));
+      expect(confirmed.replies[0]?.text).toMatch(
+        /^Confirmed the requirements\./,
+      );
+      expect(await s.fileOn(branch, `${folder}/requirements.md`)).toBe(
+        specRequirementsDocument(
+          topic,
+          "checkout-with-saved-cards",
+          requirements,
+        ),
+      );
+    },
+  ],
+  [
     "a phase cannot be confirmed, skipped or reopened out of turn, and a Spec named like the Floor's own gets the session's number",
     async (stores, root) => {
       const s = await setUp(stores, root);

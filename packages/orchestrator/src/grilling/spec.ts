@@ -1,4 +1,7 @@
 import {
+  acceptanceCriteriaProblems,
+  acceptanceCriterionForms,
+  acceptanceCriterionProblemLine,
   confirmSpecPhaseText,
   maxSpecCriteria,
   maxSpecRequirements,
@@ -15,6 +18,7 @@ import {
   type GrillingIssues,
   type GrillingSpec,
   type SpecPhase,
+  type SpecRequirements,
 } from "@ai-office/shared";
 
 import type { FileToCommit } from "../git/commit-file.ts";
@@ -28,7 +32,9 @@ import { openInRound } from "./session.ts";
 // in their own words, never the Model:
 // - "confirm requirements" / "confirm design" / "confirm tasks" keeps the
 //   phase's draft as its approved copy, once no open questions remain and
-//   there is a draft, and moves to the next phase;
+//   there is a draft, and moves to the next phase; the requirements only
+//   once every Acceptance Criterion passes the checker (FR-114), the
+//   refusal naming each one that fails and why;
 // - "skip design", while the design is drafted, goes straight to the
 //   tasks, with no design.md;
 // - "reopen requirements" (or the design) goes back to that phase: its
@@ -81,7 +87,42 @@ export function confirmProblem(
   if (open.length > 0 || !session.awaitingConfirmation) {
     return `${capitalised(phaseName(phase))} still ${phase === "design" ? "has" : "have"} questions to settle: answer the open ones first.`;
   }
-  return undefined;
+  const failing = draftCriteriaProblems(spec);
+  return failing === undefined
+    ? undefined
+    : [
+        `The requirements cannot be confirmed yet: ${failing}`,
+        "",
+        "Say what to change, or ask for them to be fixed, and the Manager drafts them again.",
+      ].join("\n");
+}
+
+/**
+ * The draft requirements' failing Acceptance Criteria, while the Spec is
+ * on the requirements (`criteriaProblems`); undefined otherwise.
+ */
+const draftCriteriaProblems = (spec: GrillingSpec): string | undefined =>
+  spec.phase === "requirements" && spec.drafts.requirements !== null
+    ? criteriaProblems(spec.drafts.requirements)
+    : undefined;
+
+/**
+ * Every Acceptance Criterion of `requirements` that fails the checker
+ * (FR-114), as a sentence and a line each, saying why; undefined when
+ * every one passes.
+ */
+export function criteriaProblems(
+  requirements: SpecRequirements,
+): string | undefined {
+  const problems = acceptanceCriteriaProblems(requirements);
+  if (problems.length === 0) {
+    return undefined;
+  }
+  return [
+    `${problems.length === 1 ? "1 Acceptance Criterion fails" : `${String(problems.length)} Acceptance Criteria fail`} the check. Each is one testable statement starting with an id of its own, R<requirement>.<number> (R2.3 is one of requirement 2's), in the form ${acceptanceCriterionForms}.`,
+    "",
+    ...problems.map(acceptanceCriterionProblemLine),
+  ].join("\n");
 }
 
 /** Why the Owner cannot skip the design now; undefined when they can. */
@@ -312,14 +353,35 @@ export function specSection(session: GrillingSessionRecord): string[] {
     `#### Your draft of ${phaseName(spec.phase)}`,
     "",
     draft === undefined ? "None yet." : draft.trimEnd(),
+    ...draftCriteriaSection(spec),
   ];
+}
+
+/**
+ * The draft requirements' Acceptance Criteria that fail the checker, for
+ * the Manager to fix in its next draft; none when they pass, or on a
+ * later phase.
+ */
+function draftCriteriaSection(spec: GrillingSpec): string[] {
+  const failing = draftCriteriaProblems(spec);
+  return failing === undefined
+    ? []
+    : [
+        "",
+        "#### Acceptance Criteria in your draft that fail the check",
+        "",
+        failing,
+        "",
+        "The Owner cannot confirm the requirements until every one passes: fix each in your next draft, giving the requirements again, whole.",
+      ];
 }
 
 /** What a `/spec` turn is asked for of its current phase's document. */
 export function specInstructions(session: GrillingSessionRecord): string[] {
   const spec = specOf(session);
   const write: Record<SpecPhase, string> = {
-    requirements: `- \`spec.requirements\`: the whole requirements, \`{introduction, requirements}\`, each requirement \`{title, story, criteria}\`: \`story\` is one user story ("As a …, I want …, so that …"), and \`criteria\` its Acceptance Criteria, each one testable statement starting with its id, \`R<requirement>.<criterion>\` (R2.3 is requirement 2's third), in the form "R2.3 WHEN <trigger> THE SYSTEM SHALL <response>", or its "IF … THEN … SHALL", "WHILE … SHALL" or "WHERE … SHALL" forms. At most ${String(maxSpecRequirements)} requirements of at most ${String(maxSpecCriteria)} criteria each.`,
+    requirements: `- \`spec.requirements\`: the whole requirements, \`{introduction, requirements}\`, each requirement \`{title, story, criteria}\`: \`story\` is one user story ("As a …, I want …, so that …"), and \`criteria\` its Acceptance Criteria, each one testable statement starting with its id, \`R<requirement>.<criterion>\` (R2.3 is requirement 2's third), in the form "R2.3 WHEN <trigger> THE SYSTEM SHALL <response>", or its "IF <condition> THEN THE SYSTEM SHALL <response>", "WHILE <state> THE SYSTEM SHALL <response>" or "WHERE <option> THE SYSTEM SHALL <response>" forms. At most ${String(maxSpecRequirements)} requirements of at most ${String(maxSpecCriteria)} criteria each.
+- AI Office checks every criterion in plain code, and the Owner cannot confirm the requirements while any fails: its id starts with a capital R and its own requirement's number, and no other criterion has it; its keywords (WHEN, IF, THEN, WHILE, WHERE, THE SYSTEM SHALL) are in capitals; and it says SHALL once, one behaviour per criterion. Anything that is not such a statement (context, notes, examples) goes in the story or the introduction, never in \`criteria\`.`,
     design: `- \`spec.design\`: the whole design, \`{overview, architecture, data, errorHandling, testing}\`, each in Markdown: how it fits the system as it is, the data it keeps and changes, what can go wrong and what then happens, and how each Acceptance Criterion will be tested. Build on the approved requirements; design nothing they do not ask for.`,
     tasks: `- \`spec.tasks\`: the whole list, in the order they should be built, at most ${String(maxSpecTasks)}, each \`{title, description, meets, dependsOn}\`: a vertical slice that can be built, reviewed and merged on its own; \`meets\` the ids of the approved Acceptance Criteria it meets (every criterion met by some task); \`dependsOn\` the numbers of earlier tasks it needs first (1 for the first). Each task becomes one issue.`,
   };
@@ -400,11 +462,14 @@ export function specConfirmationText(
 ): string {
   const spec = specOf(session);
   const drafted = spec.drafts[spec.phase] !== null;
+  const failing = draftCriteriaProblems(spec);
   return [
     ...(message.trim() === "" ? [] : [message.trim(), ""]),
-    drafted
-      ? `${capitalised(phaseName(spec.phase))} ${spec.phase === "design" ? "is" : "are"} drafted, and no open questions remain. Reply ${specConfirmWords(spec.phase)}${spec.phase === "tasks" ? ": they become the session's issue drafts, and the pull request with the Spec is opened" : ` to move on to ${phaseName(nextSpecPhase(spec.phase) ?? spec.phase)}`}, or say what to change.`
-      : `No open questions remain, but ${phaseName(spec.phase)} ${spec.phase === "design" ? "is" : "are"} not drafted yet: send a message to have ${spec.phase === "design" ? "it" : "them"} drafted.`,
+    failing !== undefined
+      ? `The requirements are drafted, and no open questions remain, but they cannot be confirmed yet: ${failing}\n\nSay what to change, or ask for them to be fixed, and the Manager drafts them again.`
+      : drafted
+        ? `${capitalised(phaseName(spec.phase))} ${spec.phase === "design" ? "is" : "are"} drafted, and no open questions remain. Reply ${specConfirmWords(spec.phase)}${spec.phase === "tasks" ? ": they become the session's issue drafts, and the pull request with the Spec is opened" : ` to move on to ${phaseName(nextSpecPhase(spec.phase) ?? spec.phase)}`}, or say what to change.`
+        : `No open questions remain, but ${phaseName(spec.phase)} ${spec.phase === "design" ? "is" : "are"} not drafted yet: send a message to have ${spec.phase === "design" ? "it" : "them"} drafted.`,
   ].join("\n");
 }
 

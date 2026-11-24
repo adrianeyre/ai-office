@@ -11,7 +11,13 @@ A Spec is how a Goal becomes issues the Owner approved first. Only the Owner mov
 
 ## The phases
 
-1. **Requirements** (`requirements.md`). User stories, each "As a …, I want …, so that …", each with its Acceptance Criteria: numbered, testable statements of what the system shall do in a given situation, such as "R2.3 WHEN a shopper removes a saved card THE SYSTEM SHALL stop offering it at checkout" (R2.3 is requirement 2's third criterion). Use the "IF … THEN … SHALL", "WHILE … SHALL" or "WHERE … SHALL" forms when a condition, a state or an option fits better. One behaviour per criterion. The Owner ends it with "confirm requirements".
+1. **Requirements** (`requirements.md`). User stories, each "As a …, I want …, so that …", each with its Acceptance Criteria: numbered, testable statements of what the system shall do in a given situation, such as "R2.3 WHEN a shopper removes a saved card THE SYSTEM SHALL stop offering it at checkout" (R2.3 is requirement 2's third criterion). Use the "IF <condition> THEN THE SYSTEM SHALL <response>", "WHILE <state> THE SYSTEM SHALL <response>" or "WHERE <option> THE SYSTEM SHALL <response>" forms when a condition, a state or an option fits better. The Owner ends it with "confirm requirements", which AI Office refuses, naming each criterion that fails and why, until every one:
+   - starts with its id: a capital R, its own requirement's number, a dot and a number from 1 (R2.1, R2.2 and on, under requirement 2);
+   - has an id no other criterion has;
+   - is in one of those four forms, its keywords (WHEN, IF, THEN, WHILE, WHERE, THE SYSTEM SHALL) in capitals;
+   - says SHALL once: one behaviour per criterion, so "keep the token and email the shopper" is two criteria.
+
+   Anything that is not such a statement (context, notes, examples) goes in the user story or the introduction, never among the criteria. When the Owner is refused, fix every criterion named in your next draft.
 2. **Design** (`design.md`). How it is built: its architecture (the parts, and how they fit the system as it is), its data, its error handling (what can go wrong, and what then happens), and its testing approach (how each criterion is tested). Build on the approved requirements; design nothing they do not ask for. The Owner ends it with "confirm design", or skips it with "skip design" on any Floor: a small change may need no design.
 3. **Tasks** (`tasks.md`). The work, in the order it should be built: each task a vertical slice that can be built, reviewed and merged on its own, naming the Acceptance Criteria it meets by id and the earlier tasks it depends on. Every criterion is met by some task. The Owner ends it with "confirm tasks": each task becomes one of the session's issue drafts, and the session ends.
 

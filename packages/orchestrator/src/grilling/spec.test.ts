@@ -9,8 +9,11 @@ import {
   reopenSpecPhase,
   skipProblem,
   skipSpecDesign,
+  specConfirmationText,
   specFiles,
   specIssueDrafts,
+  specInstructions,
+  specSection,
 } from "./spec.ts";
 
 // A `/spec` session's plain-code rules (Guidelines, Specs and Hooks PRD,
@@ -140,6 +143,99 @@ describe("confirming a phase", () => {
     expect(confirmProblem(ready, "tasks")).toBe(
       "The Spec is on the requirements: the tasks come after the requirements are confirmed.",
     );
+  });
+
+  it("refuses the requirements while any Acceptance Criterion fails, naming every one and why", () => {
+    const failing = drafted(start, {
+      requirements: {
+        requirements: [
+          {
+            title: "Save a card",
+            story: "As a shopper, I want to save my card.",
+            criteria: [
+              "R1.1 WHEN a card is saved THE SYSTEM SHALL keep its token.",
+              "Saving should be quick.",
+              "R1.1 WHEN a card is saved THE SYSTEM SHALL show its last four digits.",
+            ],
+          },
+          {
+            title: "Pay with it",
+            story: "As a shopper, I want to pay with a saved card.",
+            criteria: [
+              "R2.1 WHILE paying THE SYSTEM SHALL disable Pay and SHALL show a spinner.",
+              "R1.3 IF a card is declined THEN THE SYSTEM SHALL ask for another.",
+            ],
+          },
+        ],
+      },
+    });
+    const refusal = confirmProblem(failing, "requirements");
+    expect(refusal).toBe(
+      [
+        'The requirements cannot be confirmed yet: 5 Acceptance Criteria fail the check. Each is one testable statement starting with an id of its own, R<requirement>.<number> (R2.3 is one of requirement 2\'s), in the form "WHEN <trigger> THE SYSTEM SHALL <response>", or its "IF … THEN … SHALL", "WHILE … SHALL" or "WHERE … SHALL" forms.',
+        "",
+        "- Requirement 1, criterion 1 (R1.1), \"R1.1 WHEN a card is saved THE SYSTEM SHALL keep its token.\": its id R1.1 is also requirement 1's criterion 3's: each id is used once.",
+        `- Requirement 1, criterion 2, "Saving should be quick.": it has no id: start it with one, such as R1.2; it is not in a criterion's form: "WHEN <trigger> THE SYSTEM SHALL <response>", or its "IF … THEN … SHALL", "WHILE … SHALL" or "WHERE … SHALL" forms, its keywords in capitals.`,
+        "- Requirement 1, criterion 3 (R1.1), \"R1.1 WHEN a card is saved THE SYSTEM SHALL show its last four digits.\": its id R1.1 is also requirement 1's criterion 1's: each id is used once.",
+        '- Requirement 2, criterion 1 (R2.1), "R2.1 WHILE paying THE SYSTEM SHALL disable Pay and SHALL show a spinner.": it says SHALL more than once: give each behaviour a criterion of its own.',
+        '- Requirement 2, criterion 2 (R1.3), "R1.3 IF a card is declined THEN THE SYSTEM SHALL ask for another.": its id R1.3 is not one of requirement 2\'s: they are R2.1, R2.2 and on.',
+        "",
+        "Say what to change, or ask for them to be fixed, and the Manager drafts them again.",
+      ].join("\n"),
+    );
+    // Nothing is approved; once fixed, the requirements are confirmed.
+    expect(failing.spec?.approved.requirements).toBeNull();
+    expect(
+      confirmProblem(drafted(failing, { requirements }), "requirements"),
+    ).toBeUndefined();
+  });
+
+  it("says, when the requirements are drafted, that failing criteria hold them back, and tells the Manager which", () => {
+    const failing = drafted(start, {
+      requirements: {
+        requirements: [
+          {
+            title: "Save a card",
+            story: "As a shopper, I want to save my card.",
+            criteria: ["Saving should be quick."],
+          },
+        ],
+      },
+    });
+    const told = specConfirmationText("", failing);
+    expect(told).toMatch(
+      /^The requirements are drafted, and no open questions remain, but they cannot be confirmed yet: 1 Acceptance Criterion fails the check\./,
+    );
+    expect(told).toContain(
+      '- Requirement 1, criterion 1, "Saving should be quick.": it has no id',
+    );
+    expect(told).not.toContain('Reply "confirm requirements"');
+    const prompt = specSection(failing).join("\n");
+    expect(prompt).toContain(
+      "#### Acceptance Criteria in your draft that fail the check\n\n1 Acceptance Criterion fails the check.",
+    );
+    expect(prompt).toContain(
+      "The Owner cannot confirm the requirements until every one passes: fix each in your next draft",
+    );
+    // Passing criteria: the usual invitation, and nothing for the Manager to fix.
+    const passing = drafted(start, { requirements });
+    expect(specConfirmationText("", passing)).toContain(
+      'Reply "confirm requirements" to move on to the design',
+    );
+    expect(specSection(passing).join("\n")).not.toContain("fail the check");
+  });
+
+  it("teaches the Manager the criteria's form and what the check refuses", () => {
+    const taught = specInstructions(start).join("\n");
+    expect(taught).toContain(
+      '"R2.3 WHEN <trigger> THE SYSTEM SHALL <response>", or its "IF <condition> THEN THE SYSTEM SHALL <response>", "WHILE <state> THE SYSTEM SHALL <response>" or "WHERE <option> THE SYSTEM SHALL <response>" forms',
+    );
+    expect(taught).toContain(
+      "AI Office checks every criterion in plain code, and the Owner cannot confirm the requirements while any fails",
+    );
+    expect(taught).toContain("no other criterion has it");
+    expect(taught).toContain("it says SHALL once, one behaviour per criterion");
+    expect(taught).toContain("never in `criteria`");
   });
 
   it("keeps the draft as the approved copy, and moves to the next phase", () => {
