@@ -317,6 +317,16 @@ export const exampleEvents: { [Type in EventType]: EventOfType<Type> } = {
     sha: "d".repeat(40),
     url: `https://github.com/adrianeyre/web-shop/commit/${"d".repeat(40)}`,
   },
+  "guideline.proposed": {
+    type: "guideline.proposed",
+    version: 1,
+    floorId: "web-shop",
+    agentId: "ada",
+    issue: 4,
+    name: "migrations",
+    contentHash: "e".repeat(64),
+    new: false,
+  },
   "guideline.dismissed": {
     type: "guideline.dismissed",
     version: 1,
