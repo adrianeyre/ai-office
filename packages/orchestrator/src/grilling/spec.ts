@@ -3,6 +3,7 @@ import {
   acceptanceCriterionForms,
   acceptanceCriterionProblemLine,
   confirmSpecPhaseText,
+  issueFilingOrder,
   maxSpecCriteria,
   maxSpecRequirements,
   maxSpecTasks,
@@ -15,15 +16,19 @@ import {
   specFolder,
   specPhaseBefore,
   specPhases,
+  specTasksDocument,
+  type GrillingIssueDraft,
   type GrillingIssues,
   type GrillingSpec,
   type SpecPhase,
   type SpecRequirements,
+  type SpecTaskIssue,
 } from "@ai-office/shared";
 
 import type { FileToCommit } from "../git/commit-file.ts";
 import type { GrillingSessionRecord } from "./session.ts";
 import { openInRound } from "./session.ts";
+import type { GrillingStore } from "./store.ts";
 
 // A `/spec` session's rules, in plain code (Guidelines, Specs and Hooks
 // PRD, FR-113; ADR 0015). The session runs the Grilling Session's rounds
@@ -258,14 +263,38 @@ export const specHasApproved = (spec: GrillingSpec): boolean =>
  * plain code writes it, in `.agents/specs/<slug>/`.
  */
 export function specFiles(
-  session: Pick<GrillingSessionRecord, "topic" | "id" | "spec">,
+  session: Pick<GrillingSessionRecord, "topic" | "id" | "spec" | "issues">,
 ): FileToCommit[] {
   const spec = specOf(session);
   return specPhases.flatMap((phase) => {
-    const content = specDocument(session.topic, spec, phase, spec.approved);
+    const content =
+      phase === "tasks" && spec.approved.tasks !== null
+        ? specTasksDocument(
+            session.topic,
+            spec.slug,
+            spec.approved.tasks,
+            specTaskIssues(session),
+          )
+        : specDocument(session.topic, spec, phase, spec.approved);
     return content === undefined
       ? []
       : [{ path: specDocumentPath(spec.slug, phase), content }];
+  });
+}
+
+/**
+ * The issue filed for each approved task, by its place (FR-117): the
+ * draft of its number (1 for the first task), once filed. A task whose
+ * draft the Owner dropped has none.
+ */
+export function specTaskIssues(
+  session: Pick<GrillingSessionRecord, "spec" | "issues">,
+): (SpecTaskIssue | undefined)[] {
+  const tasks = session.spec?.approved.tasks ?? [];
+  const drafts = session.issues?.drafts ?? [];
+  return tasks.map((_task, index) => {
+    const filed = drafts.find(({ id }) => id === index + 1)?.filed;
+    return filed == null ? undefined : { number: filed.number, url: filed.url };
   });
 }
 
@@ -311,6 +340,89 @@ export function specIssueDrafts(
     approvedAt: null,
     problem: null,
   };
+}
+
+/** A draft as it would be filed: everything but whether it was. */
+const draftContent = (draft: GrillingIssueDraft) => ({
+  id: draft.id,
+  title: draft.title.trim(),
+  whatToBuild: draft.whatToBuild.trim(),
+  acceptanceCriteria: draft.acceptanceCriteria.map((criterion) =>
+    criterion.trim(),
+  ),
+  blockedBy: [...new Set(draft.blockedBy)].sort((a, b) => a - b),
+  prdSections: draft.prdSections.map((section) => section.trim()),
+  adrs: draft.adrs.map((adr) => adr.trim()),
+});
+
+/**
+ * Whether the Owner edited the Spec's issue drafts after confirming its
+ * tasks (FR-115): any draft changed, added, dropped or reordered from
+ * those the confirmed tasks make. Then the Spec's Batch follows the
+ * Floor's plan approval, rather than standing approved by the tasks.
+ */
+export function specDraftsEdited(
+  session: Pick<GrillingSessionRecord, "id" | "spec" | "issues">,
+): boolean {
+  const confirmed = specIssueDrafts(session, new Date(0));
+  const drafts = session.issues?.drafts;
+  if (confirmed === undefined || drafts === undefined) {
+    return true;
+  }
+  return (
+    JSON.stringify(drafts.map(draftContent)) !==
+    JSON.stringify(confirmed.drafts.map(draftContent))
+  );
+}
+
+/** One issue of a Spec's Batch: its number, and the issues it waits on. */
+export interface SpecBatchIssue {
+  readonly issue: number;
+  readonly dependsOn: readonly number[];
+}
+
+/**
+ * The issues filed for a Spec's drafts, in the order its Batch's Plan
+ * works them (FR-115): the drafts' order, which is `tasks.md`'s unless
+ * the Owner reordered them, each after those it is blocked by, and
+ * depending on the issues filed for them. Drafts not filed are left out.
+ */
+export function specBatchIssues(
+  issues: Pick<GrillingIssues, "drafts">,
+): SpecBatchIssue[] {
+  const order = issueFilingOrder(issues.drafts) ?? issues.drafts;
+  const filedFor = new Map(
+    issues.drafts.map(({ id, filed }) => [id, filed?.number]),
+  );
+  return order.flatMap(({ filed, blockedBy }) =>
+    filed === null
+      ? []
+      : [
+          {
+            issue: filed.number,
+            dependsOn: blockedBy.flatMap((id) => {
+              const number = filedFor.get(id);
+              return number === undefined ? [] : [number];
+            }),
+          },
+        ],
+  );
+}
+
+/** The issues filed from the Floor's Specs (FR-115): clear by construction. */
+export async function specIssues(
+  store: Pick<GrillingStore, "list">,
+  floorId: string,
+): Promise<ReadonlySet<number>> {
+  return new Set(
+    (await store.list(floorId)).flatMap(({ spec, issues }) =>
+      spec === null
+        ? []
+        : (issues?.drafts.flatMap(({ filed }) =>
+            filed === null ? [] : [filed.number],
+          ) ?? []),
+    ),
+  );
 }
 
 /** "The requirements", from "the requirements". */

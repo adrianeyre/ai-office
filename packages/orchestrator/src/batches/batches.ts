@@ -48,6 +48,7 @@ import {
   changedOrder,
   planByRules,
   planFromDraft,
+  planFromSpec,
   plannableCoders,
   replanByRules,
   replanFromDraft,
@@ -165,6 +166,14 @@ import {
 // with theirs), and recording where the shared branch stood as it started.
 // An issue handed to the Owner holds the rest, which never start, and the
 // Batch finishes as its pull request merges or the Owner decides.
+//
+// Filing a Spec's issues starts their Batch (Guidelines, Specs and Hooks
+// PRD, FR-115; `SpecBatchRequest`), "… in one PR" in one pull request. Its
+// Plan follows `tasks.md`'s order and dependencies, by AI Office's rules
+// with no model asked, and the tasks the Owner confirmed stand as its
+// approval, recorded as the Owner's (`batch.approved` naming the session);
+// unless the Owner edited the drafts after confirming the tasks: then it
+// follows the Floor's plan approval, as a command's Batch does.
 
 /** A Batch the Manager makes from one of the Owner's chat requests. */
 export interface ChatBatchRequest {
@@ -184,10 +193,39 @@ export interface ChatBatchRequest {
   readonly plan: PlanDraft;
 }
 
+/**
+ * The Batch of a Spec's issues, which "file the issues of session N"
+ * starts once they are filed (Guidelines, Specs and Hooks PRD, FR-115).
+ */
+export interface SpecBatchRequest {
+  /** The `/spec` Grilling Session whose issues it works. */
+  readonly sessionId: number;
+  /** The Spec's folder, `.agents/specs/<slug>`, as its Plan names it. */
+  readonly folder: string;
+  /**
+   * Its issues, in `tasks.md`'s order (or the Owner's, for edited drafts),
+   * each with the issues its task depends on: its Plan follows them, with
+   * no model asked.
+   */
+  readonly issues: readonly {
+    readonly issue: number;
+    readonly dependsOn: readonly number[];
+  }[];
+  /**
+   * Whether the Owner's confirmation of the tasks stands as the Plan's
+   * approval: the drafts were filed as the tasks made them. Otherwise
+   * (the Owner edited them after confirming the tasks) the Plan follows
+   * the Floor's plan approval, as a command's does.
+   */
+  readonly approved: boolean;
+}
+
 /** How the Owner asked for a Batch to be worked. */
 export interface BatchOptions {
   /** Its issues go in one pull request, from one branch (ADR 0010). */
   readonly onePullRequest?: boolean;
+  /** The Batch of a Spec's issues, whose Plan is its tasks' (FR-115). */
+  readonly spec?: SpecBatchRequest;
 }
 
 /** What handing the Manager a Batch did. */
@@ -199,6 +237,14 @@ export type BatchOutcome =
       readonly started: readonly number[];
       /** Why the Manager's Model did not draft the Plan, if it did not. */
       readonly fallback?: string;
+      /**
+       * The Spec whose issues it works (FR-115): its session, and whether
+       * its confirmed tasks stand as the Plan's approval.
+       */
+      readonly spec?: {
+        readonly sessionId: number;
+        readonly approved: boolean;
+      };
     }
   /** None of the issues named can be worked, so no Batch was made. */
   | { readonly batch: undefined; readonly leftOut: readonly PlanLeftOut[] };
@@ -1805,12 +1851,14 @@ export function createBatches(options: BatchesOptions): Batches {
     batchOptions: BatchOptions = {},
   ): Promise<BatchOutcome> => {
     const onePullRequest = batchOptions.onePullRequest === true;
+    const { spec } = batchOptions;
     const floor = await floorOf(floorId);
     const { manager, ...members } = await teamOf(floor, request !== undefined);
+    // A Spec's issues were filed by the App as the Owner approved them.
     const { issues, leftOut } = await readIssues(
       floor,
-      numbers,
-      new Set(request?.filed ?? []),
+      spec === undefined ? numbers : spec.issues.map(({ issue }) => issue),
+      new Set(request?.filed ?? spec?.issues.map(({ issue }) => issue) ?? []),
     );
     if (issues.length === 0) {
       return { batch: undefined, leftOut };
@@ -1837,16 +1885,41 @@ export function createBatches(options: BatchesOptions): Batches {
             team,
             leftOut,
           );
-    const drafted = settled?.ok
-      ? { plan: settled.value }
-      : await draft(floor, manager, issues, team, leftOut);
+    // A Spec's Plan is its tasks' order and dependencies, in plain code.
+    const drafted =
+      spec !== undefined
+        ? {
+            plan: planFromSpec(
+              spec.issues.flatMap(({ issue, dependsOn }) => {
+                const read = issues.find(({ number }) => number === issue);
+                return read === undefined
+                  ? []
+                  : [
+                      {
+                        number: issue,
+                        title: read.title,
+                        dependsOn: dependsOn.filter((other) => kept.has(other)),
+                      },
+                    ];
+              }),
+              team,
+              leftOut,
+              spec.folder,
+            ),
+          }
+        : settled?.ok
+          ? { plan: settled.value }
+          : await draft(floor, manager, issues, team, leftOut);
+    // The chat request stands as the Plan's approval (ADR 0004), as do a
+    // Spec's confirmed tasks, unless the Owner edited its drafts since
+    // (FR-115).
+    const approvedAlready = request !== undefined || spec?.approved === true;
     const { batch, plan } = await store.create(
       {
         floorId: floor.id,
         issues: issues.map(({ number }) => number),
-        // The chat request stands as the Plan's approval (ADR 0004).
         status:
-          floor.planApproval && request === undefined
+          floor.planApproval && !approvedAlready
             ? "awaiting_approval"
             : "in_progress",
         agentId: manager.id,
@@ -1879,6 +1952,18 @@ export function createBatches(options: BatchesOptions): Batches {
         messageId: request.messageId,
       });
     }
+    // So are a Spec's confirmed tasks, recorded as the Owner's (FR-115).
+    if (spec?.approved === true) {
+      await events.publish({
+        type: "batch.approved",
+        version: 1,
+        floorId: floor.id,
+        batchId: batch.id,
+        planVersion: plan.version,
+        agentId: manager.id,
+        specSessionId: spec.sessionId,
+      });
+    }
     await kickoff(floor, manager, members.agents, batch, plan);
     let started: number[] = [];
     const urls = new Map(
@@ -1895,6 +1980,9 @@ export function createBatches(options: BatchesOptions): Batches {
       plan,
       started,
       ...(drafted.fallback === undefined ? {} : { fallback: drafted.fallback }),
+      ...(spec === undefined
+        ? {}
+        : { spec: { sessionId: spec.sessionId, approved: spec.approved } }),
     };
   };
 
@@ -1992,9 +2080,11 @@ export function createBatches(options: BatchesOptions): Batches {
       ...planLines(plan, nameOf),
       ...(batch.onePullRequest ? [onePullRequestLine(batch.id), ""] : []),
     ];
+    // A Spec's drafts the Owner edited after confirming its tasks (FR-115).
+    const edited = outcome.spec?.approved === false;
     if (batch.status === "awaiting_approval") {
       lines.push(
-        "Plan approval is on for this Floor, so work starts once you approve the Plan on the Floor's whiteboard, where you can first reorder, drop and annotate its issues, and I replan.",
+        `${edited ? "You edited the issue drafts after confirming the Spec's tasks, so the Plan follows the Floor's plan approval. " : ""}Plan approval is on for this Floor, so work starts once you approve the Plan on the Floor's whiteboard, where you can first reorder, drop and annotate its issues, and I replan.`,
       );
     } else {
       const waiting = plan.items.filter(({ issue }) => !done.has(issue));
@@ -2003,7 +2093,9 @@ export function createBatches(options: BatchesOptions): Batches {
           `${
             fromChat
               ? "Your request stands as the Plan's approval"
-              : "Plan approval is off for this Floor"
+              : outcome.spec?.approved === true
+                ? "The Spec's tasks you confirmed stand as the Plan's approval"
+                : `${edited ? "You edited the issue drafts after confirming the Spec's tasks, so the Plan follows the Floor's plan approval, and " : ""}${edited ? "plan" : "Plan"} approval is off for this Floor`
           }, so work has started${
             started.length === 0 ? "" : ` on ${issueList(started)}`
           }.`,

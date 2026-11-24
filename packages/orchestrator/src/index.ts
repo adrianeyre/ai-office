@@ -861,10 +861,12 @@ export {
   draftIssues,
   issueBody,
   parseGrillingIssues,
+  specIssueBody,
   type FileIssuesInput,
   type GrillingIssuesFiler,
   type GrillingIssuesOptions,
 } from "./grilling/issues.ts";
+export { specIssues } from "./grilling/spec.ts";
 export {
   grillingSessionSection,
   grillingTurnInstructions,
@@ -991,6 +993,7 @@ export {
   type BatchesOptions,
   type ChatBatchRequest,
   type PlanChange,
+  type SpecBatchRequest,
 } from "./batches/batches.ts";
 export { BatchError } from "./batches/errors.ts";
 export {

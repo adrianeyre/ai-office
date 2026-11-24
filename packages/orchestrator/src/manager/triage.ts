@@ -72,6 +72,12 @@ import type { TriageRecord, TriageStore } from "./triage-store.ts";
 // give an issue its work Roles itself, several in turn (FR-25 (1)): then
 // they settle it, ahead of any label, and the Model is not asked to
 // choose; the first Role works it first.
+//
+// An issue the GitHub App filed from one of the Floor's Specs (Guidelines,
+// Specs and Hooks PRD, FR-115) is clear by construction: its body names
+// the Acceptance Criteria it meets and quotes them, as the Owner approved
+// them. Triage takes it as clear in plain code, asking no model (neither
+// the Manager's nor the Decision Model), at normal priority.
 
 /** Whether a picked-up issue may go into the pipeline now. */
 export type TriageDecision =
@@ -144,6 +150,12 @@ export interface TriageOptions {
    * Floor's work Roles; the built-in Roles without it.
    */
   readonly roles?: Pick<RoleStore, "list" | "oneOffs">;
+  /**
+   * The issues the GitHub App filed from the Floor's Specs (Guidelines,
+   * Specs and Hooks PRD, FR-115): clear by construction, so triage takes
+   * them as clear with no model asked. None without it.
+   */
+  readonly specIssues?: (floorId: string) => Promise<ReadonlySet<number>>;
   readonly now?: () => Date;
   /** Told when a comment could not be written or a Notice closed. */
   readonly onError?: (error: unknown) => void;
@@ -341,6 +353,19 @@ const byDecisionModel = (judged: IssueJudgement): Judgement => ({
       }),
 });
 
+/**
+ * An issue filed from a Spec (FR-115): clear, with no model asked. Its
+ * body quotes the Acceptance Criteria it meets, which the Owner approved.
+ */
+const fromSpec: Judgement = {
+  outcome: "clear",
+  priority: defaultIssuePriority,
+  reason:
+    "It was filed from a Spec the Owner approved: its body names the Acceptance Criteria it meets and quotes them as its task list, so it is clear by construction and no model was asked.",
+  questions: [],
+  judgedBy: "rules",
+};
+
 /** AI Office's own rules, for when the Manager's Model gives no judgement. */
 const byRules = (issue: Issue, fallback?: string): Judgement => {
   const base = {
@@ -440,6 +465,9 @@ export function createTriage(options: TriageOptions): Triage {
     roles: readonly WorkRole[],
   ): Promise<Judgement> => {
     // Nothing to judge: plain code can tell, and no model is asked.
+    if ((await options.specIssues?.(floor.id))?.has(issue.number) === true) {
+      return fromSpec;
+    }
     if (issue.body.trim() === "") {
       return byRules(issue);
     }

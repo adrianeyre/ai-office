@@ -18,6 +18,7 @@ import { createLiveGitHub } from "@ai-office/github";
 import {
   agentName,
   approvedIssues,
+  specIssues,
   createAiProviders,
   createBatchBranches,
   createBatches,
@@ -1168,8 +1169,14 @@ export async function startOffice(
     ...(factFinder === undefined ? {} : { facts: factFinder }),
     ...(chatSessions === undefined ? {} : { sessions: chatSessions }),
     documents: grillingDocuments,
-    // …then drafts its issues, and files them once approved (FR-81).
+    // …then drafts its issues, and files them once approved (FR-81). A
+    // Spec's, once filed, start their Batch in its tasks' order (FR-115).
     issues: grillingIssues,
+    specBatch: async (floorId, spec, { onePullRequest }) =>
+      batches.describe(
+        floorId,
+        await batches.create(floorId, [], undefined, { onePullRequest, spec }),
+      ),
     // Compacts itself at the Manager's Context Usage threshold (FR-87).
     contextUsage,
     floors: stores.floors,
@@ -1705,6 +1712,9 @@ export async function startOffice(
     events,
     store: stores.triage,
     roles: stores.roles,
+    // An issue filed from a Spec is clear by construction: no model is
+    // asked of it (Guidelines, Specs and Hooks PRD, FR-115).
+    specIssues: (floorId) => specIssues(stores.grilling, floorId),
     redactor,
     ...memory,
     guidelines: taskGuidelines,

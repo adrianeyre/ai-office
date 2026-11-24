@@ -481,9 +481,11 @@ export function describeEvent(
         event.draftedBy === "rules" ? ", by AI Office's rules" : ""
       }: ${issueList(event.issues)}.`;
     case "batch.approved":
-      return event.messageId === undefined
-        ? `The Owner approved version ${String(event.planVersion)} of Batch ${String(event.batchId)}'s Plan, by ${agent(event.agentId)}.`
-        : `Approved by your request in Manager chat: version ${String(event.planVersion)} of Batch ${String(event.batchId)}'s Plan, by ${agent(event.agentId)}.`;
+      return event.specSessionId !== undefined
+        ? `Approved by the tasks you confirmed in the Spec of Grilling Session ${String(event.specSessionId)}: version ${String(event.planVersion)} of Batch ${String(event.batchId)}'s Plan, by ${agent(event.agentId)}.`
+        : event.messageId === undefined
+          ? `The Owner approved version ${String(event.planVersion)} of Batch ${String(event.batchId)}'s Plan, by ${agent(event.agentId)}.`
+          : `Approved by your request in Manager chat: version ${String(event.planVersion)} of Batch ${String(event.batchId)}'s Plan, by ${agent(event.agentId)}.`;
     case "batch.started":
       return event.issues.length === 0
         ? `Batch ${String(event.batchId)} started; each of its issues waits for the issues it depends on.`

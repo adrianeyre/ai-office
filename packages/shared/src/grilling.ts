@@ -766,8 +766,16 @@ export type GrillingControl =
    * session numbered, or the latest ended one.
    */
   | { readonly kind: "draft-issues"; readonly session: number | null }
-  /** The Owner approves the draft issues, and the App files them (FR-81). */
-  | { readonly kind: "file-issues"; readonly session: number | null }
+  /**
+   * The Owner approves the draft issues, and the App files them (FR-81).
+   * A Spec's issues then start a Batch (FR-115), in one pull request when
+   * the Owner said "… in one PR" (`onePullRequest`).
+   */
+  | {
+      readonly kind: "file-issues";
+      readonly session: number | null;
+      readonly onePullRequest?: true;
+    }
   /**
    * A `/spec` session's phase (FR-113): "confirm requirements", "confirm
    * design" or "confirm tasks" approves the phase's draft.
@@ -788,7 +796,7 @@ const draftIssuesPattern = new RegExp(
   `^(?:please\\s+)?(?:re-?)?draft\\s+(?:the\\s+)?issues(?:\\s+again)?${ofSession}(?:\\s+again)?(?:,?\\s+please)?$`,
 );
 const fileIssuesPattern = new RegExp(
-  `^(?:please\\s+)?(?:(?:approve\\s+and\\s+)?file|approve)\\s+(?:the\\s+)?issues${ofSession}(?:,?\\s+please)?$`,
+  `^(?:please\\s+)?(?:(?:approve\\s+and\\s+)?file|approve)\\s+(?:the\\s+)?issues${ofSession}(\\s+(?:in|as)\\s+(?:one|a\\s+single)\\s+(?:pr|pull\\s+request))?(?:,?\\s+please)?$`,
 );
 const endPattern =
   /^(?:please\s+)?(?:end|finish|stop)\s+(?:the\s+)?(?:grilling(?:\s+session)?|session)(?:\s+now)?(?:\s+please)?$/;
@@ -811,7 +819,7 @@ const confirmPattern =
  * "resume session 3"; "confirm" (the session ends once no open questions
  * remain); "end the session" (it ends now, whatever is still open); and, for an ended session's issues, "draft the issues of
  * session 3" and "file the issues of session 3" (the latest ended session
- * without a number). A `/spec` session's phases too: "confirm
+ * without a number), which may end "in one PR" for a Spec's Batch. A `/spec` session's phases too: "confirm
  * requirements", "confirm design", "confirm tasks", "skip design" and
  * "reopen requirements" (or "go back to the design"). Undefined for
  * anything else.
@@ -831,17 +839,20 @@ export function readGrillingControl(text: string): GrillingControl | undefined {
       session: resume[1] === undefined ? null : Number(resume[1]),
     };
   }
-  for (const [pattern, kind] of [
-    [draftIssuesPattern, "draft-issues"],
-    [fileIssuesPattern, "file-issues"],
-  ] as const) {
-    const issues = pattern.exec(said);
-    if (issues !== null) {
-      return {
-        kind,
-        session: issues[1] === undefined ? null : Number(issues[1]),
-      };
-    }
+  const drafting = draftIssuesPattern.exec(said);
+  if (drafting !== null) {
+    return {
+      kind: "draft-issues",
+      session: drafting[1] === undefined ? null : Number(drafting[1]),
+    };
+  }
+  const filing = fileIssuesPattern.exec(said);
+  if (filing !== null) {
+    return {
+      kind: "file-issues",
+      session: filing[1] === undefined ? null : Number(filing[1]),
+      ...(filing[2] === undefined ? {} : { onePullRequest: true as const }),
+    };
   }
   const confirmed = phaseOf(confirmPhasePattern.exec(said)?.[1]);
   if (confirmed !== undefined) {
@@ -874,6 +885,13 @@ export const skipSpecDesignText = "skip design";
 /** What reopens a `/spec` session's earlier phase: "reopen requirements". */
 export const reopenSpecPhaseText = (phase: SpecPhase): string =>
   `reopen ${phase}`;
-/** "file the issues of session 3": the Owner approves the drafts (FR-81). */
-export const fileGrillingIssuesText = (session: number): string =>
-  `file the issues of session ${String(session)}`;
+/**
+ * "file the issues of session 3": the Owner approves the drafts (FR-81);
+ * "file the issues of session 3 in one PR" has a Spec's Batch go in one
+ * pull request (FR-115).
+ */
+export const fileGrillingIssuesText = (
+  session: number,
+  onePullRequest = false,
+): string =>
+  `file the issues of session ${String(session)}${onePullRequest ? " in one PR" : ""}`;
