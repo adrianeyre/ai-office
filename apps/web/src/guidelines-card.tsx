@@ -1,10 +1,13 @@
 import {
   floorGuidelineListSchema,
   guidelineErrorCodes,
+  guidelineProposalListSchema,
   guidelinesCardId,
+  openedGuidelineProposalSchema,
   type Floor,
   type FloorGuideline,
   type GuidelineApproval,
+  type GuidelineProposal,
 } from "@ai-office/shared";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -34,6 +37,12 @@ import { sessionQuery } from "./session.ts";
 // Agent. The Owner approves or dismisses exactly the version shown; one
 // that changed meanwhile is refused, and the card shows it as it is now.
 // The Notice "Guidelines changed on …" links here, by `#guidelines`.
+//
+// Below them wait the Guidelines Agents proposed in their Handoffs and QA
+// reports (FR-110, FR-111), each shown as its difference from the version
+// Agents get (whole, for a new one). No model accepts one: the Owner opens
+// it as a pull request, which the GitHub App opens for the Owner to merge,
+// or rejects it. No Agent gets it until the Owner merges it.
 
 /** `GET /api/floors/:floorId/guidelines`. */
 export const floorGuidelinesQuery = (floorId: string) =>
@@ -43,6 +52,17 @@ export const floorGuidelinesQuery = (floorId: string) =>
       getJson(
         `/api/floors/${encodeURIComponent(floorId)}/guidelines`,
         floorGuidelineListSchema,
+      ),
+  });
+
+/** `GET /api/floors/:floorId/guideline-proposals`. */
+export const floorGuidelineProposalsQuery = (floorId: string) =>
+  queryOptions({
+    queryKey: ["floors", floorId, "guideline-proposals"],
+    queryFn: () =>
+      getJson(
+        `/api/floors/${encodeURIComponent(floorId)}/guideline-proposals`,
+        guidelineProposalListSchema,
       ),
   });
 
@@ -84,15 +104,20 @@ function Inclusion({ guideline }: { guideline: FloorGuideline }) {
   }
 }
 
-/** The version awaiting approval against the approved one, line by line. */
-function Difference({ guideline }: { guideline: FloorGuideline }) {
-  const lines = lineDiff(
-    guideline.approved?.content ?? "",
-    guideline.awaiting?.content ?? "",
-  );
+/** `after` against `before`, line by line. */
+function Lines({
+  label,
+  before,
+  after,
+}: {
+  label: string;
+  before: string;
+  after: string;
+}) {
+  const lines = lineDiff(before, after);
   return (
     <pre
-      aria-label={`Changes to ${guideline.name}`}
+      aria-label={label}
       className="max-h-96 overflow-auto rounded bg-muted p-3 font-mono text-xs whitespace-pre"
     >
       {lines.map(({ kind, text }, index) => {
@@ -115,6 +140,84 @@ function Difference({ guideline }: { guideline: FloorGuideline }) {
         );
       })}
     </pre>
+  );
+}
+
+/** The version awaiting approval against the approved one, line by line. */
+function Difference({ guideline }: { guideline: FloorGuideline }) {
+  return (
+    <Lines
+      label={`Changes to ${guideline.name}`}
+      before={guideline.approved?.content ?? ""}
+      after={guideline.awaiting?.content ?? ""}
+    />
+  );
+}
+
+function ProposalItem({
+  floor,
+  proposal,
+  current,
+  busy,
+  onAnswer,
+}: {
+  floor: Floor;
+  proposal: GuidelineProposal;
+  /** The Floor's Guideline of that name; undefined for a new one. */
+  current: FloorGuideline | undefined;
+  /** What is being sent, such as `open:3`; null when nothing. */
+  busy: string | null;
+  onAnswer: (action: "open" | "reject", proposal: GuidelineProposal) => void;
+}) {
+  const disabled = busy !== null || floor.archivedAt !== null;
+  const label = `${proposal.name}, proposed on #${String(proposal.issue)}`;
+  return (
+    <li aria-label={label} className="space-y-2 rounded-md border p-3">
+      <p className="flex flex-wrap items-center gap-2">
+        <span className="font-mono font-medium">{proposal.name}</span>
+        {current === undefined ? (
+          <Badge tone="info">New Guideline</Badge>
+        ) : (
+          <Badge tone="warning">Change</Badge>
+        )}
+      </p>
+      <p className="text-sm text-muted-foreground">
+        Proposed by {proposal.agentName ?? "an Agent no longer on this Floor"}{" "}
+        on #{proposal.issue}, for{" "}
+        <code className="font-mono">{proposal.path}</code>
+        {current?.approved === null || current === undefined
+          ? "."
+          : ", against the version Agents get:"}
+      </p>
+      <Lines
+        label={`Proposed ${proposal.name}`}
+        before={current?.approved?.content ?? ""}
+        after={proposal.content}
+      />
+      <div className="flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          disabled={disabled}
+          pending={busy === `open:${String(proposal.id)}`}
+          onClick={() => {
+            onAnswer("open", proposal);
+          }}
+        >
+          Open {proposal.name} as pull request
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={disabled}
+          pending={busy === `reject:${String(proposal.id)}`}
+          onClick={() => {
+            onAnswer("reject", proposal);
+          }}
+        >
+          Reject {proposal.name}
+        </Button>
+      </div>
+    </li>
   );
 }
 
@@ -219,8 +322,60 @@ export function GuidelinesCard({ floor }: { floor: Floor }) {
   const { data: session } = useQuery(sessionQuery);
   const query = floorGuidelinesQuery(floor.id);
   const { data: list, error } = useQuery(query);
+  const proposalsQuery = floorGuidelineProposalsQuery(floor.id);
+  const { data: proposed, error: proposalsError } = useQuery(proposalsQuery);
   const [busy, setBusy] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [opened, setOpened] = useState<{
+    readonly name: string;
+    readonly number: number;
+    readonly url: string;
+  } | null>(null);
+
+  const settle = async (
+    action: "open" | "reject",
+    proposal: GuidelineProposal,
+  ) => {
+    setBusy(`${action}:${String(proposal.id)}`);
+    setProblem(null);
+    setOpened(null);
+    const response = await sendJson(
+      "POST",
+      `/api/floors/${encodeURIComponent(floor.id)}/guideline-proposals/${String(proposal.id)}/${action}`,
+      {},
+      session?.csrfToken,
+    );
+    setBusy(null);
+    if (!response.ok) {
+      const refused = await readApiError(response);
+      setProblem(
+        refused.message ??
+          `The proposed ${proposal.name} was not ${action === "open" ? "opened as a pull request" : "rejected"}.`,
+      );
+      // Settled or gone meanwhile: show those still waiting.
+      if (
+        refused.error === guidelineErrorCodes.proposalSettled ||
+        refused.error === guidelineErrorCodes.proposalNotFound
+      ) {
+        await queryClient.invalidateQueries({
+          queryKey: proposalsQuery.queryKey,
+        });
+      }
+      return;
+    }
+    if (action === "open") {
+      const answer = openedGuidelineProposalSchema.parse(await response.json());
+      setOpened({ name: proposal.name, ...answer.pullRequest });
+      queryClient.setQueryData(proposalsQuery.queryKey, {
+        proposals: answer.proposals,
+      });
+      return;
+    }
+    queryClient.setQueryData(
+      proposalsQuery.queryKey,
+      guidelineProposalListSchema.parse(await response.json()),
+    );
+  };
 
   const answer = async (
     action: "approve" | "dismiss",
@@ -310,6 +465,51 @@ export function GuidelinesCard({ floor }: { floor: Floor }) {
               />
             ))}
           </ul>
+        )}
+        {opened !== null && (
+          <p role="status">
+            Opened{" "}
+            <a
+              href={opened.url}
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              PR #{opened.number}
+            </a>{" "}
+            for {opened.name}. No Agent gets it until you merge it.
+          </p>
+        )}
+        {proposalsError !== null && (
+          <p role="alert" className="text-destructive">
+            {proposalsError.message}
+          </p>
+        )}
+        {proposed !== undefined && proposed.proposals.length > 0 && (
+          <section aria-labelledby="guideline-proposals" className="space-y-3">
+            <h3 id="guideline-proposals" className="font-medium">
+              Proposed by Agents
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Agents may propose a new or changed Guideline in a Handoff or QA
+              report. No Agent follows one until you open it as a pull request
+              and merge it: your merge approves it.
+            </p>
+            <ul aria-label="Proposed Guidelines" className="space-y-3">
+              {proposed.proposals.map((proposal) => (
+                <ProposalItem
+                  key={proposal.id}
+                  floor={floor}
+                  proposal={proposal}
+                  current={list?.guidelines.find(
+                    ({ name }) => name === proposal.name,
+                  )}
+                  busy={busy}
+                  onAnswer={(action, chosen) => void settle(action, chosen)}
+                />
+              ))}
+            </ul>
+          </section>
         )}
       </CardContent>
     </Card>
