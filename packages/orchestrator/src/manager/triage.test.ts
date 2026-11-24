@@ -92,6 +92,8 @@ interface Setup {
   readonly queue: WorkQueue;
   readonly workStore: WorkQueueStore;
   readonly manager: AgentRecord;
+  /** The issues filed from the Floor's Specs (FR-115). */
+  readonly specIssues: Set<number>;
   /** The issue's labels on GitHub. */
   labels(issue: number): Promise<readonly string[]>;
   /** The issue's comments' bodies, oldest first. */
@@ -122,11 +124,13 @@ async function setUp(
   const jev = createFakeDecisionModel();
   let decisionSettings = defaultDecisionModelSettings;
   const notices = createNotices({ store: stores.notices, events: bus });
+  const specIssues = new Set<number>();
   const triage = createTriage({
     floors: stores.floors,
     agents: stores.agents,
     github,
     models: model,
+    specIssues: () => Promise.resolve(new Set(specIssues)),
     decisionModel: createDecisionModel({
       settings: () => Promise.resolve(decisionSettings),
       client: jev,
@@ -169,6 +173,7 @@ async function setUp(
     queue,
     workStore,
     manager,
+    specIssues,
     labels: async (issue) => (await repository.getIssue(issue)).labels,
     comments: async (issue) =>
       (await repository.listComments(issue)).map(({ body }) => body),
@@ -194,6 +199,70 @@ const decisionModelOn: DecisionModelSettings = {
 };
 
 const cases: Case[] = [
+  [
+    "an issue filed from a Spec is clear by construction: no model is asked, not even Jev (FR-115)",
+    async (setup) => {
+      const { github, model, jev, manager, intake } = setup;
+      setup.setDecisionModel(decisionModelOn);
+      const fromSpec = github.createIssue(webShop, {
+        title: "Save a card at checkout",
+        body: [
+          "## Spec",
+          "",
+          "Filed from the Spec in `.agents/specs/saved-cards/`: task 1 of its `tasks.md`.",
+          "",
+          "## What to build",
+          "",
+          "The vault and the tick box.",
+          "",
+          "## Acceptance criteria",
+          "",
+          "Meets: R1.1",
+          "",
+          "- [ ] R1.1 WHEN a shopper ticks Save card THE SYSTEM SHALL keep the card's token.",
+          "",
+          "## Blocked by",
+          "",
+          "None: it can start at once.",
+        ].join("\n"),
+        labels: ["ai-office"],
+      });
+      setup.specIssues.add(fromSpec.number);
+
+      expect((await intake.poll()).pickedUp).toEqual([
+        { floorId: "web-shop", issue: fromSpec.number },
+      ]);
+      expect(await setup.queued()).toEqual([
+        { issue: fromSpec.number, stage: "needs-work", priority: "normal" },
+      ]);
+      // Neither the Manager's Model nor Jev was asked.
+      expect(model.requests).toEqual([]);
+      expect(jev.requests).toEqual([]);
+      expect(await setup.triaged()).toMatchObject([
+        {
+          issue: fromSpec.number,
+          outcome: "clear",
+          priority: "normal",
+          judgedBy: "rules",
+        },
+      ]);
+      const [comment] = await setup.comments(fromSpec.number);
+      expect(comment).toContain("### Triage: clear to work");
+      expect(comment).toContain(
+        "> It was filed from a Spec the Owner approved: its body names the Acceptance Criteria it meets and quotes them as its task list, so it is clear by construction and no model was asked.",
+      );
+
+      // An issue of the Owner's own is judged by Jev as before.
+      const ordinary = github.createIssue(webShop, clearIssue);
+      jev.answer(manager.id, {
+        clear: noul(0.93),
+        priority: choice("high"),
+        gap: choice("nothing"),
+      });
+      await intake.poll();
+      expect(jev.requests).toMatchObject([{ issue: ordinary.number }]);
+    },
+  ],
   [
     "with the Decision Model off, Jev is never asked: the Manager's Model triages as it always has",
     async (setup) => {
