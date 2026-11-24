@@ -123,6 +123,11 @@ import {
   type GuidelineStore,
 } from "./guidelines/store.ts";
 import {
+  databaseGuidelineProposalStore,
+  memoryGuidelineProposalStore,
+  type GuidelineProposalStore,
+} from "./guidelines/proposal-store.ts";
+import {
   databaseRoleStore,
   memoryRoleStore,
   type MemoryRoleStore,
@@ -195,6 +200,8 @@ export interface OfficeStores {
    * awaiting approval or dismissed (ADR 0014).
    */
   readonly guidelines: GuidelineStore;
+  /** The Guidelines Agents proposed on each Floor, for the Owner (FR-110). */
+  readonly guidelineProposals: GuidelineProposalStore;
   readonly batches: BatchStore;
   /** The turns of the work Roles a Plan gives an issue (FR-25 (1)). */
   readonly workTurns: WorkTurnsStore;
@@ -212,6 +219,7 @@ export interface OfficeStores {
  * `notices`, `issue_token_caps`, `agent_cap_pauses`, `review_verdicts`,
  * `qa_reports`, `design_reviews`, `handoffs`, `skills`, `floor_skill_toggles`,
  * `repository_skill_reviews`, `approved_guidelines`, `guideline_changes`,
+ * `guideline_proposals`,
  * `manager_chat_messages`, `grilling_sessions`, `status_updates`, `issue_triage`, `manager_decisions`, `batches`,
  * `plans`, `batch_issues`, `issue_work_turns`, `memory_proposals`,
  * `memory_curations`,
@@ -242,6 +250,7 @@ export const databaseStores = (db: Database): OfficeStores => ({
   floorSkills: databaseFloorSkillToggleStore(db),
   repositorySkillReviews: databaseRepositorySkillReviewStore(db),
   guidelines: databaseGuidelineStore(db),
+  guidelineProposals: databaseGuidelineProposalStore(db),
   batches: databaseBatchStore(db),
   workTurns: databaseWorkTurnsStore(db),
   memory: databaseMemoryStore(db),
@@ -313,6 +322,7 @@ export function memoryStores(): OfficeStores & {
     floorSkills: memoryFloorSkillToggleStore(),
     repositorySkillReviews: memoryRepositorySkillReviewStore(),
     guidelines: memoryGuidelineStore(),
+    guidelineProposals: memoryGuidelineProposalStore(),
     batches: memoryBatchStore(),
     workTurns: memoryWorkTurnsStore(),
     memory: memoryMemoryStore(),

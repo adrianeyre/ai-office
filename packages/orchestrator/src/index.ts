@@ -662,6 +662,13 @@ export {
   type GuidelinesWithin,
 } from "./guidelines/choose.ts";
 export {
+  createGuidelineProposals,
+  GuidelineProposalError,
+  keepGuidelineProposal,
+  type GuidelineProposals,
+  type GuidelineProposalsOptions,
+} from "./guidelines/proposals.ts";
+export {
   droppedProposalReasons,
   proposedGuideline,
   proposingGuidelines,
@@ -670,6 +677,13 @@ export {
   type ProposalTag,
   type ProposedGuideline,
 } from "./guidelines/proposal.ts";
+export {
+  databaseGuidelineProposalStore,
+  memoryGuidelineProposalStore,
+  type GuidelineProposalRecord,
+  type GuidelineProposalStore,
+  type NewGuidelineProposal,
+} from "./guidelines/proposal-store.ts";
 export {
   guidelineFiles,
   type GivenGuidelines,
