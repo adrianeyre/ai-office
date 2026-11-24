@@ -50,6 +50,7 @@ import {
 import { createDesignFlow } from "../design/design.ts";
 import { createDocsFlow } from "../docs/docs.ts";
 import { createFloors } from "../floors/floors.ts";
+import { issueSpec, type IssueSpecOf } from "../grilling/issue-spec.ts";
 import type { ApprovedGuideline } from "../guidelines/approval.ts";
 import {
   createGuidelineProposals,
@@ -102,7 +103,9 @@ import { memoryWorkQueueStore, type WorkItem } from "./store.ts";
 // every flow has it too: mounted into each sandbox, quoted in each
 // reviewer's prompt, and proposed to. Given the Floor's Guidelines, every
 // flow chooses each task's: mounted into each sandbox, quoted in each
-// reviewer's prompt.
+// reviewer's prompt. An issue filed from a Spec kept in the Floor's
+// Grilling Sessions has its criteria and design in the coder's prompt, and
+// its criteria in each reviewer's.
 
 const exec = promisify(execFile);
 export const repository = "adrianeyre/web-shop";
@@ -743,6 +746,9 @@ export async function scenario(
             events: bus,
           }),
         };
+  // The Spec an issue was filed from, as its session keeps it (FR-116).
+  const specs: IssueSpecOf = (floorId, issue) =>
+    issueSpec(stores.grilling, floorId, issue);
   const guidelineProposals = createGuidelineProposals({
     floors: stores.floors,
     agents: stores.agents,
@@ -774,6 +780,7 @@ export async function scenario(
     guidelineProposals,
     ...shared,
     ...guidelines,
+    specs,
   };
   // The Merge Policy waits for CI on its own clock: each wait passes at
   // once, and the checks given finish during the first.
@@ -838,6 +845,7 @@ export async function scenario(
           roles: stores.roles,
           ...shared,
           ...guidelines,
+          specs,
         }),
         "needs-qa": createQaFlow(sandboxFlow),
         "needs-docs": createDocsFlow(sandboxFlow),

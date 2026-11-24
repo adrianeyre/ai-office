@@ -1,4 +1,5 @@
 import { agentTrailer, type TrailerAgent } from "../git/identity.ts";
+import { coderSpecSection, type IssueSpec } from "../grilling/issue-spec.ts";
 import {
   withGuidelineProposals,
   withMountedGuidelines,
@@ -33,7 +34,10 @@ import { sharedBranchLines, type SharedBranch } from "../sandbox/branch.ts";
 // for entries for its Role's memory in the Handoff too. Given the Owner's
 // Guidelines (Guidelines PRD, FR-105 to FR-108), it says where they are
 // mounted, which to follow and which to read before changing a matching
-// file: the Owner's rules, after the issue and before the memory. When the issue's
+// file: the Owner's rules, after the issue and before the memory. Given
+// the Spec the issue was filed from (Guidelines, Specs and Hooks PRD,
+// FR-116), it quotes the issue's Acceptance Criteria and the Spec's
+// approved design, as the Owner approved them, after the issue. When the issue's
 // Plan gives it several work Roles, which take turns on its branch (FR-25
 // (1)), it names them in order and whose turn it is, quotes the Handoff of
 // the Role before as untrusted, and asks for a Handoff for the next Role,
@@ -119,6 +123,12 @@ export interface CoderPromptInput {
    * (Guidelines PRD, FR-105 to FR-108); none when absent.
    */
   readonly guidelines?: GivenGuidelines;
+  /**
+   * The Spec the issue was filed from, as the Owner approved it
+   * (Guidelines, Specs and Hooks PRD, FR-116): its criteria and design,
+   * quoted within the budget's `spec`. None for an issue from no Spec.
+   */
+  readonly spec?: IssueSpec;
   /** The repository's memory, redacted, if it has any (FR-53). */
   readonly memory?: string;
   /** The office-wide and Role memory mounted in its sandbox (FR-54, FR-55). */
@@ -295,6 +305,9 @@ export function coderPrompt(input: CoderPromptInput): string {
     "",
     quoted(issue.body.trim() === "" ? "(No description.)" : issue.body.trim()),
     "</issue>",
+    ...(input.spec === undefined
+      ? []
+      : ["", ...coderSpecSection(input.spec, input.budget?.spec)]),
     ...(input.feedback === undefined ? [] : feedbackSection(input.feedback)),
     ...(input.qaFeedback === undefined
       ? []

@@ -38,6 +38,7 @@ import {
 } from "../memory/shared.ts";
 import { agentMemoryWithin, type PromptBudgetOf } from "../memory/budget.ts";
 import { guidelineFiles } from "../guidelines/prompt.ts";
+import type { IssueSpecOf } from "../grilling/issue-spec.ts";
 import type { TaskGuidelines } from "../guidelines/tasks.ts";
 import type { Pipeline } from "../pipeline/pipeline.ts";
 import { roleOfAgent } from "../roles/roles.ts";
@@ -93,7 +94,10 @@ import { coderPrompt, type CoderPromptInput } from "./prompt.ts";
 // for the task mounted read-only beside them (Guidelines PRD, FR-105,
 // FR-106): those for every task, those the issue's `guideline:<name>`
 // labels ask for, and those for the files the Batch's Plan expects it to
-// change, with the rest of the Floor's for some files listed.
+// change, with the rest of the Floor's for some files listed. An issue
+// filed from a Spec has its Acceptance Criteria and the Spec's design in
+// its prompt, as the Owner approved them in the Spec's session, never as
+// the repository has them (Guidelines, Specs and Hooks PRD, FR-116).
 //
 // An issue whose Batch's Plan gives it several work Roles (FR-25 (1)) is
 // worked by each in turn on its one branch: when a Role that is not the
@@ -162,6 +166,12 @@ export interface CoderFlowOptions {
    * issue to change. None without it.
    */
   readonly guidelines?: Pick<TaskGuidelines, "forTask">;
+  /**
+   * The Spec each issue was filed from, as the Owner approved it in its
+   * session, never as the repository has it (Guidelines, Specs and Hooks
+   * PRD, FR-116): quoted in the prompt. None without it.
+   */
+  readonly specs?: IssueSpecOf;
   /**
    * The office Role library (FR-98): each task reads its Agent's Role
    * from it as the task starts. The built-in Roles when absent.
@@ -861,6 +871,8 @@ export function createCoderFlow(options: CoderFlowOptions): ExecuteWork {
       issue: { number: issue.number, labels: issue.labels },
       ...(budget === undefined ? {} : { budget: budget.guidelines }),
     });
+    // The Spec it was filed from, as the Owner approved it (FR-116).
+    const spec = await options.specs?.(floor.id, issue.number);
     let run: SandboxRun | undefined;
     try {
       run = await options.runner.run({
@@ -898,6 +910,7 @@ export function createCoderFlow(options: CoderFlowOptions): ExecuteWork {
           ...(turnLines === undefined ? {} : { turns: turnLines }),
           ...(fromDesign === undefined ? {} : { designFeedback: fromDesign }),
           ...(guidelines === undefined ? {} : { guidelines }),
+          ...(spec === undefined ? {} : { spec }),
           ...(memory === undefined ? {} : { memory }),
           ...(agentMemory === undefined ? {} : { agentMemory }),
           ...(budget === undefined ? {} : { budget }),

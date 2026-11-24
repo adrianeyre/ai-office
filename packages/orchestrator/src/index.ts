@@ -868,6 +868,11 @@ export {
 } from "./grilling/issues.ts";
 export { specIssues } from "./grilling/spec.ts";
 export {
+  issueSpec,
+  type IssueSpec,
+  type IssueSpecOf,
+} from "./grilling/issue-spec.ts";
+export {
   grillingSessionSection,
   grillingTurnInstructions,
   parseGrillingTurn,
