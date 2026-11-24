@@ -1984,9 +1984,11 @@ export const directChatMessages = pgTable(
 // null until first written; `issues` the issues drafted from them and the
 // issues filed (FR-81, `grillingIssuesSchema`), null until drafted.
 // `skill` is the built-in Skill that started it (`/grilling`,
-// `/grill-with-docs`, `/wayfinder`, `/to-tickets` or `/to-spec`, FR-83b),
-// and `sources` the documents `/to-tickets` read into it
-// (`grillingSourceSchema`). A Floor runs at most one session at a time;
+// `/grill-with-docs`, `/wayfinder`, `/to-tickets` or `/to-spec`, FR-83b; or
+// `/guidelines`, Guidelines, Specs and Hooks PRD FR-109), `sources` the
+// documents `/to-tickets` read into it (`grillingSourceSchema`), and
+// `guidelines` the Guidelines `/guidelines` settled
+// (`grillingGuidelineSchema`). A Floor runs at most one session at a time;
 // the rest are paused or ended, and every one is kept.
 export const grillingSessions = pgTable(
   "grilling_sessions",
@@ -2017,6 +2019,7 @@ export const grillingSessions = pgTable(
     documents: jsonb("documents"),
     issues: jsonb("issues"),
     sources: jsonb("sources").notNull().default([]),
+    guidelines: jsonb("guidelines").notNull().default([]),
     startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
     pausedAt: timestamp("paused_at", { withTimezone: true }),
@@ -2034,7 +2037,7 @@ export const grillingSessions = pgTable(
     check("grilling_sessions_round", sql`${table.round} >= 0`),
     check(
       "grilling_sessions_skill",
-      sql`${table.skill} IN ('grilling', 'grill-with-docs', 'wayfinder', 'to-tickets', 'to-spec')`,
+      sql`${table.skill} IN ('grilling', 'grill-with-docs', 'wayfinder', 'to-tickets', 'to-spec', 'guidelines')`,
     ),
     check(
       "grilling_sessions_paused",
@@ -2371,6 +2374,17 @@ export const guidelineChanges = pgTable(
     ),
   ],
 );
+
+// The Floors that were suggested `/guidelines` (Guidelines, Specs and Hooks
+// PRD, FR-109): a Floor whose default branch had no Guidelines when they
+// were read got one info Notice suggesting it, once, ever; the row is kept
+// so it is never raised again.
+export const guidelineSuggestions = pgTable("guideline_suggestions", {
+  floorId: text("floor_id")
+    .primaryKey()
+    .references(() => floors.id),
+  suggestedAt: timestamp("suggested_at", { withTimezone: true }).notNull(),
+});
 
 // The new or changed Guidelines Agents proposed (Guidelines, Specs and
 // Hooks PRD, FR-110, FR-111): the coder, the docs Agent or QA (`agent_id`)

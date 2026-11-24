@@ -499,13 +499,14 @@ CREATE TABLE "grilling_sessions" (
 	"documents" jsonb,
 	"issues" jsonb,
 	"sources" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"guidelines" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"started_at" timestamp with time zone NOT NULL,
 	"updated_at" timestamp with time zone NOT NULL,
 	"paused_at" timestamp with time zone,
 	"ended_at" timestamp with time zone,
 	CONSTRAINT "grilling_sessions_status" CHECK ("grilling_sessions"."status" IN ('active', 'paused', 'ended')),
 	CONSTRAINT "grilling_sessions_round" CHECK ("grilling_sessions"."round" >= 0),
-	CONSTRAINT "grilling_sessions_skill" CHECK ("grilling_sessions"."skill" IN ('grilling', 'grill-with-docs', 'wayfinder', 'to-tickets', 'to-spec')),
+	CONSTRAINT "grilling_sessions_skill" CHECK ("grilling_sessions"."skill" IN ('grilling', 'grill-with-docs', 'wayfinder', 'to-tickets', 'to-spec', 'guidelines')),
 	CONSTRAINT "grilling_sessions_paused" CHECK (("grilling_sessions"."status" = 'paused') = ("grilling_sessions"."paused_at" IS NOT NULL)),
 	CONSTRAINT "grilling_sessions_ended" CHECK (("grilling_sessions"."status" = 'ended') = ("grilling_sessions"."ended_at" IS NOT NULL))
 );
@@ -545,6 +546,11 @@ CREATE TABLE "guideline_proposals" (
 	CONSTRAINT "guideline_proposals_content" CHECK (length("guideline_proposals"."content") BETWEEN 1 AND 12000),
 	CONSTRAINT "guideline_proposals_issue" CHECK ("guideline_proposals"."issue" > 0),
 	CONSTRAINT "guideline_proposals_status" CHECK ("guideline_proposals"."status" IN ('proposed', 'opened', 'rejected') AND ("guideline_proposals"."status" = 'proposed') = ("guideline_proposals"."decided_at" IS NULL) AND ("guideline_proposals"."status" = 'opened') = ("guideline_proposals"."pull_request" IS NOT NULL AND "guideline_proposals"."url" IS NOT NULL))
+);
+
+CREATE TABLE "guideline_suggestions" (
+	"floor_id" text PRIMARY KEY NOT NULL,
+	"suggested_at" timestamp with time zone NOT NULL
 );
 
 CREATE TABLE "handoffs" (
@@ -1064,6 +1070,7 @@ ALTER TABLE "gateway_requests" ADD CONSTRAINT "gateway_requests_gateway_key_id_g
 ALTER TABLE "grilling_sessions" ADD CONSTRAINT "grilling_sessions_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "guideline_changes" ADD CONSTRAINT "guideline_changes_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "guideline_proposals" ADD CONSTRAINT "guideline_proposals_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "guideline_suggestions" ADD CONSTRAINT "guideline_suggestions_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "handoffs" ADD CONSTRAINT "handoffs_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "issue_token_caps" ADD CONSTRAINT "issue_token_caps_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "issue_triage" ADD CONSTRAINT "issue_triage_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
