@@ -134,6 +134,22 @@ _Avoid_: System skill, default skill
 A Manager conversation, started with `/grilling` or another Built-in Skill that starts one, that interviews the Owner in rounds of questions with recommended answers until they share an understanding, then produces documents, GitHub issues or both.
 _Avoid_: Interview, Q&A, discovery session
 
+**Guideline**:
+One of the Owner's written rules for a Floor's repository, which Agents follow only as the Owner approved it, and only for the work it applies to.
+_Avoid_: Steering, rule, instructions file, convention
+
+**Spec**:
+A feature's requirements, design and tasks, agreed with the Owner one step at a time in a Grilling Session, whose tasks become the issues of one Batch.
+_Avoid_: PRD, specification, design doc
+
+**Acceptance Criterion**:
+One numbered, testable statement in a Spec's requirements of what the system shall do in a given situation, which the issues cite, the reviewers check and QA tests.
+_Avoid_: AC, requirement, check
+
+**Hook**:
+An Owner's rule on a Floor that has an Agent run a Skill when a chosen event happens. Not a git hook.
+_Avoid_: Trigger, automation, webhook
+
 **Direct chat**:
 The Owner's one-to-one conversation with one of a Floor's Agents, opened from its card, with no commands or Skills; the Manager's is the Manager chat.
 _Avoid_: DM, agent chat window
