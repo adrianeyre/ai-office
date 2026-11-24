@@ -33,6 +33,8 @@ import {
   type SharedMemory,
 } from "../memory/shared.ts";
 import { agentMemoryWithin, type PromptBudgetOf } from "../memory/budget.ts";
+import { guidelineFiles } from "../guidelines/prompt.ts";
+import type { TaskGuidelines } from "../guidelines/tasks.ts";
 import type { Pipeline } from "../pipeline/pipeline.ts";
 import { roleOfAgent } from "../roles/roles.ts";
 import { memoryRoleStore, type RoleStore } from "../roles/store.ts";
@@ -83,7 +85,11 @@ import { coderPrompt, type CoderPromptInput } from "./prompt.ts";
 // entries its Handoff proposes for it are kept for the Manager to curate.
 // Its sandbox has the office-wide and Role memory mounted read-only (FR-54,
 // FR-55), and the entries its Handoff proposes for its Role's memory wait
-// for the Manager or the Owner to decide.
+// for the Manager or the Owner to decide. It has the Owner's Guidelines
+// for the task mounted read-only beside them (Guidelines PRD, FR-105,
+// FR-106): those for every task, those the issue's `guideline:<name>`
+// labels ask for, and those for the files the Batch's Plan expects it to
+// change, with the rest of the Floor's for some files listed.
 //
 // An issue whose Batch's Plan gives it several work Roles (FR-25 (1)) is
 // worked by each in turn on its one branch: when a Role that is not the
@@ -141,6 +147,12 @@ export interface CoderFlowOptions {
    * its Model (the prompt budget); as much as AI Office keeps without it.
    */
   readonly promptBudget?: PromptBudgetOf;
+  /**
+   * The Owner's Guidelines for each task (Guidelines PRD, FR-105 to
+   * FR-108): mounted into the sandbox, by the files the Plan expects the
+   * issue to change. None without it.
+   */
+  readonly guidelines?: Pick<TaskGuidelines, "forTask">;
   /**
    * The office Role library (FR-98): each task reads its Agent's Role
    * from it as the task starts. The built-in Roles when absent.
@@ -810,6 +822,14 @@ export function createCoderFlow(options: CoderFlowOptions): ExecuteWork {
       agent.aiProvider,
       trailer.model,
     );
+    // The Owner's Guidelines for it, by the files its Plan expects.
+    const guidelines = await options.guidelines?.forTask({
+      floor,
+      task: "work",
+      agentId: agent.id,
+      issue: { number: issue.number, labels: issue.labels },
+      ...(budget === undefined ? {} : { budget: budget.guidelines }),
+    });
     let run: SandboxRun | undefined;
     try {
       run = await options.runner.run({
@@ -846,6 +866,7 @@ export function createCoderFlow(options: CoderFlowOptions): ExecuteWork {
           ...(fromQa === undefined ? {} : { qaFeedback: fromQa }),
           ...(turnLines === undefined ? {} : { turns: turnLines }),
           ...(fromDesign === undefined ? {} : { designFeedback: fromDesign }),
+          ...(guidelines === undefined ? {} : { guidelines }),
           ...(memory === undefined ? {} : { memory }),
           ...(agentMemory === undefined ? {} : { agentMemory }),
           ...(budget === undefined ? {} : { budget }),
@@ -853,6 +874,9 @@ export function createCoderFlow(options: CoderFlowOptions): ExecuteWork {
         ...(agentMemory === undefined
           ? {}
           : { memory: memoryFiles(agentMemoryWithin(agentMemory, budget)) }),
+        ...(guidelines === undefined
+          ? {}
+          : { guidelines: guidelineFiles(guidelines) }),
         ...(budget === undefined ? {} : { skillsBudget: budget.skills }),
         gitIdentity: await options.gitIdentity(floor.id),
         signal,

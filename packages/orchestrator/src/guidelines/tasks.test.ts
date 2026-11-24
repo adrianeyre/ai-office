@@ -109,6 +109,30 @@ describe("each task's Guidelines", () => {
     }
   });
 
+  it("lists the pull request's files only when a fileMatch Guideline needs them", async () => {
+    const listed: string[] = [];
+    const files = () => {
+      listed.push("listed");
+      return Promise.resolve(["packages/db/schema.ts"]);
+    };
+    const without = setUp([techGuideline]);
+    const request = {
+      floor,
+      task: "qa",
+      issue: { number: 4, labels: [] },
+      files,
+    } as const;
+    expect(names((await without.tasks.forTask(request))?.followed)).toEqual([
+      "tech",
+    ]);
+    expect(listed).toEqual([]);
+    const withFileMatch = setUp([techGuideline, migrationsGuideline]);
+    expect(
+      names((await withFileMatch.tasks.forTask(request))?.followed),
+    ).toEqual(["migrations", "tech"]);
+    expect(listed).toEqual(["listed"]);
+  });
+
   it("gives the Manager the always Guidelines and tells it of the rest", async () => {
     const { tasks } = setUp();
     const given = await tasks.forTask({ floor, task: "chat" });

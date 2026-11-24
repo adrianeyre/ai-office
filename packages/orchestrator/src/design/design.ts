@@ -15,6 +15,7 @@ import type { TrailerAgent } from "../git/identity.ts";
 import { createPushRun } from "../git/push-run.ts";
 import { roleOfWork } from "../manager/dispatch.ts";
 import { keepProposals } from "../memory/memory.ts";
+import { guidelineFiles } from "../guidelines/prompt.ts";
 import { agentMemoryWithin } from "../memory/budget.ts";
 import { keepRoleProposals, memoryFiles } from "../memory/shared.ts";
 import { stageAfter } from "../pipeline/pipeline.ts";
@@ -51,6 +52,11 @@ import { parseDesignReport, type DesignReport } from "./report.ts";
 // QA Agent does, and its work waits for it. Its prompt has the repository's
 // memory (FR-53) and its sandbox the office-wide and Role memory (FR-54,
 // FR-55); what its report proposes for either is kept.
+// Its sandbox also has the Owner's Guidelines for the task mounted
+// read-only (Guidelines PRD, FR-105, FR-106): those for every task, those
+// the issue's labels ask for, and those for the files the Batch's Plan
+// expects the issue to change, with the rest of the Floor's for some
+// files listed.
 
 /** The designer flow takes what the QA flow does. */
 export type DesignFlowOptions = QaFlowOptions;
@@ -380,6 +386,14 @@ export function createDesignFlow(options: DesignFlowOptions): ExecuteWork {
       agent.aiProvider,
       trailer.model,
     );
+    // The Owner's Guidelines for it, by the files its Plan expects.
+    const guidelines = await options.guidelines?.forTask({
+      floor,
+      task: "design",
+      agentId: agent.id,
+      issue: { number: issue.number, labels: issue.labels },
+      ...(budget === undefined ? {} : { budget: budget.guidelines }),
+    });
     let run: SandboxRun | undefined;
     try {
       run = await options.runner.run({
@@ -415,6 +429,7 @@ export function createDesignFlow(options: DesignFlowOptions): ExecuteWork {
           afterQa: team.some(({ stage }) => stage === "qa"),
           round: { number: round, cap: designRoundCap },
           ...(handed === undefined ? {} : { handoff: handed.summary }),
+          ...(guidelines === undefined ? {} : { guidelines }),
           ...(memory === undefined ? {} : { memory }),
           ...(agentMemory === undefined ? {} : { agentMemory }),
           ...(budget === undefined ? {} : { budget }),
@@ -422,6 +437,9 @@ export function createDesignFlow(options: DesignFlowOptions): ExecuteWork {
         ...(agentMemory === undefined
           ? {}
           : { memory: memoryFiles(agentMemoryWithin(agentMemory, budget)) }),
+        ...(guidelines === undefined
+          ? {}
+          : { guidelines: guidelineFiles(guidelines) }),
         ...(budget === undefined ? {} : { skillsBudget: budget.skills }),
         gitIdentity: await options.gitIdentity(floor.id),
         signal,

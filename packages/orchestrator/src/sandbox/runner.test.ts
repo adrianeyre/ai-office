@@ -477,6 +477,91 @@ describe("the sandbox runner", () => {
     ).toBe(false);
   });
 
+  it("mounts the task's Guidelines read-only beside the memory, never in the clone, and deletes them with it", async () => {
+    const mounted: (readonly SkillMount[])[] = [];
+    const seen: { files: string[]; tech: string }[] = [];
+    let guidelinesDir = "";
+    setup = await setUp(
+      async (context) => {
+        seen.push({
+          files: (await readdir(guidelinesDir)).sort(),
+          tech: await readFile(join(guidelinesDir, "tech.md"), "utf8"),
+        });
+        await works(context);
+      },
+      {
+        sandbox: (environment, _tool, mounts) => {
+          mounted.push(mounts);
+          guidelinesDir = mounts.at(-1)?.hostPath ?? "";
+          return setup.sandbox.provider(environment);
+        },
+      },
+    );
+    const run = await setup.runner.run({
+      ...setup.task,
+      memory: [{ name: "OFFICE.md", content: "- Use pnpm.\n" }],
+      guidelines: [
+        { name: "tech.md", content: "Use pnpm, never npm.\n" },
+        {
+          name: "migrations.md",
+          content:
+            '---\ninclusion: fileMatch\nfileMatchPattern: "packages/db/**"\n---\n\nPlain SQL.\n',
+        },
+      ],
+    });
+
+    const [memory, guidelines, ...others] = mounted[0] ?? [];
+    expect(others).toEqual([]);
+    expect(memory?.sandboxPath).toBe("/home/agent/.ai-office/memory");
+    expect(guidelines).toEqual({
+      hostPath: join(setup.root, "work", `${run.sandboxId}-guidelines`),
+      sandboxPath: "/home/agent/.ai-office/guidelines",
+      readonly: true,
+    });
+    const hostPath = guidelines?.hostPath ?? "";
+    expect(hostPath.startsWith(`${run.workspace}/`)).toBe(false);
+    expect(seen).toEqual([
+      { files: ["migrations.md", "tech.md"], tech: "Use pnpm, never npm.\n" },
+    ]);
+    for (const file of ["migrations.md", "tech.md"]) {
+      expect((await stat(join(hostPath, file))).mode & 0o222).toBe(0);
+    }
+    // The Agent's commits hold its work, not the Guidelines.
+    expect(
+      await gitIn(
+        run.workspace,
+        "show",
+        "--name-only",
+        "--format=",
+        run.commits[0] ?? "",
+      ),
+    ).toBe("basket.txt");
+
+    await run.discard();
+    expect(existsSync(hostPath)).toBe(false);
+  });
+
+  it("mounts no Guidelines when the task has none, and refuses a file that is not a Guideline's", async () => {
+    const mounted: (readonly SkillMount[])[] = [];
+    setup = await setUp(works, {
+      sandbox: (environment, _tool, mounts) => {
+        mounted.push(mounts);
+        return setup.sandbox.provider(environment);
+      },
+    });
+    const run = await setup.runner.run({ ...setup.task, guidelines: [] });
+    expect(mounted).toEqual([[]]);
+    expect(
+      existsSync(join(setup.root, "work", `${run.sandboxId}-guidelines`)),
+    ).toBe(false);
+    await expect(
+      setup.runner.run({
+        ...setup.task,
+        guidelines: [{ name: "../../escape.md", content: "Nothing.\n" }],
+      }),
+    ).rejects.toThrow(SandboxRunError);
+  });
+
   it("deletes the memory with the clone when the run fails", async () => {
     let memoryDir = "";
     setup = await setUp(

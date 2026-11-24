@@ -26,6 +26,7 @@ import {
   designerRole,
   initialDefaultModels,
   memoryPath,
+  sandboxGuidelinesDirectory,
   sandboxMemoryDirectory,
   type DecisionModelSettings,
   type DesignResult,
@@ -49,6 +50,8 @@ import {
 import { createDesignFlow } from "../design/design.ts";
 import { createDocsFlow } from "../docs/docs.ts";
 import { createFloors } from "../floors/floors.ts";
+import type { ApprovedGuideline } from "../guidelines/approval.ts";
+import { createTaskGuidelines } from "../guidelines/tasks.ts";
 import { withApprovedIssues } from "../intake/approved.ts";
 import { createIntake, type IntakeQueue } from "../intake/intake.ts";
 import {
@@ -93,7 +96,9 @@ import { memoryWorkQueueStore, type WorkItem } from "./store.ts";
 // reads the repository's memory, and those that write a Handoff (or QA's
 // report) may propose entries for it. Given office-wide or Role memory,
 // every flow has it too: mounted into each sandbox, quoted in each
-// reviewer's prompt, and proposed to.
+// reviewer's prompt, and proposed to. Given the Floor's Guidelines, every
+// flow chooses each task's: mounted into each sandbox, quoted in each
+// reviewer's prompt.
 
 const exec = promisify(execFile);
 export const repository = "adrianeyre/web-shop";
@@ -195,6 +200,17 @@ export interface ScenarioOptions {
   readonly decisionModel?: DecisionModelSettings;
   /** A command the coder runs with its Bash tool first, each run. */
   readonly coderCommand?: string;
+  /**
+   * The Floor's Guidelines, as the Owner approved them (Guidelines PRD,
+   * FR-105): given them, every flow chooses each task's. None otherwise.
+   */
+  readonly guidelines?: readonly ApprovedGuideline[];
+}
+
+/** The Guidelines a sandbox had mounted, by file name, run by run. */
+export interface MountedGuidelines {
+  readonly agent: "coder" | "qa" | "docs" | "designer";
+  readonly files: readonly string[];
 }
 
 /** The memory a sandbox had mounted, as its Agent found it while it worked. */
@@ -228,6 +244,8 @@ export interface Scenario {
   readonly sharedMemory: SharedMemory;
   /** What each sandbox had mounted as memory, run by run. */
   readonly mountedMemory: MountedMemory[];
+  /** What each sandbox had mounted as Guidelines, run by run. */
+  readonly mountedGuidelines: MountedGuidelines[];
   /** Who the Floor's commits are by. */
   readonly gitIdentity: () => Promise<GitIdentity>;
   readonly manager: AgentRecord;
@@ -279,6 +297,20 @@ const proposingBoth = (proposed: Proposing | undefined): string[] => [
   ...proposing(proposed?.memory),
   ...proposing(proposed?.role, "role-memory"),
 ];
+
+/** The Guidelines mounted among `mounts`, by file name. */
+async function mountedGuidelinesOf(
+  agent: MountedGuidelines["agent"],
+  mounts: readonly SkillMount[],
+): Promise<MountedGuidelines> {
+  const mount = mounts.find(
+    ({ sandboxPath }) => sandboxPath === sandboxGuidelinesDirectory,
+  );
+  return {
+    agent,
+    files: mount === undefined ? [] : (await readdir(mount.hostPath)).sort(),
+  };
+}
 
 /** The memory mounted among `mounts`, read as the Agent finds it. */
 async function mountedMemory(
@@ -589,8 +621,17 @@ export async function scenario(
       ? {}
       : { sharedMemory };
   const mounted: MountedMemory[] = [];
+  const guidelinesMounted: MountedGuidelines[] = [];
   let mounts: readonly SkillMount[] = [];
   const sandbox = await createFakeSandbox(async (context) => {
+    const agent = context.prompt.includes("a designer Agent in AI Office")
+      ? "designer"
+      : context.prompt.includes("a docs Agent in AI Office")
+        ? "docs"
+        : context.prompt.includes("a QA Agent in AI Office")
+          ? "qa"
+          : "coder";
+    guidelinesMounted.push(await mountedGuidelinesOf(agent, mounts));
     if (context.prompt.includes("a designer Agent in AI Office")) {
       designPrompts.push(context.prompt);
       const run = designPrompts.length;
@@ -666,6 +707,18 @@ export async function scenario(
     github,
     async () => (await office.intakeSettings()).ownerLogin,
   );
+  // The Floor's Guidelines, as its latest read settled them.
+  const approvedGuidelines = options.guidelines;
+  const guidelines =
+    approvedGuidelines === undefined
+      ? {}
+      : {
+          guidelines: createTaskGuidelines({
+            approvals: { approved: () => Promise.resolve(approvedGuidelines) },
+            notices,
+            events: bus,
+          }),
+        };
   const sandboxFlow = {
     floors: stores.floors,
     agents: stores.agents,
@@ -683,6 +736,7 @@ export async function scenario(
     memory,
     roles: stores.roles,
     ...shared,
+    ...guidelines,
   };
   // The Merge Policy waits for CI on its own clock: each wait passes at
   // once, and the checks given finish during the first.
@@ -746,6 +800,7 @@ export async function scenario(
           memory,
           roles: stores.roles,
           ...shared,
+          ...guidelines,
         }),
         "needs-qa": createQaFlow(sandboxFlow),
         "needs-docs": createDocsFlow(sandboxFlow),
@@ -779,6 +834,7 @@ export async function scenario(
     memory,
     sharedMemory,
     mountedMemory: mounted,
+    mountedGuidelines: guidelinesMounted,
     gitIdentity: () => office.floorGitIdentity("web-shop"),
     manager,
     coder,

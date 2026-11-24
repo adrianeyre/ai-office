@@ -23,6 +23,7 @@ import {
   type FreshStartWatch,
 } from "../context/fresh-start.ts";
 import { skillsLeftOutLine, skillsWithin } from "../memory/budget.ts";
+import type { GuidelineFile } from "../guidelines/prompt.ts";
 import type { MemoryFile } from "../memory/shared.ts";
 
 import { runGit } from "../git/command.ts";
@@ -32,6 +33,7 @@ import { cloneRepository } from "./clone.ts";
 import { fileDiffs, type FileDiff } from "./diffs.ts";
 import { dockerProvider } from "./docker.ts";
 import { sandboxImages } from "./images.ts";
+import { guidelinesMount, writeGuidelines } from "./guidelines.ts";
 import { memoryMount, writeMemory } from "./memory.ts";
 import {
   skillMounts,
@@ -60,8 +62,10 @@ import { makeWorkDir } from "./work-dir.ts";
 // pull request; never an AI Account's credential), runs the Floor's setup command when the sandbox is ready,
 // then the agent tool of the Agent's AI Provider (FR-16), with the Floor's
 // Skills on for the Agent's Role mounted read-only where that tool finds
-// them (FR-75), as many as its prompt budget lists, and the office-wide
-// and Role memory mounted read-only (FR-54, FR-55), and streams what the
+// them (FR-75), as many as its prompt budget lists, the office-wide
+// and Role memory mounted read-only (FR-54, FR-55), and the Owner's
+// Guidelines for the task mounted read-only beside it (Guidelines PRD,
+// FR-106), and streams what the
 // Agent says and the tools it calls to the event bus. Each tool call is screened (FR-17: AI Office's rules,
 // and the Decision Model while it is on), and one judged unsafe stops the
 // run: its work is thrown away and the run fails, saying why. With the
@@ -112,6 +116,12 @@ export interface SandboxTask {
    * says (FR-54, FR-55); none when absent or empty.
    */
   readonly memory?: readonly MemoryFile[];
+  /**
+   * The Owner's Guidelines for the task, in the versions the Owner
+   * approved, mounted read-only where the prompt says (Guidelines PRD,
+   * FR-106); none when absent or empty.
+   */
+  readonly guidelines?: readonly GuidelineFile[];
   /**
    * The most characters of its Skills' listing (each one's name and
    * description) the Agent's tool is given, its prompt budget's: the
@@ -498,6 +508,11 @@ export function createSandboxRunner(
       const skillsDir = join(options.workDir, `${firstSandboxId}-skills`);
       // Its office-wide and Role memory, beside it too.
       const memoryDir = join(options.workDir, `${firstSandboxId}-memory`);
+      // And its Guidelines.
+      const guidelinesDir = join(
+        options.workDir,
+        `${firstSandboxId}-guidelines`,
+      );
       const subject = () => ({
         floorId: task.floor.id,
         agentId: task.agent.id,
@@ -511,6 +526,7 @@ export function createSandboxRunner(
         await rm(workspace, removed);
         await rm(skillsDir, removed);
         await rm(memoryDir, removed);
+        await rm(guidelinesDir, removed);
       };
 
       // Published one after another, in the order Sandcastle streamed them.
@@ -758,6 +774,10 @@ export function createSandboxRunner(
         if (task.memory !== undefined && task.memory.length > 0) {
           await writeMemory(memoryDir, task.memory);
           mounts = [...mounts, memoryMount(memoryDir)];
+        }
+        if (task.guidelines !== undefined && task.guidelines.length > 0) {
+          await writeGuidelines(guidelinesDir, task.guidelines);
+          mounts = [...mounts, guidelinesMount(guidelinesDir)];
         }
         const setup = task.floor.setupCommand.trim();
         // The setup command runs in every session's sandbox, before the

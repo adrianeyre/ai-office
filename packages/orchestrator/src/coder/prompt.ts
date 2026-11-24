@@ -1,4 +1,8 @@
 import { agentTrailer, type TrailerAgent } from "../git/identity.ts";
+import {
+  withMountedGuidelines,
+  type GivenGuidelines,
+} from "../guidelines/prompt.ts";
 import type { RoleRecord } from "../roles/store.ts";
 import { memorySection, proposingMemory } from "../memory/memory.ts";
 import {
@@ -25,7 +29,10 @@ import { sharedBranchLines, type SharedBranch } from "../sandbox/branch.ts";
 // may propose entries for the repository's memory (FR-53), which it is
 // given, quoted as untrusted background like the issue. Given office-wide
 // and Role memory (FR-54, FR-55), it says where they are mounted, and asks
-// for entries for its Role's memory in the Handoff too. When the issue's
+// for entries for its Role's memory in the Handoff too. Given the Owner's
+// Guidelines (Guidelines PRD, FR-105 to FR-108), it says where they are
+// mounted, which to follow and which to read before changing a matching
+// file: the Owner's rules, after the issue and before the memory. When the issue's
 // Plan gives it several work Roles, which take turns on its branch (FR-25
 // (1)), it names them in order and whose turn it is, quotes the Handoff of
 // the Role before as untrusted, and asks for a Handoff for the next Role,
@@ -106,6 +113,11 @@ export interface CoderPromptInput {
     readonly findings: string;
     readonly handoff: HandoffSummary;
   };
+  /**
+   * The Owner's Guidelines for the task, mounted in its sandbox
+   * (Guidelines PRD, FR-105 to FR-108); none when absent.
+   */
+  readonly guidelines?: GivenGuidelines;
   /** The repository's memory, redacted, if it has any (FR-53). */
   readonly memory?: string;
   /** The office-wide and Role memory mounted in its sandbox (FR-54, FR-55). */
@@ -290,6 +302,7 @@ export function coderPrompt(input: CoderPromptInput): string {
     ...(input.designFeedback === undefined
       ? []
       : designFeedbackSection(input.designFeedback)),
+    ...withMountedGuidelines(input.guidelines),
     ...(input.memory === undefined
       ? []
       : ["", ...memorySection(input.memory, input.budget?.repositoryMemory)]),

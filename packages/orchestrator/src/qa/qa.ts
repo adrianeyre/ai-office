@@ -39,6 +39,8 @@ import {
   memoryFiles,
   type SharedMemory,
 } from "../memory/shared.ts";
+import { guidelineFiles } from "../guidelines/prompt.ts";
+import { changedFiles, type TaskGuidelines } from "../guidelines/tasks.ts";
 import { agentMemoryWithin, type PromptBudgetOf } from "../memory/budget.ts";
 import { nextRoleAt, stageAfter, type Pipeline } from "../pipeline/pipeline.ts";
 import { roleOfAgent } from "../roles/roles.ts";
@@ -94,6 +96,9 @@ import { parseQaReport, type QaReport } from "./report.ts";
 // Manager to curate. Its sandbox has the office-wide and Role memory
 // mounted read-only (FR-54, FR-55), and what its report proposes for its
 // Role's memory waits for a decision.
+// Its sandbox also has the Owner's Guidelines for the task mounted
+// read-only (Guidelines PRD, FR-105, FR-106): those for every task, those
+// the issue's labels ask for, and those for the files the pull request changes.
 
 export interface QaFlowOptions {
   readonly floors: FloorStore;
@@ -138,6 +143,13 @@ export interface QaFlowOptions {
    * its Model (the prompt budget); as much as AI Office keeps without it.
    */
   readonly promptBudget?: PromptBudgetOf;
+  /**
+   * The Owner's Guidelines for each task (Guidelines PRD, FR-105 to
+   * FR-108), mounted into the sandbox: by the files the pull request
+   * changes (the designer's, by the files the Plan expects the issue to
+   * change). None without it.
+   */
+  readonly guidelines?: Pick<TaskGuidelines, "forTask">;
   /**
    * The office Role library (FR-98): each task reads its Agent's Role
    * from it as the task starts. The built-in Roles when absent.
@@ -513,6 +525,19 @@ export function createQaFlow(options: QaFlowOptions): ExecuteWork {
       agent.aiProvider,
       trailer.model,
     );
+    // The Owner's Guidelines for it, by the files the pull request changes.
+    const guidelines = await options.guidelines?.forTask({
+      floor,
+      task: "qa",
+      agentId: agent.id,
+      issue: { number: issue.number, labels: issue.labels },
+      files: changedFiles(
+        client,
+        pullRequest,
+        batch === undefined ? undefined : baseOf(batch, issue.number),
+      ),
+      ...(budget === undefined ? {} : { budget: budget.guidelines }),
+    });
     let run: SandboxRun | undefined;
     try {
       run = await options.runner.run({
@@ -548,6 +573,7 @@ export function createQaFlow(options: QaFlowOptions): ExecuteWork {
           pullRequest: pullRequest.number,
           round: { number: round, cap: qaRoundCap },
           ...(handed === undefined ? {} : { handoff: handed.summary }),
+          ...(guidelines === undefined ? {} : { guidelines }),
           ...(memory === undefined ? {} : { memory }),
           ...(agentMemory === undefined ? {} : { agentMemory }),
           ...(budget === undefined ? {} : { budget }),
@@ -555,6 +581,9 @@ export function createQaFlow(options: QaFlowOptions): ExecuteWork {
         ...(agentMemory === undefined
           ? {}
           : { memory: memoryFiles(agentMemoryWithin(agentMemory, budget)) }),
+        ...(guidelines === undefined
+          ? {}
+          : { guidelines: guidelineFiles(guidelines) }),
         ...(budget === undefined ? {} : { skillsBudget: budget.skills }),
         gitIdentity: await options.gitIdentity(floor.id),
         signal,

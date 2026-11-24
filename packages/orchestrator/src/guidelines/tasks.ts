@@ -1,4 +1,5 @@
 import type { EventBus } from "@ai-office/events";
+import type { PullRequest, RepositoryClient } from "@ai-office/github";
 import {
   floorGuidelinesPath,
   guidelinesBudget,
@@ -51,10 +52,11 @@ export interface GuidelinesRequest {
     readonly labels: readonly string[];
   };
   /**
-   * The files the pull request changes, for review, QA and docs. The work
-   * Stage's and designer's come from the Plan.
+   * The files the pull request changes, for review, QA and docs, or how
+   * to list them, asked only when a `fileMatch` Guideline needs them. The
+   * work Stage's and designer's come from the Plan.
    */
-  readonly files?: readonly string[];
+  readonly files?: readonly string[] | (() => Promise<readonly string[]>);
   /**
    * The most characters of Guidelines its prompt carries, its Model's
    * prompt budget's; `guidelinesBudget` when absent.
@@ -108,6 +110,23 @@ export const plannedFiles =
     }
     return [];
   };
+
+/**
+ * How to list the files a pull request changes, for review, QA and docs:
+ * on a Batch's shared branch (ADR 0010), only the issue's own, from
+ * `since`.
+ */
+export const changedFiles =
+  (
+    client: Pick<RepositoryClient, "listPullRequestFiles" | "compareCommits">,
+    pullRequest: Pick<PullRequest, "number" | "head">,
+    since?: string,
+  ) =>
+  async (): Promise<readonly string[]> =>
+    (since === undefined
+      ? await client.listPullRequestFiles(pullRequest.number)
+      : await client.compareCommits(since, pullRequest.head.sha)
+    ).map(({ path }) => path);
 
 /** Which versions of which Guidelines a Floor gives, as one string. */
 const versionsOf = (approved: readonly ApprovedGuideline[]): string =>
@@ -209,6 +228,22 @@ export function createTaskGuidelines(
       raisedFor.set(floor.id, versions);
     });
 
+  /** The files that choose the task's `fileMatch` Guidelines. */
+  const filesOf = async (
+    request: GuidelinesRequest,
+  ): Promise<readonly string[]> => {
+    if (choosesByPlan(request.task)) {
+      return request.issue === undefined
+        ? []
+        : ((await options.planFiles?.(
+            request.floor.id,
+            request.issue.number,
+          )) ?? []);
+    }
+    const { files } = request;
+    return typeof files === "function" ? files() : (files ?? []);
+  };
+
   return {
     async forTask(request) {
       const { floor, task } = request;
@@ -229,15 +264,12 @@ export function createTaskGuidelines(
         }
         return undefined;
       }
-      const files =
-        choosesByPlan(task) && request.issue !== undefined
-          ? ((await options
-              .planFiles?.(floor.id, request.issue.number)
-              .catch((error: unknown) => {
-                options.onError?.(error);
-                return [];
-              })) ?? [])
-          : (request.files ?? []);
+      const files = approved.some(({ inclusion }) => inclusion === "fileMatch")
+        ? await filesOf(request).catch((error: unknown) => {
+            options.onError?.(error);
+            return [];
+          })
+        : [];
       const chosen = chooseGuidelines(approved, {
         task,
         files,
