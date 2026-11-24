@@ -1021,6 +1021,7 @@ export {
   type SpecRequirement,
   type SpecRequirements,
   type SpecTask,
+  type SpecTaskIssue,
   type SpecTurn,
 } from "./spec.ts";
 export {

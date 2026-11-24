@@ -294,11 +294,22 @@ export function specDesignDocument(
   ].join("\n");
 }
 
-/** `tasks.md`, from the tasks as kept, in their order. It holds no status. */
+/** The issue filed for a task (FR-117): `tasks.md` links it. */
+export interface SpecTaskIssue {
+  readonly number: number;
+  readonly url: string;
+}
+
+/**
+ * `tasks.md`, from the tasks as kept, in their order, each linking the
+ * issue filed for it once there is one (`issues`, by the task's place;
+ * FR-117). It holds no status: progress is read from the issues.
+ */
 export function specTasksDocument(
   topic: string,
   slug: string,
   tasks: readonly SpecTask[],
+  issues: readonly (SpecTaskIssue | undefined)[] = [],
 ): string {
   return [
     `# Tasks: ${titleOf(topic, slug)}`,
@@ -312,10 +323,17 @@ export function specTasksDocument(
       "",
       `- **Meets:** ${meets.join(", ")}`,
       `- **Depends on:** ${dependsOn.length === 0 ? "none" : dependsOn.map((number) => `task ${String(number)}`).join(", ")}`,
+      ...linkOf(issues[index]),
       "",
     ]),
   ].join("\n");
 }
+
+/** A task's issue, as `tasks.md` links it; none before it is filed. */
+const linkOf = (issue: SpecTaskIssue | undefined): string[] =>
+  issue === undefined
+    ? []
+    : [`- **Issue:** [#${String(issue.number)}](${issue.url})`];
 
 /** A phase's document as written from `document`, the phase's kept copy. */
 export function specDocument(

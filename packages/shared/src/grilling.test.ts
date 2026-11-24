@@ -188,6 +188,27 @@ describe("readGrillingControl", () => {
     ).toEqual({ kind: "file-issues", session: 4 });
   });
 
+  it("reads \"… in one PR\" after filing a session's issues, for a Spec's Batch (FR-115)", () => {
+    expect(readGrillingControl(fileGrillingIssuesText(7, true))).toEqual({
+      kind: "file-issues",
+      session: 7,
+      onePullRequest: true,
+    });
+    expect(
+      readGrillingControl(
+        "Please file the issues of session 7 as a single pull request.",
+      ),
+    ).toEqual({ kind: "file-issues", session: 7, onePullRequest: true });
+    expect(readGrillingControl("file the issues in one PR, please")).toEqual({
+      kind: "file-issues",
+      session: null,
+      onePullRequest: true,
+    });
+    expect(
+      readGrillingControl("file the issues of session 7 in two PRs"),
+    ).toBeUndefined();
+  });
+
   it("reads a /spec session's phases: confirm, skip design and reopen (FR-113)", () => {
     expect(readGrillingControl("confirm requirements")).toEqual({
       kind: "confirm-phase",

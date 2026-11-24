@@ -188,6 +188,34 @@ describe("a Spec's documents", () => {
     expect(text).not.toMatch(/status|done|\[x\]/i);
   });
 
+  it("link each task's issue in tasks.md once it is filed, still with no status (FR-117)", () => {
+    const tasks = [
+      {
+        title: "Save a card",
+        description: "The vault and the tick box.",
+        meets: ["R1.1"],
+        dependsOn: [],
+      },
+      {
+        title: "Show saved cards",
+        description: "The last four digits.",
+        meets: ["R1.2"],
+        dependsOn: [1],
+      },
+    ];
+    const text = specTasksDocument("saved cards", "saved-cards", tasks, [
+      undefined,
+      { number: 12, url: "https://github.com/adrianeyre/web-shop/issues/12" },
+    ]);
+    expect(text).toContain(
+      "## 1. Save a card\n\nThe vault and the tick box.\n\n- **Meets:** R1.1\n- **Depends on:** none\n\n## 2.",
+    );
+    expect(text).toContain(
+      "- **Meets:** R1.2\n- **Depends on:** task 1\n- **Issue:** [#12](https://github.com/adrianeyre/web-shop/issues/12)\n",
+    );
+    expect(text).not.toMatch(/status|done|open|closed|\[x\]/i);
+  });
+
   it("are written only for a phase that has its document", () => {
     const spec = newGrillingSpec("saved-cards");
     expect(
