@@ -118,13 +118,21 @@ function environment(
   };
 }
 
-/** Git's own message, without anything that could carry the token. */
-function failure(step: string, error: unknown): Error {
-  const stderr = (error as { stderr?: unknown }).stderr;
+/**
+ * Git's own message, without anything that could carry the token. Git
+ * says why it failed on its standard error, which `execFile` gives its
+ * callback but does not put on the error, so the caller passes it. Its
+ * first `fatal:` or `error:` line says why; any lines after it are hints.
+ */
+function failure(step: string, error: unknown, stderr = ""): Error {
+  const lines = stderr
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "");
   const detail =
-    typeof stderr === "string" && stderr.trim() !== ""
-      ? stderr.trim().split("\n").at(-1)
-      : (error as Error).message.split("\n", 1)[0];
+    lines.find((line) => /^(fatal|error):/.test(line)) ??
+    lines.at(-1) ??
+    (error as Error).message.split("\n", 1)[0];
   return new Error(`Git could not ${step}: ${detail ?? "unknown error"}`, {
     cause: error,
   });
@@ -147,11 +155,11 @@ function spawnGit(
         ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
         ...(options.signal === undefined ? {} : { signal: options.signal }),
       },
-      (error, stdout) => {
+      (error, stdout, stderr) => {
         if (error === null) {
           resolve(stdout);
         } else {
-          reject(failure(step, error));
+          reject(failure(step, error, stderr));
         }
       },
     );
