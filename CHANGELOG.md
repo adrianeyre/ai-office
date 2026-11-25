@@ -1,3 +1,10 @@
+## [1.16.0](https://github.com/adrianeyre/ai-office/compare/v1.15.0...v1.16.0) (2026-11-25)
+
+### Features
+
+* **db:** migrate a database from an earlier schema as the app starts ([0c056bd](https://github.com/adrianeyre/ai-office/commit/0c056bd993494ff56192e846d92155391d10d21e))
+* **deploy:** pnpm redeploy builds, backs up, migrates and rolls back in one go ([54985a6](https://github.com/adrianeyre/ai-office/commit/54985a62994d1cb31045222ff4492f1c4092daa9))
+
 ## [1.15.0](https://github.com/adrianeyre/ai-office/compare/v1.14.0...v1.15.0) (2026-11-25)
 
 ### Features
