@@ -265,6 +265,10 @@ docker compose up --build --wait
 curl localhost:3045/health   # {"status":"ok","database":"up"}
 ```
 
+To upgrade it later, run `pnpm redeploy` (see
+[Redeploying](#redeploying-pnpm-redeploy)). It backs up, rebuilds,
+migrates, and rolls back if the new app fails.
+
 - The app applies the database schema each time it starts (see
   [The database schema](#the-database-schema)), and waits for a healthy
   database first. Both services have health checks; the app's is
