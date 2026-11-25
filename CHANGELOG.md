@@ -1,3 +1,9 @@
+## [1.16.1](https://github.com/adrianeyre/ai-office/compare/v1.16.0...v1.16.1) (2026-11-25)
+
+### Bug Fixes
+
+* **git:** say what Git said when a command fails ([8ce124f](https://github.com/adrianeyre/ai-office/commit/8ce124fb6e242b3e534cb62b48012b7057b7f7c6))
+
 ## [1.16.0](https://github.com/adrianeyre/ai-office/compare/v1.15.0...v1.16.0) (2026-11-25)
 
 ### Features
