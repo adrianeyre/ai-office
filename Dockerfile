@@ -71,6 +71,7 @@ COPY apps/server/src apps/server/src
 COPY packages/communications/src packages/communications/src
 COPY packages/db/src packages/db/src
 COPY packages/db/schema.sql packages/db/schema.sql
+COPY packages/db/migrations packages/db/migrations
 COPY templates templates
 COPY packages/events/src packages/events/src
 COPY packages/gateway/src packages/gateway/src
@@ -86,7 +87,7 @@ USER node
 # too; the Gateway's own port, 3047, is the sandboxes' way in and never
 # published.
 EXPOSE 3045
-# The schema is applied to an empty database (or checked against one that
-# has it) before the server starts; if that fails, the container exits and
+# The schema is applied to an empty database (or one made from an earlier
+# schema is migrated, or one that has it checked) before the server starts; if that fails, the container exits and
 # compose restarts it.
 CMD ["sh", "-c", "node packages/db/src/apply-schema-cli.ts && exec node apps/server/src/main.ts"]

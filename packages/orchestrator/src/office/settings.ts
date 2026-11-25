@@ -181,8 +181,8 @@ export interface OfficeSettingsStore {
 /**
  * Where the currency is kept: `schema_meta`, as JSON, under this key. It
  * has no column of its own in `office_settings`, so that adding it did not
- * change the schema (which has no migrations: a database made from another
- * schema must be made again).
+ * change the schema, which had no migrations then (a database made from
+ * another schema had to be made again).
  */
 export const currencySettingKey = "setting:currency";
 

@@ -36,6 +36,32 @@ walks through the first run step by step, and through running it all with
 `docker compose`. Every command, the tests and the screenshot tests are in
 [Developing AI Office](docs/guide/development.md).
 
+## Deploying and upgrading
+
+To run AI Office for real, use docker compose (see
+[Running AI Office with docker compose](docs/guide/running.md#running-ai-office-with-docker-compose),
+or [Deploying to EC2](docs/processes/deploying-to-ec2.md) for a whole
+server with HTTPS). After that, each upgrade is one command, run from your
+clone:
+
+```bash
+git switch main
+pnpm redeploy --pull   # add --yes to skip the question
+```
+
+`pnpm redeploy` refuses uncommitted changes and branches other than `main`.
+It says which database migrations will run, and stops before changing
+anything if none lead to the new schema. Then it:
+
+1. backs the database up to `~/ai-office-backups`
+2. builds the images while the old app keeps serving
+3. swaps in the new app and waits until it's healthy
+
+The app migrates its database as it starts, and commits the migration only
+if the result matches `schema.sql`. If the new app fails before the
+database was migrated, the script puts the previous image back. See
+[Redeploying](docs/guide/running.md#redeploying-pnpm-redeploy).
+
 ## How it works
 
 - **Floors and Agents.** Each Floor is a repository with a Manager and a
@@ -88,7 +114,7 @@ How AI Office works, part by part, is in [`docs/guide/`](docs/guide/README.md):
 | [Developing AI Office](docs/guide/development.md) | Requirements, every `pnpm` command, the tests, the end-to-end and scene screenshot tests, and working on AI Office with Sandcastle. |
 | [Roles, Stages and Floor Templates](docs/guide/roles-and-templates.md) | An overview of the Role library, the four Stages and the built-in and the Owner's own Floor Templates. |
 | [Screenshots](docs/guide/screenshots.md) | Every page of AI Office, as `pnpm screenshots` takes it. |
-| [Running AI Office](docs/guide/running.md) | Running AI Office in development, with docker compose, the server's first run and sign-in, freeing storage, retention, and configuration export and import. |
+| [Running AI Office](docs/guide/running.md) | Running AI Office in development, with docker compose, redeploying with `pnpm redeploy`, the server's first run and sign-in, freeing storage, retention, and configuration export and import. |
 | [The AI Gateway](docs/guide/ai-gateway.md) | The built-in AI Gateway: its endpoints, prices, analytics, request history, Gateway Keys, AI Accounts, the outbound proxy, the Decision Model and AI Providers. |
 | [Floors and Agents](docs/guide/floors-and-agents.md) | Floors and Floor Templates (the built-in ones and the Owner's own), Agents and their editors, the Role library, Token Caps and the Git identity. |
 | [The issue pipeline](docs/guide/issue-pipeline.md) | From issue to merged pull request: intake, triage, sandboxes, reviews, QA, the designer, docs, the Merge Policy and the Manager's watchdog. |

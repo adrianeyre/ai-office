@@ -393,19 +393,43 @@ docker compose --profile tls start
 
 ## 10. Upgrade
 
-1. **Back up first.** AI Office is not in production yet and has no
-   database migrations, so going back to an older version means restoring
-   the dump taken before the upgrade.
+The app migrates its database forward as it starts, never back. Each
+migration runs in one transaction, which is committed only if the result
+matches the new version's schema
+([ADR 0017](../architectural-decision-record/0017-schema-changes-ship-with-a-migration-checked-against-schema-sql.md)).
+To go back to an older version, restore the dump taken before the upgrade.
 
-   ```bash
-   ~/backup-ai-office.sh
-   ```
+### With `pnpm redeploy` (recommended)
 
-2. **Update and rebuild.** The app checks the database schema as it
-   starts, before it listens. If this version's schema differs from the
-   database's, it exits and `docker compose logs app` says so: the
-   database has to be recreated (`docker volume rm ai-office_postgres-data`,
-   which deletes its data) for the new schema to be applied.
+```bash
+cd ~/ai-office
+git switch main
+pnpm install --frozen-lockfile
+pnpm redeploy --pull
+docker compose --profile tls up --detach --wait caddy   # only if Caddy isn't running, or its pinned image changed
+```
+
+`pnpm redeploy` does the following, in order:
+
+1. Refuses to run on uncommitted changes.
+2. Says which migrations will run, and stops before changing anything if
+   none lead to the new schema.
+3. Asks you to confirm (`--yes` skips this).
+4. Dumps the database to `~/ai-office-backups`, keeping the newest five.
+5. Builds any new sandbox images and the app's image while the old app
+   keeps serving.
+6. Swaps in the app and the sandbox relay and waits until they're healthy.
+7. If the new app never becomes healthy:
+   - if the database is unchanged, it puts the previous image back;
+   - if the database was migrated, it prints how to restore the dump.
+
+See [Redeploying](../guide/running.md#redeploying-pnpm-redeploy).
+
+### By hand
+
+1. **Back up first:** `~/backup-ai-office.sh`.
+2. **Update and rebuild.** If a migration fails, the database is left as
+   it was, the app exits, and `docker compose logs app` says why.
 
    ```bash
    cd ~/ai-office
@@ -417,15 +441,15 @@ docker compose --profile tls start
 3. **Rebuild the sandbox images**, if you built them, when their
    Dockerfiles or the agent tools' versions changed (`git log --
    docker/sandbox-*`). The tools' versions are pinned in AI Office, so
-   they move with an upgrade, never on a rebuild alone:
+   they change only when you upgrade AI Office, never when you just rebuild:
 
    ```bash
    pnpm install --frozen-lockfile
    AGENT_UID=1000 AGENT_GID=1000 pnpm sandbox:build
    ```
 
-4. **Tidy up** old images and build cache: `docker image prune -f` and
-   `docker builder prune -f`.
+Either way, tidy up old images and build cache afterwards with
+`docker image prune -f` and `docker builder prune -f`.
 
 Every image is pinned by digest (`docker-compose.yml` and the
 Dockerfiles), so `pull` and `--build` fetch exactly what this version of

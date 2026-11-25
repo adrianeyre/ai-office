@@ -1284,6 +1284,7 @@ pnpm dev</code></pre>
                 <li>
                   <a href="#setup-first-issue">Hand over the first issue</a>
                 </li>
+                <li><a href="#setup-upgrade">Upgrade</a></li>
               </ol>
             </nav>
 
@@ -1863,6 +1864,33 @@ pnpm sandbox:build claude   <span class="comment"># or only those your Agents' A
                   <a
                     href="{{REPO_URL}}/blob/main/docs/guide/guidelines-specs-and-hooks.md"
                     >Guidelines, Specs and Hooks</a
+                  >.
+                </p>
+              </article>
+
+              <article class="setup-step" id="setup-upgrade">
+                <h3><span class="step-number">12</span> Upgrade</h3>
+                <p>
+                  When AI Office runs with docker compose, one command rebuilds
+                  and redeploys it from your clone, migrating its database on
+                  the way:
+                </p>
+                <pre tabindex="0"><code>git switch main
+pnpm redeploy --pull   <span class="comment"># add --yes to skip the question</span></code></pre>
+                <p>
+                  It refuses uncommitted changes, says which database migrations
+                  will run (and stops before changing anything if none lead to
+                  the new schema), backs the database up with
+                  <code>pg_dump</code> to <code>~/ai-office-backups</code>,
+                  builds the images while the old app keeps serving, then swaps
+                  the new app in and waits until it is healthy. The app runs the
+                  migrations as it starts, in one transaction that is committed
+                  only if the result matches the new schema. If the new app
+                  never gets healthy and the database was left as it was, the
+                  previous image is put back. See
+                  <a
+                    href="{{REPO_URL}}/blob/main/docs/guide/running.md#redeploying-pnpm-redeploy"
+                    >Redeploying</a
                   >.
                 </p>
               </article>

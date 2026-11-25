@@ -46,12 +46,32 @@ open it beyond your machine, use compose's `tls` profile.
 
 Tests that need Postgres start Postgres 18 with Testcontainers, so they need
 Docker. Without it they are skipped with the reason (or fail when `CI` is
-set, so CI never skips them). AI Office is not in production yet, so its
-schema has no migrations: it is one plain SQL file, `packages/db/schema.sql`.
-After changing `packages/db/src/schema.ts` (or
-`src/schema-extras.sql`, the trigger and starting rows it cannot say),
-`pnpm --filter @ai-office/db db:generate` writes it again, and
-`pnpm db:reset` recreates the development database from it.
+set, so CI never skips them).
+
+### Changing the schema
+
+The schema is one plain SQL file, `packages/db/schema.sql`, and each change
+to it ships with a migration in `packages/db/migrations` (see
+[The database schema](running.md#the-database-schema)):
+
+1. Change `packages/db/src/schema.ts` (or `src/schema-extras.sql`, the
+   trigger and starting rows it cannot say).
+2. `pnpm --filter @ai-office/db db:generate` writes `schema.sql` again.
+3. `pnpm db:migration <name>` (such as `add_browser_access`) writes the next
+   migration file, `NNNN_<name>.sql`, from the version the last one ends at
+   (`-- from:`) to today's (`-- to:`), with the change to `schema.sql` in it
+   as comments. Write its SQL: `ALTER TABLE`s, and any `UPDATE`s that fill a
+   new column for rows already there. A change only to comments needs no SQL.
+4. `pnpm --filter @ai-office/db test` checks the migrations are one chain
+   ending at today's `schema.sql`. `pnpm db:schema` then migrates your
+   development database, and refuses, naming each difference, if the
+   migration leaves it different from a fresh one.
+
+If you change `schema.ts` again before the migration is merged, run
+`db:generate` again and set the migration's `-- to:` line to the hash the
+test names. Never edit a migration once it is released: databases have
+already run it. Changes to starting rows (the built-in Roles, say) are not
+compared, so a migration must make those itself.
 
 ### End-to-end tests
 

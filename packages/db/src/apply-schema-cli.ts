@@ -1,6 +1,6 @@
 // `pnpm db:schema`: applies the schema (`schema.sql`) to the database at
-// DATABASE_URL if it is empty, checks it is the same schema if not, then
-// exits.
+// DATABASE_URL if it is empty, migrates it if it was made from an earlier
+// version, or checks it is the same schema, then exits.
 import { applySchema } from "./apply-schema.ts";
 import { connect, databaseUrlFromEnv } from "./client.ts";
 import { errorMessage } from "./error-message.ts";
@@ -15,7 +15,12 @@ try {
 
 const connection = connect(url);
 try {
-  await applySchema(connection.db);
+  const outcome = await applySchema(connection.db);
+  if (outcome.action === "migrated") {
+    console.log(
+      `Schema migrated from ${outcome.from} with ${outcome.migrations.join(", ")}.`,
+    );
+  }
   console.log("Schema is up to date.");
 } catch (error) {
   const message = errorMessage(error);

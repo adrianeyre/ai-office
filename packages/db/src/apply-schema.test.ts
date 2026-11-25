@@ -5,11 +5,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   applySchema,
+  MigrationError,
   schemaFile,
   schemaHash,
   schemaHashKey,
   SchemaMismatchError,
 } from "./apply-schema.ts";
+import type { Database } from "./client.ts";
+import { compareWithSchemaSql } from "./compare-schema.ts";
+import type { Migration } from "./migrations.ts";
 import { roles, schemaMeta } from "./schema.ts";
 import { postgresTest } from "./testing/postgres.ts";
 
@@ -66,7 +70,9 @@ describe("the schema against Postgres 18", () => {
   );
 
   postgresTest("is a no-op when applied again", async ({ database }) => {
-    await applySchema(database.db);
+    await expect(applySchema(database.db)).resolves.toEqual({
+      action: "unchanged",
+    });
     await applySchema(database.db);
     const rows = await database.db.select().from(schemaMeta);
     expect(rows).toHaveLength(2);
@@ -91,6 +97,22 @@ describe("the schema against Postgres 18", () => {
   );
 
   postgresTest(
+    "describes a fresh database as the same as schema.sql",
+    async ({ database }) => {
+      const schemaSql = await readFile(schemaFile, "utf8");
+      const differences = await database.db.transaction((tx) =>
+        compareWithSchemaSql(tx, schemaSql),
+      );
+      expect(differences).toEqual({ missing: [], unexpected: [] });
+      // The scratch schema is gone again.
+      const scratch = await database.db.execute<{ n: number }>(
+        sql`SELECT count(*)::int AS n FROM pg_namespace WHERE nspname = 'ai_office_schema_check'`,
+      );
+      expect(scratch.rows[0]?.n).toBe(0);
+    },
+  );
+
+  postgresTest(
     "refuses a database with schema_meta but no recorded hash",
     async ({ database }) => {
       await database.db
@@ -99,6 +121,92 @@ describe("the schema against Postgres 18", () => {
       await expect(applySchema(database.db)).rejects.toThrow(
         /no schema hash recorded.*pnpm db:reset/,
       );
+    },
+  );
+
+  postgresTest(
+    "describes a database restored from pg_dump as the same, though its expressions print flatter",
+    async ({ database }) => {
+      // pg_dump prints this check as one flat AND, and a restore keeps it so.
+      await database.db.execute(sql`
+        ALTER TABLE "memory_proposals" DROP CONSTRAINT "memory_proposals_text";
+        ALTER TABLE "memory_proposals" ADD CONSTRAINT "memory_proposals_text"
+          CHECK (length(text) >= 1 AND length(text) <= 300 AND position(E'\\n' in text) = 0)`);
+      const schemaSql = await readFile(schemaFile, "utf8");
+      const differences = await database.db.transaction((tx) =>
+        compareWithSchemaSql(tx, schemaSql),
+      );
+      expect(differences).toEqual({ missing: [], unexpected: [] });
+    },
+  );
+
+  postgresTest(
+    "migrates a database made from an earlier schema, keeping its rows",
+    async ({ database }) => {
+      const { current, earlier } = await schemas();
+      await recreate(database.db, earlier);
+      await database.db
+        .insert(schemaMeta)
+        .values({ key: "kept", value: "through the migration" });
+      const outcome = await applySchema(database.db, {
+        migrations: chainTo(earlier, current, addBrowserAccess),
+      });
+      expect(outcome).toEqual({
+        action: "migrated",
+        from: schemaHash(earlier),
+        migrations: ["0001_browser_access.sql"],
+      });
+      expect(await recordedHash(database.db)).toBe(schemaHash(current));
+      const kept = await database.db
+        .select({ value: schemaMeta.value })
+        .from(schemaMeta)
+        .where(eq(schemaMeta.key, "kept"));
+      expect(kept).toEqual([{ value: "through the migration" }]);
+      await expect(applySchema(database.db)).resolves.toEqual({
+        action: "unchanged",
+      });
+    },
+  );
+
+  postgresTest(
+    "refuses a migration that falls short of schema.sql, changing nothing",
+    async ({ database }) => {
+      const { current, earlier } = await schemas();
+      await recreate(database.db, earlier);
+      // The column, but not its check constraint.
+      const applying = applySchema(database.db, {
+        migrations: chainTo(
+          earlier,
+          current,
+          `ALTER TABLE "gateway_keys" ADD COLUMN "browser_access" jsonb;`,
+        ),
+      });
+      await expect(applying).rejects.toBeInstanceOf(MigrationError);
+      await expect(applying).rejects.toThrow(
+        /missing: +constraint gateway_keys\.gateway_keys_browser_access CHECK/,
+      );
+      expect(await recordedHash(database.db)).toBe(schemaHash(earlier));
+      expect(await hasBrowserAccess(database.db)).toBe(false);
+    },
+  );
+
+  postgresTest(
+    "refuses a migration whose SQL fails, naming it and changing nothing",
+    async ({ database }) => {
+      const { current, earlier } = await schemas();
+      await recreate(database.db, earlier);
+      const applying = applySchema(database.db, {
+        migrations: chainTo(
+          earlier,
+          current,
+          `ALTER TABLE "gateway_keys" ADD COLUMN "browser_access" jsonb;\nALTER TABLE "no_such_table" ADD COLUMN "x" int;`,
+        ),
+      });
+      await expect(applying).rejects.toThrow(
+        /Migration 0001_browser_access\.sql failed.*no_such_table/,
+      );
+      expect(await recordedHash(database.db)).toBe(schemaHash(earlier));
+      expect(await hasBrowserAccess(database.db)).toBe(false);
     },
   );
 
@@ -123,3 +231,58 @@ describe("the schema against Postgres 18", () => {
     },
   );
 });
+
+const addBrowserAccess = `ALTER TABLE "gateway_keys" ADD COLUMN "browser_access" jsonb;
+ALTER TABLE "gateway_keys" ADD CONSTRAINT "gateway_keys_browser_access" CHECK ("gateway_keys"."browser_access" IS NULL OR "gateway_keys"."kind" = 'owner_tool');`;
+
+/** Today's schema.sql, and the one before Browser access was added to it. */
+async function schemas(): Promise<{ current: string; earlier: string }> {
+  const current = await readFile(schemaFile, "utf8");
+  const earlier = current
+    .replace('\t"browser_access" jsonb,\n', "")
+    .replace(/\tCONSTRAINT "gateway_keys_browser_access"[^\n]*\n/, "");
+  expect(earlier.length).toBeLessThan(current.length - 100);
+  return { current, earlier };
+}
+
+/** A baseline at `from`, then one migration to `to`. */
+function chainTo(from: string, to: string, migrationSql: string): Migration[] {
+  return [
+    {
+      name: "0000_baseline.sql",
+      from: undefined,
+      to: schemaHash(from),
+      sql: "",
+    },
+    {
+      name: "0001_browser_access.sql",
+      from: schemaHash(from),
+      to: schemaHash(to),
+      sql: migrationSql,
+    },
+  ];
+}
+
+/** Empties the database and makes it again from `schemaSql`. */
+async function recreate(db: Database, schemaSql: string): Promise<void> {
+  await db.execute(sql`DROP SCHEMA public CASCADE`);
+  await db.execute(sql`CREATE SCHEMA public`);
+  await expect(applySchema(db, { schemaSql })).resolves.toEqual({
+    action: "created",
+  });
+}
+
+async function recordedHash(db: Database): Promise<string | undefined> {
+  const [row] = await db
+    .select({ value: schemaMeta.value })
+    .from(schemaMeta)
+    .where(eq(schemaMeta.key, schemaHashKey));
+  return row?.value;
+}
+
+async function hasBrowserAccess(db: Database): Promise<boolean> {
+  const result = await db.execute<{ present: boolean }>(
+    sql`SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'gateway_keys' AND column_name = 'browser_access') AS present`,
+  );
+  return result.rows[0]?.present === true;
+}
