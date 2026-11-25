@@ -13,7 +13,8 @@
     "typecheck": "tsc",
     "test": "vitest run",
     "db:schema": "node --env-file-if-exists=../../.env src/apply-schema-cli.ts",
-    "db:generate": "node src/generate-schema.ts"
+    "db:generate": "node src/generate-schema.ts",
+    "db:migration": "node src/new-migration.ts"
   },
   "dependencies": {
     "drizzle-orm": "~0.45.4",

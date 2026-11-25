@@ -459,6 +459,11 @@ describe("the Dockerfile", async () => {
     expect(dockerfile).toContain(
       "COPY packages/db/schema.sql packages/db/schema.sql\n",
     );
+    // The migrations, which the schema step runs on a database made from an
+    // earlier schema.
+    expect(dockerfile).toContain(
+      "COPY packages/db/migrations packages/db/migrations\n",
+    );
     // The built-in Floor Templates, which the server loads as it starts.
     expect(dockerfile).toContain("COPY templates templates\n");
     // The pricing table, which the AI Gateway reads as it starts.

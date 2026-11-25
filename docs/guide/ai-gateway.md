@@ -173,7 +173,7 @@ circulating ISO 4217 currency).
   `config.changed` event naming what changed (`currency.currency`,
   `currency.manualRate`). It is kept in `schema_meta` under
   `setting:currency`, not in a column of `office_settings`, so adding it
-  did not change the schema (which has no migrations).
+  did not change the schema (which had no migrations then).
 
 ### Analytics
 

@@ -7,10 +7,12 @@ export {
 } from "./client.ts";
 export {
   applySchema,
+  MigrationError,
   schemaFile,
   schemaHash,
   schemaHashKey,
   SchemaMismatchError,
+  type SchemaOutcome,
 } from "./apply-schema.ts";
 export {
   deleteConnectionDeliveriesBefore,

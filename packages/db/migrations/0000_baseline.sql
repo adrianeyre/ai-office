@@ -1,0 +1,4 @@
+-- to: c831bd5be022b196bd2d5dc71aaba0ea54780cde150ec03512a689e53a34ca6e
+-- The baseline: schema.sql as of release 1.13.0, the first version that
+-- databases are migrated from. A database made from an earlier version can
+-- only be recreated. There is nothing to run.

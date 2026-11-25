@@ -390,20 +390,58 @@ curl localhost:3046/health   # {"status":"ok","database":"up"}
 
 ### The database schema
 
-AI Office is not in production yet, so it has no database migrations. The
-whole schema is one plain SQL file, `packages/db/schema.sql`, generated from
-`packages/db/src/schema.ts` and `packages/db/src/schema-extras.sql` (the
+The whole schema is one plain SQL file, `packages/db/schema.sql`, generated
+from `packages/db/src/schema.ts` and `packages/db/src/schema-extras.sql` (the
 events log's trigger and the rows a new database starts with) by
-`pnpm --filter @ai-office/db db:generate`. Don't edit it by hand.
+`pnpm --filter @ai-office/db db:generate`. Don't edit it by hand. Each
+version of it is named by its sha256.
 
-`pnpm db:schema` (and the app's container, each time it starts) applies it:
+`pnpm db:schema` (and the app's container, each time it starts) applies it,
+in one transaction:
 
-- to an empty database, it runs the whole of `schema.sql` in one
-  transaction and records its sha256 in `schema_meta` (`schema_hash`);
+- to an empty database, it runs the whole of `schema.sql` and records its
+  sha256 in `schema_meta` (`schema_hash`);
 - to a database that already has this schema, it does nothing;
-- to a database made from a different version of the schema, it refuses,
-  and says to recreate the database. For the development Postgres that is
+- to a database made from an earlier version, it runs the migrations in
+  `packages/db/migrations` from that version to this one, then builds a
+  fresh copy of `schema.sql` in a scratch schema and compares the two. Only
+  if they are the same does it commit, with the new hash; otherwise it
+  names the differences and changes nothing;
+- to a database made from a version no migration starts from (one older
+  than the `0000_baseline` migration, say), it refuses, and says to
+  recreate the database. For the development Postgres that is
   `pnpm db:reset`, which deletes its data.
+
+So upgrading AI Office is rebuilding the image: the app migrates its
+database as it starts. A migration that fails leaves the database as it was,
+and the container exits (compose restarts it) until a fixed image is built
+([ADR 0017](../architectural-decision-record/0017-schema-changes-ship-with-a-migration-checked-against-schema-sql.md)).
+
+### Redeploying: `pnpm redeploy`
+
+On a machine running AI Office with docker compose, `pnpm redeploy`
+(`docker/deploy.ts`) rebuilds and redeploys it from the working tree in one
+go:
+
+1. It refuses a working tree with changes (everything in it is built into
+   the image) or a branch other than `main`. `--pull` fast-forwards first.
+2. It compares the database's schema hash with this version's and says
+   what will happen: nothing, a fresh schema, or which migrations will run.
+   If no chain of migrations leads there, it stops before changing
+   anything.
+3. It asks to go on (`--yes` skips the question), then backs the database
+   up with `pg_dump` to `~/ai-office-backups` (`AI_OFFICE_BACKUP_DIR`),
+   keeping the newest five (`AI_OFFICE_BACKUPS_KEPT`). `--skip-backup`
+   skips this.
+4. It builds any sandbox image not built yet, then the app's image, while
+   the old app keeps serving. It keeps the old image as `ai-office:rollback`.
+5. It replaces the app and starts the sandbox relay, waiting until they are
+   healthy. The app migrates the database as it starts.
+6. If the new app never becomes healthy and the database was left as it
+   was, it puts `ai-office:rollback` back. If the database was migrated,
+   it doesn't touch it and prints how to restore the backup.
+
+`--allow-dirty` and `--allow-branch` override the checks in step 1.
 
 `GET /health` is 200 when the database answers and 503 when it does not. The
 server also serves the built web app from `apps/web/dist`, with every other

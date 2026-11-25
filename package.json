@@ -16,6 +16,7 @@
     "test": "vitest run",
     "format": "prettier --write . && node --max-old-space-size=8192 node_modules/eslint/bin/eslint.js --fix .",
     "db:schema": "pnpm --filter @ai-office/db db:schema",
+    "db:migration": "pnpm --filter @ai-office/db db:migration",
     "e2e": "pnpm build && pnpm --filter @ai-office/e2e e2e",
     "sandbox:build": "node docker/sandbox-build.ts",
     "sandbox:ensure": "node docker/sandbox-build.ts --missing",
