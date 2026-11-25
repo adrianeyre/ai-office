@@ -393,19 +393,23 @@ docker compose --profile tls start
 
 ## 10. Upgrade
 
-1. **Back up first.** AI Office is not in production yet and has no
-   database migrations, so going back to an older version means restoring
-   the dump taken before the upgrade.
+1. **Back up first.** The app migrates its database forward as it starts,
+   but never back, so going back to an older version means restoring the
+   dump taken before the upgrade.
 
    ```bash
    ~/backup-ai-office.sh
    ```
 
-2. **Update and rebuild.** The app checks the database schema as it
-   starts, before it listens. If this version's schema differs from the
-   database's, it exits and `docker compose logs app` says so: the
-   database has to be recreated (`docker volume rm ai-office_postgres-data`,
-   which deletes its data) for the new schema to be applied.
+2. **Update and rebuild.** The app runs any migrations the database needs
+   as it starts, before it listens, and commits them only if the result
+   matches this version's schema. If a migration fails, the database is left
+   as it was, the app exits, and `docker compose logs app` says why
+   ([ADR 0017](../architectural-decision-record/0017-schema-changes-ship-with-a-migration-checked-against-schema-sql.md)).
+   `pnpm redeploy` does this step, the backup and a rollback in one go
+   ([Redeploying](../guide/running.md#redeploying-pnpm-redeploy)). It runs
+   the default compose services, so start Caddy with the `tls` profile
+   afterwards if it isn't running.
 
    ```bash
    cd ~/ai-office

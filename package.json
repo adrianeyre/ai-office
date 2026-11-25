@@ -20,6 +20,7 @@
     "e2e": "pnpm build && pnpm --filter @ai-office/e2e e2e",
     "sandbox:build": "node docker/sandbox-build.ts",
     "sandbox:ensure": "node docker/sandbox-build.ts --missing",
+    "redeploy": "node docker/deploy.ts",
     "screenshots": "pnpm build && pnpm --filter @ai-office/e2e screenshots",
     "scenes": "pnpm --filter @ai-office/e2e scenes",
     "site:build": "node site/build.ts",
