@@ -17,6 +17,7 @@ import {
   floorSkillDetailSchema,
   floorSkillListSchema,
   mattPocockSkillNames,
+  ownSkillNames,
   repositorySkillDetailSchema,
   skillErrorCodes,
 } from "@ai-office/shared";
@@ -217,13 +218,13 @@ const cases: Case[] = [
       expect(response.statusCode).toBe(200);
       const list = floorSkillListSchema.parse(response.json());
       expect(list.repositoryError).toBeNull();
-      // AI Office's own adapted from Matt Pocock's skills, on every Floor
-      // (FR-83b).
+      // AI Office's own: `/guidelines` (FR-109) and those adapted from Matt
+      // Pocock's skills (FR-83b), on every Floor.
       expect(
         list.skills.flatMap(({ name, source }) =>
           source === "built-in" && name !== "grilling" ? [name] : [],
         ),
-      ).toEqual([...mattPocockSkillNames].sort());
+      ).toEqual([...ownSkillNames, ...mattPocockSkillNames].sort());
       expect(
         list.skills
           .filter(

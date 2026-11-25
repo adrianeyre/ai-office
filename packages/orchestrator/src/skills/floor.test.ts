@@ -16,6 +16,7 @@ import {
   floorErrorCodes,
   grillingSkillNames,
   mattPocockSkillNames,
+  ownSkillNames,
   parseSkillDocument,
   skillErrorCodes,
   type SkillFile,
@@ -359,7 +360,8 @@ const allOff = { coder: false, qa: false, docs: false, designer: false };
 
 /**
  * The Floor's own Skills and `/grilling`, without the built-in Skills
- * adapted from Matt Pocock's, which every Floor has.
+ * kept as Skill folders (`/guidelines` and those adapted from Matt
+ * Pocock's), which every Floor has.
  */
 const withoutMattPococks = <Skill extends { name: string; source: string }>(
   skills: readonly Skill[],
@@ -399,7 +401,7 @@ describe("a Floor's Skills", () => {
         source === "built-in" ? [[name, roles]] : [],
       ),
     ).toEqual(
-      [...mattPocockSkillNames, "grilling"]
+      [...mattPocockSkillNames, ...ownSkillNames, "grilling"]
         .sort()
         .map((name) => [name, allOff]),
     );
@@ -638,7 +640,12 @@ describe("a Floor's Skills", () => {
       expect(text).toContain("Adapted from Matt Pocock's skills, MIT");
       expect(text).not.toContain("setup-matt-pocock-skills");
     }
-    for (const name of [...grillingSkillNames.slice(1), "domain-modeling"]) {
+    for (const name of [
+      ...grillingSkillNames
+        .slice(1)
+        .filter((name) => name !== "guidelines" && name !== "spec"),
+      "domain-modeling",
+    ]) {
       const text = (
         builtInSkills.find((each) => each.name === name)?.files ?? []
       )
@@ -650,6 +657,26 @@ describe("a Floor's Skills", () => {
     expect(
       (await floorSkills.get("web-shop", "pr")).files.map(({ path }) => path),
     ).toEqual(["SKILL.md"]);
+
+    // `/guidelines` is AI Office's own (FR-109): no credit to Matt Pocock,
+    // and it writes only the Floor's Guidelines.
+    const guidelines = await floorSkills.get("web-shop", "guidelines");
+    expect(guidelines).toMatchObject({ source: "built-in" });
+    const text = guidelines.files.map(({ content }) => content).join("");
+    expect(text).not.toContain("Matt Pocock");
+    expect(text).toContain(".agents/guidelines/<name>.md");
+    expect(text).toContain("It writes no PRD, ADRs, glossary or process docs");
+
+    // `/spec` is AI Office's own too (FR-113): no credit to Matt Pocock,
+    // and it writes only its Spec, in three phases the Owner confirms.
+    const spec = await floorSkills.get("web-shop", "spec");
+    expect(spec).toMatchObject({ source: "built-in" });
+    const specText = spec.files.map(({ content }) => content).join("");
+    expect(specText).not.toContain("Matt Pocock");
+    expect(specText).toContain("`.agents/specs/<slug>/`");
+    expect(specText).toContain('"confirm requirements"');
+    expect(specText).toContain('"skip design"');
+    expect(specText).toContain("Only the Spec: no PRD");
   });
 
   it("will not load a built-in Skill that is not a valid Skill", () => {

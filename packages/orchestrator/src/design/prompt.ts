@@ -1,5 +1,9 @@
 import { command, commitRules, quotedIn } from "../coder/prompt.ts";
 import { agentTrailer, type TrailerAgent } from "../git/identity.ts";
+import {
+  withMountedGuidelines,
+  type GivenGuidelines,
+} from "../guidelines/prompt.ts";
 import { memorySection, proposingMemory } from "../memory/memory.ts";
 import {
   withMountedMemory,
@@ -52,6 +56,11 @@ export interface DesignPromptInput {
   readonly round: { readonly number: number; readonly cap: number };
   /** The Handoff it takes: QA's, or the reviewers' on a Floor without QA. */
   readonly handoff?: HandoffSummary;
+  /**
+   * The Owner's Guidelines for the task, mounted in its sandbox
+   * (Guidelines PRD, FR-105 to FR-108); none when absent.
+   */
+  readonly guidelines?: GivenGuidelines;
   /** The repository's memory, redacted, if it has any (FR-53). */
   readonly memory?: string;
   /** The office-wide and Role memory mounted in its sandbox (FR-54, FR-55). */
@@ -108,6 +117,7 @@ export function designPrompt(input: DesignPromptInput): string {
           `Known risks: ${quotedIn("handoff", input.handoff.risks)}`,
           "</handoff>",
         ]),
+    ...withMountedGuidelines(input.guidelines),
     ...(input.memory === undefined
       ? []
       : ["", ...memorySection(input.memory, input.budget?.repositoryMemory)]),

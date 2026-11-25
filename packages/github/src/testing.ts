@@ -2,6 +2,7 @@
 // HTTP for the real App client (and the server) to call.
 export {
   createFakeGitHub,
+  type FakeActivity,
   type FakeGitHub,
   type FakeGitHubOptions,
   type FakeLabel,

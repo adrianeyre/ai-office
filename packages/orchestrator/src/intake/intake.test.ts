@@ -13,6 +13,13 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createFloors, type Floors } from "../floors/floors.ts";
+import type { ApprovedGuideline } from "../guidelines/approval.ts";
+import {
+  approvedGuideline,
+  floorGuidelines,
+  releaseGuideline,
+  techGuideline,
+} from "../guidelines/testing.ts";
 import type { Triage } from "../manager/triage.ts";
 import { createPipeline } from "../pipeline/pipeline.ts";
 import { memoryStores } from "../stores.ts";
@@ -448,5 +455,123 @@ describe("issue intake", () => {
     await vi.advanceTimersByTimeAsync(1_000);
     expect(queued).toHaveLength(4);
     await intake.stop();
+  });
+});
+
+describe("guideline:<name> labels (Guidelines PRD, FR-105)", () => {
+  /** Intake on web-shop, whose approved Guidelines are `approved`. */
+  async function withGuidelines(approved: { current: ApprovedGuideline[] }) {
+    const github = createFakeGitHub();
+    github.installRepository(webShop);
+    const stores = memoryStores();
+    const bus = createEventBus({ store: memoryEventStore() });
+    await createFloors({ store: stores.floors, github, events: bus }).add(
+      webShop,
+    );
+    const queue = memoryIntakeQueue();
+    const intake = createIntake({
+      floors: stores.floors,
+      github,
+      pipeline: createPipeline({ github, events: bus }),
+      queue,
+      events: bus,
+      settings: () => Promise.resolve(defaultIntakeSettings),
+      guidelines: {
+        sync: () =>
+          Promise.resolve({
+            approved: approved.current,
+            unapproved: [],
+            refused: [],
+          }),
+      },
+    });
+    const guidelineLabels = () =>
+      github
+        .labels(webShop)
+        .filter(({ name }) => name.startsWith("guideline:"))
+        .map(({ name, color, description }) => ({ name, color, description }));
+    return { github, intake, queued: queue.items, guidelineLabels };
+  }
+
+  it("makes one for each manual Guideline, once a process, and none for an always or fileMatch one", async () => {
+    const { github, intake, guidelineLabels } = await withGuidelines({
+      current: [...floorGuidelines],
+    });
+    expect((await intake.poll()).failed).toEqual([]);
+    // tech is always, migrations and web are fileMatch: only release.
+    expect(guidelineLabels()).toEqual([
+      {
+        name: "guideline:release",
+        color: "d4c5f9",
+        description: "AI Office: follow the Owner's release Guideline",
+      },
+    ]);
+
+    await github
+      .repository(webShop)
+      .renameLabel("guideline:release", { name: "release", color: "ededed" });
+    await intake.poll();
+    // Made once a process, as the pipeline's and role:<name> labels are.
+    expect(guidelineLabels()).toEqual([]);
+
+    // A webhook says a label was deleted or renamed: made again.
+    intake.recheckLabels("web-shop");
+    await intake.poll();
+    expect(guidelineLabels().map(({ name }) => name)).toEqual([
+      "guideline:release",
+    ]);
+  });
+
+  it("makes one for a manual Guideline the Owner approves later", async () => {
+    const approved = { current: [techGuideline] };
+    const { intake, guidelineLabels } = await withGuidelines(approved);
+    await intake.poll();
+    expect(guidelineLabels()).toEqual([]);
+
+    approved.current = [
+      techGuideline,
+      releaseGuideline,
+      approvedGuideline(
+        "hotfix",
+        ["inclusion: manual"],
+        "Branch from the last release.",
+      ),
+    ];
+    await intake.poll();
+    expect(guidelineLabels().map(({ name }) => name)).toEqual([
+      "guideline:release",
+      "guideline:hotfix",
+    ]);
+  });
+
+  it("makes none for a Floor without Guidelines", async () => {
+    const { intake, guidelineLabels } = await withGuidelines({ current: [] });
+    expect((await intake.poll()).failed).toEqual([]);
+    expect(guidelineLabels()).toEqual([]);
+  });
+
+  it("ignores a guideline:<name> label naming no Guideline: the issue is taken in as ever", async () => {
+    const { github, intake, queued, guidelineLabels } = await withGuidelines({
+      current: [...floorGuidelines],
+    });
+    const issue = github.createIssue(webShop, {
+      title: "Add a basket",
+      labels: ["ai-office", "guideline:nothing", "guideline:tech"],
+    });
+    const report = await intake.poll();
+    expect(report.failed).toEqual([]);
+    expect(report.pickedUp).toEqual([
+      { floorId: "web-shop", issue: issue.number },
+    ]);
+    expect(queued).toEqual([
+      { floorId: "web-shop", issue: issue.number, stage: "needs-work" },
+    ]);
+    // Intake made only the manual Guideline's; the issue's own stay as
+    // they are, asking for nothing.
+    expect(
+      guidelineLabels()
+        .filter(({ description }) => description.startsWith("AI Office"))
+        .map(({ name }) => name),
+    ).toEqual(["guideline:release"]);
   });
 });

@@ -808,6 +808,8 @@ describe("Grilling Sessions in the Manager chat", () => {
     documents: null,
     issues: null,
     sources: [],
+    guidelines: [],
+    spec: null,
   });
   const roundMessage = (): ManagerChatMessage => ({
     ...message(
@@ -1067,6 +1069,158 @@ describe("Grilling Sessions in the Manager chat", () => {
       "Refunds go back to the card: A refund is paid to the card that paid.",
     );
     expect(within(dialog).getByText("Handling a return")).toBeTruthy();
+  });
+
+  it("reads a /guidelines session with the Guidelines it settled in place of the PRD's outline, and no issues (FR-109)", async () => {
+    const ended: GrillingSession = {
+      ...session(3, "ended", []),
+      topic: "",
+      skill: "guidelines",
+      endedAt: "2026-11-24T12:00:03.000Z",
+      guidelines: [
+        {
+          name: "tech",
+          inclusion: "always",
+          fileMatchPatterns: [],
+          description: "The stack and its tools.",
+          text: "Use pnpm, never npm.",
+        },
+        {
+          name: "migrations",
+          inclusion: "fileMatch",
+          fileMatchPatterns: ["packages/db/**", "*.sql"],
+          description: "How migrations are written.",
+          text: "Plain SQL.",
+        },
+      ],
+      documents: {
+        branch: "ai-office/grilling-3",
+        files: [
+          ".agents/guidelines/tech.md",
+          ".agents/guidelines/migrations.md",
+        ],
+        commit: "0123456789abcdef0123456789abcdef01234567",
+        writtenAt: "2026-11-24T12:00:02.000Z",
+        pullRequest: {
+          number: 22,
+          url: "https://github.com/adrianeyre/web-shop/pull/22",
+        },
+        problem: null,
+      },
+    };
+    stubServer(
+      chatOf([]),
+      (text) =>
+        Response.json(
+          { message: message(1, "owner", text), reply: null },
+          { status: 201 },
+        ),
+      [ended],
+    );
+    renderPage();
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Read Grilling Session 3" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Grilling Session 3",
+    });
+    await within(dialog).findByRole("listitem", { name: "tech" });
+    expect(dialog.textContent).toContain("Started with /guidelines");
+    expect(dialog.textContent).toContain(
+      "Kept on ai-office/grilling-3: .agents/guidelines/tech.md, .agents/guidelines/migrations.md.",
+    );
+    expect(
+      within(dialog).getByRole("listitem", { name: "tech" }).textContent,
+    ).toBe("tech (always): The stack and its tools.");
+    expect(
+      within(dialog).getByRole("listitem", { name: "migrations" }).textContent,
+    ).toBe(
+      "migrations (fileMatch: packages/db/**, *.sql): How migrations are written.",
+    );
+    expect(dialog.textContent).not.toContain("The PRD's outline");
+    expect(
+      within(dialog).queryByRole("heading", { name: "Issues" }),
+    ).toBeNull();
+  });
+
+  it("reads a /spec session with its phase and each document of its Spec, approved, drafted or skipped (FR-113)", async () => {
+    const requirements = {
+      introduction: "",
+      requirements: [
+        {
+          title: "Save a card",
+          story: "As a shopper, I want to save my card.",
+          criteria: [
+            "R1.1 WHEN a card is saved THE SYSTEM SHALL keep its token.",
+          ],
+        },
+      ],
+    };
+    const tasks = [
+      {
+        title: "The vault",
+        description: "Keep the token.",
+        meets: ["R1.1"],
+        dependsOn: [],
+      },
+    ];
+    const running: GrillingSession = {
+      ...session(4, "paused", []),
+      topic: "saved cards",
+      skill: "spec",
+      spec: {
+        slug: "saved-cards",
+        phase: "tasks",
+        drafts: { requirements, design: null, tasks },
+        approved: { requirements, design: null, tasks: null },
+        designSkipped: true,
+        confirmedAt: {
+          requirements: "2026-11-24T12:00:01.000Z",
+          design: "2026-11-24T12:00:02.000Z",
+          tasks: null,
+        },
+      },
+    };
+    stubServer(
+      chatOf([]),
+      (text) =>
+        Response.json(
+          { message: message(1, "owner", text), reply: null },
+          { status: 201 },
+        ),
+      [running],
+    );
+    renderPage();
+    await userEvent.click(
+      await screen.findByRole("button", {
+        name: "Read Grilling Session 4: saved cards",
+      }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Grilling Session 4: saved cards",
+    });
+    const approved = await within(dialog).findByRole("region", {
+      name: ".agents/specs/saved-cards/requirements.md",
+    });
+    expect(dialog.textContent).toContain("Started with /spec");
+    expect(dialog.textContent).toContain("On the tasks.");
+    expect(approved.textContent).toContain(
+      ".agents/specs/saved-cards/requirements.md (approved)",
+    );
+    expect(approved.textContent).toContain(
+      "- R1.1 WHEN a card is saved THE SYSTEM SHALL keep its token.",
+    );
+    expect(
+      within(dialog).getByRole("region", {
+        name: ".agents/specs/saved-cards/design.md",
+      }).textContent,
+    ).toBe(".agents/specs/saved-cards/design.md (skipped)");
+    const draft = within(dialog).getByRole("region", {
+      name: ".agents/specs/saved-cards/tasks.md",
+    });
+    expect(draft.textContent).toContain("(draft)");
+    expect(draft.textContent).toContain("## 1. The vault");
+    expect(dialog.textContent).not.toContain("The PRD's outline");
   });
 
   it("edits, reorders, merges and drops an ended session's draft issues, then approves them to be filed", async () => {

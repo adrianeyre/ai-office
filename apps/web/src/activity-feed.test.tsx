@@ -412,6 +412,9 @@ describe("event text", () => {
     expect(describeEvent({ ...approved, messageId: 41 }, names)).toBe(
       "Approved by your request in Manager chat: version 1 of Batch 3's Plan, by Grace.",
     );
+    expect(describeEvent({ ...approved, specSessionId: 7 }, names)).toBe(
+      "Approved by the tasks you confirmed in the Spec of Grilling Session 7: version 1 of Batch 3's Plan, by Grace.",
+    );
   });
 
   it("names Agents, and never needs more than the event", () => {
@@ -948,6 +951,269 @@ describe("event text", () => {
       },
       { kind: "agent", floorId: "web-shop", agentId: "ada" },
     ]);
+  });
+
+  it("says how a Guideline was approved, or that it awaits approval, and links GitHub", () => {
+    const sha = "b".repeat(40);
+    const names = { agent: (id: string) => id };
+    const approved: OfficeEvent = {
+      type: "guideline.approved",
+      version: 1,
+      floorId: "web-shop",
+      name: "migrations",
+      contentHash: "a".repeat(64),
+      approval: "owner_merge",
+      sha,
+      pullRequest: 12,
+      url: "https://github.com/adrianeyre/web-shop/pull/12",
+    };
+    expect(describeEvent(approved, names)).toBe(
+      'Guideline "migrations" approved: the Owner merged PR #12, which changed it. Agents follow this version.',
+    );
+    expect(sourceLinks(approved, [])).toEqual([
+      {
+        kind: "github",
+        href: "https://github.com/adrianeyre/web-shop/pull/12",
+        label: "PR #12 on GitHub",
+      },
+    ]);
+    expect(
+      describeEvent(
+        {
+          type: "guideline.approved",
+          version: 1,
+          floorId: "web-shop",
+          name: "tech",
+          contentHash: "a".repeat(64),
+          approval: "owner_push",
+          sha,
+        },
+        names,
+      ),
+    ).toBe(
+      'Guideline "tech" approved: the Owner pushed the commit that changed it. Agents follow this version.',
+    );
+    const awaiting: OfficeEvent = {
+      type: "guideline.awaiting",
+      version: 1,
+      floorId: "web-shop",
+      name: "tech",
+      contentHash: "c".repeat(64),
+      sha,
+      url: `https://github.com/adrianeyre/web-shop/commit/${sha}`,
+    };
+    expect(describeEvent(awaiting, names)).toBe(
+      'Guideline "tech" changed in bbbbbbb, which the Owner neither merged nor pushed: it awaits the Owner\'s approval, and Agents keep the last version the Owner approved.',
+    );
+    expect(sourceLinks(awaiting, [])).toEqual([
+      {
+        kind: "github",
+        href: `https://github.com/adrianeyre/web-shop/commit/${sha}`,
+        label: "Commit on GitHub",
+      },
+    ]);
+    expect(
+      describeEvent(
+        {
+          type: "guideline.dismissed",
+          version: 1,
+          floorId: "web-shop",
+          name: "tech",
+          contentHash: "c".repeat(64),
+        },
+        names,
+      ),
+    ).toBe(
+      'The Owner dismissed the change to Guideline "tech": Agents keep the last version the Owner approved.',
+    );
+  });
+
+  it("says what became of each Hook and each of its runs, and links the answer", () => {
+    const names = { agent: (id: string) => (id === "linus" ? "Linus" : id) };
+    const run = {
+      version: 1,
+      floorId: "web-shop",
+      hookId: 1,
+      name: "Migration check",
+      trigger: "pull_request_opened",
+      issue: 4,
+      pullRequest: 14,
+    } as const;
+    expect(
+      describeEvent(
+        {
+          type: "hook.added",
+          version: 1,
+          floorId: "web-shop",
+          hookId: 1,
+          name: "Migration check",
+          trigger: "pull_request_opened",
+        },
+        names,
+      ),
+    ).toBe(
+      'The Owner added the Hook "Migration check": A pull request is opened.',
+    );
+    expect(
+      describeEvent(
+        {
+          type: "hook.changed",
+          version: 1,
+          floorId: "web-shop",
+          hookId: 1,
+          name: "Migration check",
+          fields: ["enabled"],
+          by: "owner",
+          enabled: false,
+        },
+        names,
+      ),
+    ).toBe(
+      'The Owner changed the Hook "Migration check" (enabled): it is off.',
+    );
+    expect(
+      describeEvent(
+        {
+          type: "hook.changed",
+          version: 1,
+          floorId: "web-shop",
+          hookId: 1,
+          name: "Migration check",
+          fields: ["enabled"],
+          by: "failures",
+          enabled: false,
+        },
+        names,
+      ),
+    ).toBe(
+      'The Hook "Migration check" turned itself off after 3 failed runs in a row: the Owner can turn it on again in the Floor admin.',
+    );
+    expect(
+      describeEvent(
+        {
+          type: "hook.removed",
+          version: 1,
+          floorId: "web-shop",
+          hookId: 1,
+          name: "Migration check",
+        },
+        names,
+      ),
+    ).toBe('The Owner deleted the Hook "Migration check".');
+    expect(
+      describeEvent(
+        {
+          ...run,
+          type: "hook.run_started",
+          runId: 7,
+          agentId: "linus",
+          skillName: "migration-check",
+        },
+        names,
+      ),
+    ).toBe(
+      'Linus started running /migration-check for the Hook "Migration check" on PR #14.',
+    );
+    const finished: OfficeEvent = {
+      ...run,
+      type: "hook.run_finished",
+      runId: 7,
+      agentId: "linus",
+      outcome: "succeeded",
+      failures: 0,
+      turnedOff: false,
+      url: "https://github.com/adrianeyre/web-shop/pull/14#issuecomment-1",
+    };
+    expect(describeEvent(finished, names)).toBe(
+      'Linus\'s run of the Hook "Migration check" on PR #14 finished, and its answer is posted on GitHub.',
+    );
+    expect(sourceLinks(finished, [])).toContainEqual({
+      kind: "github",
+      href: "https://github.com/adrianeyre/web-shop/pull/14#issuecomment-1",
+      label: "Answer on GitHub",
+    });
+    expect(
+      describeEvent(
+        {
+          ...run,
+          type: "hook.run_finished",
+          runId: 9,
+          agentId: "linus",
+          outcome: "failed",
+          error: "Linus's daily Token Cap is reached.",
+          failures: 3,
+          turnedOff: true,
+        },
+        names,
+      ),
+    ).toBe(
+      "Linus's run of the Hook \"Migration check\" on PR #14 failed: Linus's daily Token Cap is reached. That is 3 in a row, so the Hook is off now.",
+    );
+    expect(
+      describeEvent(
+        { ...run, type: "hook.run_skipped", reason: "rate_limited" },
+        names,
+      ),
+    ).toBe(
+      'The Hook "Migration check" did not run on PR #14: it has made all the runs it may this hour.',
+    );
+  });
+
+  it("says an Agent proposed a Guideline, new or changed, which waits for the Owner", () => {
+    const proposed: OfficeEvent = {
+      type: "guideline.proposed",
+      version: 1,
+      floorId: "web-shop",
+      agentId: "ada",
+      issue: 4,
+      name: "migrations",
+      contentHash: "e".repeat(64),
+      new: false,
+    };
+    expect(describeEvent(proposed, { agent: () => "Ada" })).toBe(
+      'Ada proposed a change to Guideline "migrations" on #4: it waits for the Owner in the Floor admin, and no Agent gets it unless the Owner merges it.',
+    );
+    expect(
+      describeEvent(
+        { ...proposed, name: "accessibility", new: true },
+        { agent: () => "Ada" },
+      ),
+    ).toBe(
+      'Ada proposed a new Guideline "accessibility" on #4: it waits for the Owner in the Floor admin, and no Agent gets it unless the Owner merges it.',
+    );
+  });
+
+  it("names the Guidelines a task's prompt left out over its budget, and whose task it was", () => {
+    const over: OfficeEvent = {
+      type: "guideline.over_budget",
+      version: 1,
+      floorId: "web-shop",
+      task: "work",
+      agentId: "ada",
+      issue: 12,
+      budget: 12_000,
+      characters: 15_400,
+      leftOut: ["migrations", "api"],
+    };
+    expect(describeEvent(over, { agent: () => "Ada" })).toBe(
+      'Ada\'s work of #12 left out Guidelines "migrations" and "api": the Guidelines it was to follow have 15,400 characters, over the 12,000 a prompt carries.',
+    );
+    expect(
+      describeEvent(
+        {
+          type: "guideline.over_budget",
+          version: 1,
+          floorId: "web-shop",
+          task: "chat",
+          budget: 12_000,
+          characters: 13_000,
+          leftOut: ["structure"],
+        },
+        { agent: () => "Ada" },
+      ),
+    ).toBe(
+      'A chat left out Guideline "structure": the Guidelines it was to follow have 13,000 characters, over the 12,000 a prompt carries.',
+    );
   });
 
   it("says what a reviewer's verdict was, and links the review on GitHub", () => {

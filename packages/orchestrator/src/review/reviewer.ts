@@ -27,6 +27,8 @@ import {
   type BatchBranches,
 } from "../batches/one-pull-request.ts";
 import type { RepositoryMemory } from "../memory/memory.ts";
+import type { IssueSpecOf } from "../grilling/issue-spec.ts";
+import type { TaskGuidelines } from "../guidelines/tasks.ts";
 import type { PromptBudgetOf } from "../memory/budget.ts";
 import type { SharedMemory } from "../memory/shared.ts";
 import type { ModelClient, ModelMessage } from "../models/client.ts";
@@ -85,7 +87,11 @@ import { parseVerdict } from "./verdict.ts";
 // verdict is posted on the pull request as a review by the GitHub App,
 // with its comments inline where the diff allows. Each reviewer's prompt
 // has the repository's memory (FR-53), and the office-wide and reviewers'
-// Role memory (FR-54, FR-55), read once a round. How much of the diff a
+// Role memory (FR-54, FR-55), read once a round, and the Owner's
+// Guidelines for the files the pull request changes, quoted as rules to
+// review against (Guidelines PRD, FR-105, FR-106), and, for an issue
+// filed from a Spec, its Acceptance Criteria as the Owner approved them,
+// to judge the pull request against, naming any not met (FR-116). How much of the diff a
 // reviewer is shown is sized from its Model's context window: a pull
 // request whose diff is more than one of its reviewers can be shown goes
 // to the Owner, "Too large to review", naming the window.
@@ -165,6 +171,18 @@ export interface ReviewFlowOptions {
    * (the prompt budget); as much as AI Office keeps without it.
    */
   readonly promptBudget?: PromptBudgetOf;
+  /**
+   * The Owner's Guidelines for each review (Guidelines PRD, FR-105 to
+   * FR-108), quoted in its prompt, by the files the pull request changes.
+   * None without it.
+   */
+  readonly guidelines?: Pick<TaskGuidelines, "forTask">;
+  /**
+   * The Spec each issue was filed from, as the Owner approved it in its
+   * session, never as the repository has it (Guidelines, Specs and Hooks
+   * PRD, FR-116): quoted in the prompt. None without it.
+   */
+  readonly specs?: IssueSpecOf;
   /**
    * The office Role library (FR-98): each reviewer's Role is read from it
    * every round. The built-in Roles when absent.
@@ -384,6 +402,18 @@ export function createReviewFlow(options: ReviewFlowOptions): ExecuteWork {
       floor.id,
       agent.role,
     );
+    const budget = await options.promptBudget?.(agent.aiProvider, model);
+    // The Owner's Guidelines for it, by the files the pull request changes.
+    const guidelines = await options.guidelines?.forTask({
+      floor,
+      task: "review",
+      agentId: agent.id,
+      issue: { number: issue.number, labels: issue.labels },
+      files: round.changed.files.map(({ path }) => path),
+      ...(budget === undefined ? {} : { budget: budget.guidelines }),
+    });
+    // The Spec it was filed from, as the Owner approved it (FR-116).
+    const spec = await options.specs?.(floor.id, issue.number);
     const prompt = reviewerPrompt({
       floor,
       agent: { ...agent, model },
@@ -399,9 +429,9 @@ export function createReviewFlow(options: ReviewFlowOptions): ExecuteWork {
       ...(round.handoff === undefined ? {} : { handoff: round.handoff }),
       ...(round.memory === undefined ? {} : { memory: round.memory }),
       ...(agentMemory === undefined ? {} : { agentMemory }),
-      ...(options.promptBudget === undefined
-        ? {}
-        : { budget: await options.promptBudget(agent.aiProvider, model) }),
+      ...(guidelines === undefined ? {} : { guidelines }),
+      ...(spec === undefined ? {} : { spec }),
+      ...(budget === undefined ? {} : { budget }),
       // As much of the diff as its own Model's context window holds.
       ...(options.contextWindow === undefined
         ? {}

@@ -10,6 +10,7 @@ import {
   intakeLabel,
   pipelineLabels,
   renamedPipelineLabels,
+  guidelineLabel,
   roleLabel,
   type IntakeSettings,
   type PipelineStage,
@@ -17,6 +18,7 @@ import {
 } from "@ai-office/shared";
 
 import type { FloorRecord, FloorStore } from "../floors/store.ts";
+import type { GuidelineApprovals } from "../guidelines/approval.ts";
 import type { Triage } from "../manager/triage.ts";
 import { positionOf, type Pipeline } from "../pipeline/pipeline.ts";
 import { createRounds } from "../rounds.ts";
@@ -35,11 +37,15 @@ import { approvedIssue, UnapprovedIssueError } from "./approved.ts";
 // work; one that is not waits for the Owner, out of the pipeline, as does
 // one whose work Role the Owner is asked to choose. Each Floor's repository
 // gets the pipeline's labels, and a `role:<name>` label for each work Role
-// on its team, which forces that Role (ADR 0003). An issue an open Batch
+// on its team, which forces that Role (ADR 0003), and a `guideline:<name>`
+// label for each `manual` Guideline the Owner approved, which gives the
+// issue's tasks that Guideline (Guidelines PRD, FR-105). An issue an open Batch
 // holds (FR-25), waiting for its Plan's approval or for the issues it
 // depends on, is the Batch's to start, not intake's. With the GitHub App's
 // webhooks on, a webhook starts a round at once; polling carries on, in
 // case a delivery is lost.
+// Each round also reads each Floor's Guidelines from its default branch,
+// so only the versions the Owner approved reach Agents (ADR 0014).
 
 /**
  * Renames the labels the pipeline has renamed on a Floor's repository
@@ -146,8 +152,9 @@ export interface Intake {
    */
   trigger(): Promise<void>;
   /**
-   * Checks the Floor's repository for every pipeline label and its work
-   * Roles' `role:<name>` labels again in the next round, as when one was
+   * Checks the Floor's repository for every pipeline label, its work
+   * Roles' `role:<name>` labels and its `manual` Guidelines'
+   * `guideline:<name>` labels again in the next round, as when one was
    * deleted on GitHub.
    */
   recheckLabels(floorId: string): void;
@@ -171,6 +178,12 @@ export interface IntakeOptions {
    * them for their Batch to start.
    */
   readonly held?: (floorId: string) => Promise<ReadonlySet<number>>;
+  /**
+   * Reads each Floor's Guidelines from its default branch every round,
+   * settling which versions the Owner approved (Guidelines PRD, FR-103):
+   * a Floor whose read fails still has its issues taken in.
+   */
+  readonly guidelines?: Pick<GuidelineApprovals, "sync">;
   /** Told of each round that did something or failed somewhere. */
   readonly onReport?: (report: IntakeReport) => void;
 }
@@ -241,10 +254,17 @@ export function createIntake(options: IntakeOptions): Intake {
    * name, this process.
    */
   const labelled = new Set<string>();
-  /** The `role:<name>` labels made this process, by Floor. */
+  /**
+   * The `role:<name>` and `guideline:<name>` labels made this process, by
+   * Floor.
+   */
   const roleLabelled = new Set<string>();
 
-  const ensureLabels = async (floor: FloorRecord): Promise<void> => {
+  const ensureLabels = async (
+    floor: FloorRecord,
+    /** The Floor's `manual` Guidelines, each asked for by its label. */
+    manual: readonly string[],
+  ): Promise<void> => {
     const repository = github.repository(floor.repository);
     if (!labelled.has(floor.id)) {
       await renameRetiredLabels(repository);
@@ -266,6 +286,16 @@ export function createIntake(options: IntakeOptions): Intake {
         roleLabelled.add(key);
       }
     }
+    // Each `manual` Guideline the Owner approved gets the label that asks
+    // for it (Guidelines PRD, FR-105).
+    for (const name of manual) {
+      const label = guidelineLabel(name);
+      const key = `${floor.id}\n${label.name}`;
+      if (!roleLabelled.has(key)) {
+        await repository.ensureLabel(label);
+        roleLabelled.add(key);
+      }
+    }
   };
 
   const poll = async (): Promise<IntakeReport> => {
@@ -278,9 +308,17 @@ export function createIntake(options: IntakeOptions): Intake {
     const { ownerLogin } = await options.settings();
     // Archived Floors are not listed: their intake has stopped (FR-9).
     for (const floor of await options.floors.list()) {
+      let manual: string[] = [];
+      try {
+        manual = ((await options.guidelines?.sync(floor))?.approved ?? [])
+          .filter(({ inclusion }) => inclusion === "manual")
+          .map(({ name }) => name);
+      } catch (error) {
+        report.failed.push({ floorId: floor.id, error });
+      }
       let issues: Issue[];
       try {
-        await ensureLabels(floor);
+        await ensureLabels(floor, manual);
         issues = await github
           .repository(floor.repository)
           .listIssues({ labels: [intakeLabel] });

@@ -14,12 +14,20 @@ import {
 // does. The sharing strategies spread by that weight:
 // - `session` keeps a session (an Agent's sandbox run, or an Owner tool)
 //   on the account it started on for a window (5 hours by default), and
-//   starts each new session on the account with the fewest sessions for
-//   its weight;
+//   starts each new session on the account that has used the least of its
+//   five-hour usage window for its weight, the one with the fewest
+//   sessions for its weight on a tie;
 // - `session_affinity` keeps a session on its account for as long as it
 //   is in use (each call renews the window), and starts each new session
-//   on the account with the fewest sessions in use for its weight, the one
-//   that has used the fewest tokens lately for its weight on a tie;
+//   the same way, counting the sessions in use, then the one that has used
+//   the fewest tokens lately for its weight on a tie;
+// Sessions differ a great deal in size, so counting them alone can leave
+// the better priority the less used: the five-hour window, as the AI
+// Provider reports it, is what each account has really spent. It is
+// compared in bands of `usageBandPercent`, so accounts close in use tie and
+// sessions started together still spread out; it counts only when every
+// candidate reports a window, so an API key's sessions are counted as
+// before.
 // - `least_used` sends each request to the account that has used the
 //   fewest tokens in the last five hours for its weight.
 // The draining strategies spend one account at a time, so they keep to the
@@ -47,6 +55,11 @@ export interface Candidate {
    */
   readonly fiveHourResetsAt?: Date | null;
   readonly weeklyResetsAt?: Date | null;
+  /**
+   * How much of its five-hour usage window it has used, in percent, where
+   * its AI Provider reports it; null or absent when unknown.
+   */
+  readonly fiveHourUtilization?: number | null;
 }
 
 /** What a strategy knows of the request it chooses for. */
@@ -139,6 +152,33 @@ export function byWeightedLoad<C extends Candidate>(
     ...loads.map((load) => (load(candidate) + 1) * candidate.priority),
     candidate.priority,
   ]);
+}
+
+/** The width of the bands five-hour usage is compared in, in percent. */
+export const usageBandPercent = 5;
+
+/**
+ * How much of its five-hour window each candidate has used, in bands of
+ * `usageBandPercent` (a window that has reset counts as unused), as a
+ * load for `byWeightedLoad`; none when a candidate reports no window, so
+ * what cannot be compared is not.
+ */
+export function windowUsageLoads<C extends Candidate>(
+  candidates: readonly C[],
+  now: Date,
+): ((candidate: C) => number)[] {
+  const known = candidates.every(
+    ({ fiveHourUtilization }) => fiveHourUtilization != null,
+  );
+  if (!known) {
+    return [];
+  }
+  return [
+    ({ fiveHourUtilization, fiveHourResetsAt }) =>
+      fiveHourResetsAt != null && fiveHourResetsAt <= now
+        ? 0
+        : Math.floor((fiveHourUtilization ?? 0) / usageBandPercent),
+  ];
 }
 
 function rankBy<C extends Candidate>(
@@ -259,7 +299,11 @@ export function sessionStrategy(
         sessions,
         request,
         now,
-        byWeightedLoad(candidates, ({ id }) => sessions.sessionsOn(id, now)),
+        byWeightedLoad(
+          candidates,
+          ...windowUsageLoads(candidates, now),
+          ({ id }) => sessions.sessionsOn(id, now),
+        ),
       ),
     (account, { sessionKey }, now, fellBack = false) => {
       // A new window only when the session starts, or moves.
@@ -298,9 +342,11 @@ export interface UsageSource {
 /**
  * Keeps each session on its account for as long as it is in use: every
  * call renews it, and it lapses only after `windowMs` without one. A new
- * session (or a request in none) goes to the account with the fewest
- * sessions in use for its weight, the least-used for its weight on a tie:
- * sessions started together spread out, though none has used a token yet.
+ * session (or a request in none) goes to the account that has used the
+ * least of its five-hour window for its weight, where every candidate
+ * reports one, then the one with the fewest sessions in use for its
+ * weight, then the least-used for its weight: sessions started together
+ * spread out, though none has used a token yet.
  */
 export function sessionAffinityStrategy(
   sessions: SessionTable,
@@ -316,6 +362,7 @@ export function sessionAffinityStrategy(
         now,
         byWeightedLoad(
           candidates,
+          ...windowUsageLoads(candidates, now),
           ({ id }) => sessions.sessionsOn(id, now),
           ({ id }) => usage.used(id, now),
         ),

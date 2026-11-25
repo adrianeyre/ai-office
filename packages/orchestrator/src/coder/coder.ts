@@ -26,6 +26,10 @@ import { agentTrailer, type TrailerAgent } from "../git/identity.ts";
 import type { Published } from "../git/publish.ts";
 import { createPushRun } from "../git/push-run.ts";
 import type { Notices } from "../notices/notices.ts";
+import {
+  keepGuidelineProposal,
+  type GuidelineProposals,
+} from "../guidelines/proposals.ts";
 import { keepProposals, type RepositoryMemory } from "../memory/memory.ts";
 import {
   keepRoleProposals,
@@ -33,6 +37,9 @@ import {
   type SharedMemory,
 } from "../memory/shared.ts";
 import { agentMemoryWithin, type PromptBudgetOf } from "../memory/budget.ts";
+import { guidelineFiles } from "../guidelines/prompt.ts";
+import type { IssueSpecOf } from "../grilling/issue-spec.ts";
+import type { TaskGuidelines } from "../guidelines/tasks.ts";
 import type { Pipeline } from "../pipeline/pipeline.ts";
 import { roleOfAgent } from "../roles/roles.ts";
 import { memoryRoleStore, type RoleStore } from "../roles/store.ts";
@@ -83,7 +90,14 @@ import { coderPrompt, type CoderPromptInput } from "./prompt.ts";
 // entries its Handoff proposes for it are kept for the Manager to curate.
 // Its sandbox has the office-wide and Role memory mounted read-only (FR-54,
 // FR-55), and the entries its Handoff proposes for its Role's memory wait
-// for the Manager or the Owner to decide.
+// for the Manager or the Owner to decide. It has the Owner's Guidelines
+// for the task mounted read-only beside them (Guidelines PRD, FR-105,
+// FR-106): those for every task, those the issue's `guideline:<name>`
+// labels ask for, and those for the files the Batch's Plan expects it to
+// change, with the rest of the Floor's for some files listed. An issue
+// filed from a Spec has its Acceptance Criteria and the Spec's design in
+// its prompt, as the Owner approved them in the Spec's session, never as
+// the repository has them (Guidelines, Specs and Hooks PRD, FR-116).
 //
 // An issue whose Batch's Plan gives it several work Roles (FR-25 (1)) is
 // worked by each in turn on its one branch: when a Role that is not the
@@ -137,10 +151,27 @@ export interface CoderFlowOptions {
    */
   readonly sharedMemory?: SharedMemory;
   /**
+   * Keeps the Guideline an Agent proposes in its Handoff or report, for
+   * the Owner (Guidelines, Specs and Hooks PRD, FR-110).
+   */
+  readonly guidelineProposals?: Pick<GuidelineProposals, "propose">;
+  /**
    * How much of the memory and the Skills an Agent's prompt carries, for
    * its Model (the prompt budget); as much as AI Office keeps without it.
    */
   readonly promptBudget?: PromptBudgetOf;
+  /**
+   * The Owner's Guidelines for each task (Guidelines PRD, FR-105 to
+   * FR-108): mounted into the sandbox, by the files the Plan expects the
+   * issue to change. None without it.
+   */
+  readonly guidelines?: Pick<TaskGuidelines, "forTask">;
+  /**
+   * The Spec each issue was filed from, as the Owner approved it in its
+   * session, never as the repository has it (Guidelines, Specs and Hooks
+   * PRD, FR-116): quoted in the prompt. None without it.
+   */
+  readonly specs?: IssueSpecOf;
   /**
    * The office Role library (FR-98): each task reads its Agent's Role
    * from it as the task starts. The built-in Roles when absent.
@@ -386,6 +417,17 @@ export function createCoderFlow(options: CoderFlowOptions): ExecuteWork {
       },
       report,
     );
+    await keepGuidelineProposal(
+      options.guidelineProposals,
+      {
+        floorId: floor.id,
+        issue: issue.number,
+        agentId: agent.id,
+        text: run.lastText,
+        tag: "handoff",
+      },
+      report,
+    );
     // The last of its work Roles (or a fix) is done: on to review.
     await options.turns?.delivered(floor.id, issue.number, files);
     await pipeline.move(floor, issue.number, "needs-review", {
@@ -464,6 +506,17 @@ export function createCoderFlow(options: CoderFlowOptions): ExecuteWork {
         issue: issue.number,
         agentId: agent.id,
         role: agent.role,
+        text: run.lastText,
+        tag: "handoff",
+      },
+      report,
+    );
+    await keepGuidelineProposal(
+      options.guidelineProposals,
+      {
+        floorId: floor.id,
+        issue: issue.number,
+        agentId: agent.id,
         text: run.lastText,
         tag: "handoff",
       },
@@ -810,6 +863,16 @@ export function createCoderFlow(options: CoderFlowOptions): ExecuteWork {
       agent.aiProvider,
       trailer.model,
     );
+    // The Owner's Guidelines for it, by the files its Plan expects.
+    const guidelines = await options.guidelines?.forTask({
+      floor,
+      task: "work",
+      agentId: agent.id,
+      issue: { number: issue.number, labels: issue.labels },
+      ...(budget === undefined ? {} : { budget: budget.guidelines }),
+    });
+    // The Spec it was filed from, as the Owner approved it (FR-116).
+    const spec = await options.specs?.(floor.id, issue.number);
     let run: SandboxRun | undefined;
     try {
       run = await options.runner.run({
@@ -846,6 +909,8 @@ export function createCoderFlow(options: CoderFlowOptions): ExecuteWork {
           ...(fromQa === undefined ? {} : { qaFeedback: fromQa }),
           ...(turnLines === undefined ? {} : { turns: turnLines }),
           ...(fromDesign === undefined ? {} : { designFeedback: fromDesign }),
+          ...(guidelines === undefined ? {} : { guidelines }),
+          ...(spec === undefined ? {} : { spec }),
           ...(memory === undefined ? {} : { memory }),
           ...(agentMemory === undefined ? {} : { agentMemory }),
           ...(budget === undefined ? {} : { budget }),
@@ -853,6 +918,9 @@ export function createCoderFlow(options: CoderFlowOptions): ExecuteWork {
         ...(agentMemory === undefined
           ? {}
           : { memory: memoryFiles(agentMemoryWithin(agentMemory, budget)) }),
+        ...(guidelines === undefined
+          ? {}
+          : { guidelines: guidelineFiles(guidelines) }),
         ...(budget === undefined ? {} : { skillsBudget: budget.skills }),
         gitIdentity: await options.gitIdentity(floor.id),
         signal,

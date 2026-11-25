@@ -407,6 +407,49 @@ export function planFromDraft(
   };
 }
 
+/** One issue of a Spec's Batch, as its Plan takes it (FR-115). */
+export interface SpecPlanIssue extends PlanIssue {
+  /** The issues of the Batch it waits on: those its task depends on. */
+  readonly dependsOn: readonly number[];
+}
+
+/**
+ * A Spec's Plan, in plain code (Guidelines, Specs and Hooks PRD, FR-115):
+ * the issues in `tasks.md`'s order, each after the issues its task depends
+ * on (only those in the Batch and before it), shared out across the
+ * coders. No model drafts it: the Owner confirmed the tasks it follows.
+ */
+export function planFromSpec(
+  issues: readonly SpecPlanIssue[],
+  team: PlanTeam,
+  leftOut: readonly PlanLeftOut[],
+  spec: string,
+): PlanContent {
+  const assignments = assign(
+    issues.map(() => null),
+    team,
+  );
+  return complete(
+    "rules",
+    `AI Office's rules drafted this Plan from the tasks of the Spec in \`${spec}/\`: the issues in its tasks' order, each after the tasks it depends on, the rest in parallel as the Floor's coders and sandboxes are free.`,
+    issues.map((issue, index) => ({
+      issue: issue.number,
+      title: issue.title,
+      dependsOn: unique(
+        issue.dependsOn.filter((dependency) =>
+          issues
+            .slice(0, index)
+            .some((earlier) => earlier.number === dependency),
+        ),
+      ),
+      files: [],
+      agentId: assignments[index] ?? null,
+      note: "",
+    })),
+    leftOut,
+  );
+}
+
 /**
  * AI Office's own Plan, for when the Manager's Model gives none (FR-17):
  * the issues in the order named, all at once, shared out across the

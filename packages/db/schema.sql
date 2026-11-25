@@ -108,6 +108,20 @@ CREATE TABLE "ai_provider_settings" (
 	CONSTRAINT "ai_provider_settings_default_model" CHECK (length("ai_provider_settings"."default_model") BETWEEN 1 AND 200)
 );
 
+CREATE TABLE "approved_guidelines" (
+	"floor_id" text NOT NULL,
+	"name" text NOT NULL,
+	"content_hash" text NOT NULL,
+	"content" text NOT NULL,
+	"approval" text NOT NULL,
+	"approved_at" timestamp with time zone NOT NULL,
+	CONSTRAINT "approved_guidelines_floor_id_name_content_hash_pk" PRIMARY KEY("floor_id","name","content_hash"),
+	CONSTRAINT "approved_guidelines_name" CHECK ("approved_guidelines"."name" ~ '^[a-z0-9-]+$' AND length("approved_guidelines"."name") <= 255),
+	CONSTRAINT "approved_guidelines_content_hash" CHECK ("approved_guidelines"."content_hash" ~ '^[0-9a-f]{64}$'),
+	CONSTRAINT "approved_guidelines_content" CHECK (length("approved_guidelines"."content") <= 12000),
+	CONSTRAINT "approved_guidelines_approval" CHECK ("approved_guidelines"."approval" IN ('owner_merge', 'owner_push', 'owner_admin'))
+);
+
 CREATE TABLE "batch_acknowledgements" (
 	"batch_id" bigint NOT NULL,
 	"agent_id" text NOT NULL,
@@ -485,15 +499,59 @@ CREATE TABLE "grilling_sessions" (
 	"documents" jsonb,
 	"issues" jsonb,
 	"sources" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"guidelines" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"spec" jsonb,
 	"started_at" timestamp with time zone NOT NULL,
 	"updated_at" timestamp with time zone NOT NULL,
 	"paused_at" timestamp with time zone,
 	"ended_at" timestamp with time zone,
 	CONSTRAINT "grilling_sessions_status" CHECK ("grilling_sessions"."status" IN ('active', 'paused', 'ended')),
 	CONSTRAINT "grilling_sessions_round" CHECK ("grilling_sessions"."round" >= 0),
-	CONSTRAINT "grilling_sessions_skill" CHECK ("grilling_sessions"."skill" IN ('grilling', 'grill-with-docs', 'wayfinder', 'to-tickets', 'to-spec')),
+	CONSTRAINT "grilling_sessions_skill" CHECK ("grilling_sessions"."skill" IN ('grilling', 'grill-with-docs', 'wayfinder', 'to-tickets', 'to-spec', 'guidelines', 'spec')),
 	CONSTRAINT "grilling_sessions_paused" CHECK (("grilling_sessions"."status" = 'paused') = ("grilling_sessions"."paused_at" IS NOT NULL)),
 	CONSTRAINT "grilling_sessions_ended" CHECK (("grilling_sessions"."status" = 'ended') = ("grilling_sessions"."ended_at" IS NOT NULL))
+);
+
+CREATE TABLE "guideline_changes" (
+	"floor_id" text NOT NULL,
+	"name" text NOT NULL,
+	"content_hash" text NOT NULL,
+	"content" text NOT NULL,
+	"commit_sha" text,
+	"status" text DEFAULT 'awaiting' NOT NULL,
+	"seen_at" timestamp with time zone NOT NULL,
+	"dismissed_at" timestamp with time zone,
+	CONSTRAINT "guideline_changes_floor_id_name_content_hash_pk" PRIMARY KEY("floor_id","name","content_hash"),
+	CONSTRAINT "guideline_changes_name" CHECK ("guideline_changes"."name" ~ '^[a-z0-9-]+$' AND length("guideline_changes"."name") <= 255),
+	CONSTRAINT "guideline_changes_content_hash" CHECK ("guideline_changes"."content_hash" ~ '^[0-9a-f]{64}$'),
+	CONSTRAINT "guideline_changes_content" CHECK (length("guideline_changes"."content") <= 12000),
+	CONSTRAINT "guideline_changes_commit_sha" CHECK ("guideline_changes"."commit_sha" IS NULL OR "guideline_changes"."commit_sha" ~ '^[0-9a-f]{40,64}$'),
+	CONSTRAINT "guideline_changes_status" CHECK ("guideline_changes"."status" IN ('awaiting', 'dismissed') AND ("guideline_changes"."status" = 'dismissed') = ("guideline_changes"."dismissed_at" IS NOT NULL))
+);
+
+CREATE TABLE "guideline_proposals" (
+	"id" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "guideline_proposals_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1),
+	"floor_id" text NOT NULL,
+	"name" text NOT NULL,
+	"content_hash" text NOT NULL,
+	"content" text NOT NULL,
+	"agent_id" text NOT NULL,
+	"issue" integer NOT NULL,
+	"status" text DEFAULT 'proposed' NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"decided_at" timestamp with time zone,
+	"pull_request" integer,
+	"url" text,
+	CONSTRAINT "guideline_proposals_name" CHECK ("guideline_proposals"."name" ~ '^[a-z0-9-]+$' AND length("guideline_proposals"."name") <= 255),
+	CONSTRAINT "guideline_proposals_content_hash" CHECK ("guideline_proposals"."content_hash" ~ '^[0-9a-f]{64}$'),
+	CONSTRAINT "guideline_proposals_content" CHECK (length("guideline_proposals"."content") BETWEEN 1 AND 12000),
+	CONSTRAINT "guideline_proposals_issue" CHECK ("guideline_proposals"."issue" > 0),
+	CONSTRAINT "guideline_proposals_status" CHECK ("guideline_proposals"."status" IN ('proposed', 'opened', 'rejected') AND ("guideline_proposals"."status" = 'proposed') = ("guideline_proposals"."decided_at" IS NULL) AND ("guideline_proposals"."status" = 'opened') = ("guideline_proposals"."pull_request" IS NOT NULL AND "guideline_proposals"."url" IS NOT NULL))
+);
+
+CREATE TABLE "guideline_suggestions" (
+	"floor_id" text PRIMARY KEY NOT NULL,
+	"suggested_at" timestamp with time zone NOT NULL
 );
 
 CREATE TABLE "handoffs" (
@@ -508,6 +566,58 @@ CREATE TABLE "handoffs" (
 	"created_at" timestamp with time zone NOT NULL,
 	CONSTRAINT "handoffs_stage" CHECK ("handoffs"."stage" IN ('needs-work', 'needs-review', 'needs-qa', 'needs-docs', 'ready-to-merge', 'needs-human')),
 	CONSTRAINT "handoffs_issue" CHECK ("handoffs"."issue" > 0)
+);
+
+CREATE TABLE "hook_push_heads" (
+	"floor_id" text PRIMARY KEY NOT NULL,
+	"sha" text NOT NULL,
+	"seen_at" timestamp with time zone NOT NULL,
+	CONSTRAINT "hook_push_heads_sha" CHECK ("hook_push_heads"."sha" ~ '^[0-9a-f]{40,64}$')
+);
+
+CREATE TABLE "hook_runs" (
+	"id" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "hook_runs_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1),
+	"hook_id" bigint NOT NULL,
+	"floor_id" text NOT NULL,
+	"agent_id" text,
+	"trigger" text NOT NULL,
+	"issue" integer,
+	"pull_request" integer,
+	"status" text NOT NULL,
+	"started_at" timestamp with time zone NOT NULL,
+	"finished_at" timestamp with time zone,
+	"error" text,
+	"result" text,
+	"comment_url" text,
+	CONSTRAINT "hook_runs_status" CHECK ("hook_runs"."status" IN ('running', 'succeeded', 'failed') AND ("hook_runs"."status" = 'running') = ("hook_runs"."finished_at" IS NULL)),
+	CONSTRAINT "hook_runs_subject" CHECK (("hook_runs"."issue" IS NULL OR "hook_runs"."issue" > 0) AND ("hook_runs"."pull_request" IS NULL OR "hook_runs"."pull_request" > 0)),
+	CONSTRAINT "hook_runs_result" CHECK ("hook_runs"."result" IS NULL OR length("hook_runs"."result") <= 8000)
+);
+
+CREATE TABLE "hooks" (
+	"id" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "hooks_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1),
+	"floor_id" text NOT NULL,
+	"name" text NOT NULL,
+	"trigger" text NOT NULL,
+	"stage" text,
+	"labels" text[] NOT NULL,
+	"file_patterns" text[] NOT NULL,
+	"agent_id" text,
+	"role" text,
+	"skill_name" text NOT NULL,
+	"runs_per_hour" integer NOT NULL,
+	"enabled" boolean NOT NULL,
+	"failures" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	CONSTRAINT "hooks_name" CHECK (length("hooks"."name") BETWEEN 1 AND 60 AND "hooks"."name" = btrim("hooks"."name")),
+	CONSTRAINT "hooks_trigger" CHECK ("hooks"."trigger" IN ('stage', 'pull_request_opened', 'push', 'wrap_up', 'spec_filed', 'run_now') AND ("hooks"."trigger" = 'stage') = ("hooks"."stage" IS NOT NULL)),
+	CONSTRAINT "hooks_stage" CHECK ("hooks"."stage" IS NULL OR "hooks"."stage" IN ('needs-work', 'needs-review', 'needs-qa', 'needs-docs')),
+	CONSTRAINT "hooks_filters" CHECK (cardinality("hooks"."labels") <= 20 AND cardinality("hooks"."file_patterns") <= 20),
+	CONSTRAINT "hooks_action" CHECK (("hooks"."agent_id" IS NULL) <> ("hooks"."role" IS NULL) AND "hooks"."role" IS DISTINCT FROM 'manager'),
+	CONSTRAINT "hooks_skill_name" CHECK ("hooks"."skill_name" ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND length("hooks"."skill_name") <= 64),
+	CONSTRAINT "hooks_runs_per_hour" CHECK ("hooks"."runs_per_hour" BETWEEN 1 AND 60),
+	CONSTRAINT "hooks_failures" CHECK ("hooks"."failures" >= 0)
 );
 
 CREATE TABLE "issue_token_caps" (
@@ -994,6 +1104,7 @@ ALTER TABLE "agents" ADD CONSTRAINT "agents_floor_id_floors_id_fk" FOREIGN KEY (
 ALTER TABLE "agents" ADD CONSTRAINT "agents_role_id_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "public"."roles"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "agents" ADD CONSTRAINT "agents_contractor_batch_id_batches_id_fk" FOREIGN KEY ("contractor_batch_id") REFERENCES "public"."batches"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "ai_account_usage" ADD CONSTRAINT "ai_account_usage_ai_account_id_ai_accounts_id_fk" FOREIGN KEY ("ai_account_id") REFERENCES "public"."ai_accounts"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "approved_guidelines" ADD CONSTRAINT "approved_guidelines_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "batch_acknowledgements" ADD CONSTRAINT "batch_acknowledgements_batch_id_batches_id_fk" FOREIGN KEY ("batch_id") REFERENCES "public"."batches"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "batch_issues" ADD CONSTRAINT "batch_issues_batch_id_batches_id_fk" FOREIGN KEY ("batch_id") REFERENCES "public"."batches"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "batches" ADD CONSTRAINT "batches_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
@@ -1010,7 +1121,14 @@ ALTER TABLE "gateway_request_bodies" ADD CONSTRAINT "gateway_request_bodies_requ
 ALTER TABLE "gateway_requests" ADD CONSTRAINT "gateway_requests_ai_account_id_ai_accounts_id_fk" FOREIGN KEY ("ai_account_id") REFERENCES "public"."ai_accounts"("id") ON DELETE set null ON UPDATE no action;
 ALTER TABLE "gateway_requests" ADD CONSTRAINT "gateway_requests_gateway_key_id_gateway_keys_id_fk" FOREIGN KEY ("gateway_key_id") REFERENCES "public"."gateway_keys"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "grilling_sessions" ADD CONSTRAINT "grilling_sessions_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "guideline_changes" ADD CONSTRAINT "guideline_changes_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "guideline_proposals" ADD CONSTRAINT "guideline_proposals_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "guideline_suggestions" ADD CONSTRAINT "guideline_suggestions_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "handoffs" ADD CONSTRAINT "handoffs_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "hook_push_heads" ADD CONSTRAINT "hook_push_heads_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "hook_runs" ADD CONSTRAINT "hook_runs_hook_id_hooks_id_fk" FOREIGN KEY ("hook_id") REFERENCES "public"."hooks"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "hook_runs" ADD CONSTRAINT "hook_runs_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "hooks" ADD CONSTRAINT "hooks_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "issue_token_caps" ADD CONSTRAINT "issue_token_caps_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "issue_triage" ADD CONSTRAINT "issue_triage_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "issue_work_turns" ADD CONSTRAINT "issue_work_turns_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
@@ -1070,7 +1188,11 @@ CREATE INDEX "gateway_requests_floor_issue_idx" ON "gateway_requests" USING btre
 CREATE UNIQUE INDEX "github_connections_app_id_unique" ON "github_connections" USING btree ("app_id");
 CREATE INDEX "grilling_sessions_floor_idx" ON "grilling_sessions" USING btree ("floor_id","id");
 CREATE UNIQUE INDEX "grilling_sessions_one_active" ON "grilling_sessions" USING btree ("floor_id") WHERE "grilling_sessions"."status" = 'active';
+CREATE INDEX "guideline_proposals_floor" ON "guideline_proposals" USING btree ("floor_id","status");
+CREATE UNIQUE INDEX "guideline_proposals_waiting" ON "guideline_proposals" USING btree ("floor_id","name","content_hash") WHERE "guideline_proposals"."status" = 'proposed';
 CREATE INDEX "handoffs_issue_idx" ON "handoffs" USING btree ("floor_id","issue","stage","created_at");
+CREATE INDEX "hook_runs_hook" ON "hook_runs" USING btree ("hook_id","started_at");
+CREATE UNIQUE INDEX "hooks_name_unique" ON "hooks" USING btree ("floor_id",lower("name"));
 CREATE INDEX "manager_chat_attachments_message_idx" ON "manager_chat_attachments" USING btree ("message_id");
 CREATE INDEX "manager_chat_attachments_unsent_idx" ON "manager_chat_attachments" USING btree ("created_at") WHERE "manager_chat_attachments"."message_id" IS NULL;
 CREATE INDEX "manager_chat_messages_floor_idx" ON "manager_chat_messages" USING btree ("floor_id","id");

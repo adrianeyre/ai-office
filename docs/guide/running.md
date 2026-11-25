@@ -665,7 +665,8 @@ moved, copied or rebuilt.
   Template it started from and its 3D theme, its settings, Merge Policy
   and Fresh Start threshold, its Agents (Avatars, Models, effort, instructions, Token Caps and Fresh
   Start thresholds), its issues' Token Caps, its Skill settings per Role,
-  and each Role's accepted memory. The settings shown
+  its [Hooks](guidelines-specs-and-hooks.md#hooks) as the Owner made them
+  (never their runs), and each Role's accepted memory. The settings shown
   in AI Settings are in it as well as General Settings'.
 - **Never a credential.** AI Accounts, Gateway Keys, the password, TOTP and
   anything sealed with `ENCRYPTION_KEY` are not in it, and the whole file
@@ -682,11 +683,14 @@ moved, copied or rebuilt.
   library here nor the file has, a required reviewer whose Role is not in
   the review Stage, a Role whose Stage would change while Agents fill it,
   a name taken, an archived Floor brought back, memory that looks like a
-  credential. With a problem, nothing is imported.
+  credential, a Hook naming an Agent the Floor will not have (or its
+  Manager) or a Role neither library has. With a problem, nothing is
+  imported.
   **Import these changes** then applies exactly what was listed.
 - **Adds and changes, never removes.** What is here and not in the file
   stays. Things are matched by Floor id and repository, Agent id, Role id,
-  Skill name and Floor Template id. Roles are added or changed before the
+  Skill name, Floor Template id and a Floor's Hook name (whatever its
+  case). Roles are added or changed before the
   Floors whose Agents fill them, so an import onto a new Office keeps the Owner's own
   Roles. A Floor that is here already keeps its template and theme.
   Importing the same file twice changes nothing the second time.
@@ -696,6 +700,10 @@ moved, copied or rebuilt.
 - **Imported Skills wait for review** (FR-76), as uploaded ones do: they
   arrive disabled, and one whose files differ from the Skill of its name
   here replaces it and waits too.
+- **Imported Hooks** arrive on or off as they were exported; each one's
+  Skill is looked for when it runs, as a repository Skill is read from
+  GitHub, and the preview says so. A file exported before Hooks reads as
+  having none.
 - **Imported Floor Templates wait for review** (FR-101) in the same way:
   each arrives disabled, and one whose files differ from the template of
   its id here replaces it and waits too. One whose files are not a valid
@@ -705,7 +713,7 @@ moved, copied or rebuilt.
 - **Every change is an event**, as when it is made in the admin
   (`config.changed`, `role.created`, `role.changed`,
   `floor_template.added`, `floor.created`, `agent.created`, `skill.added`,
-  …),
+  `hook.added`, `hook.changed`, …),
   then `config.changed` with `configuration.imported`.
 - **API.** `GET /api/configuration/export` answers the file
   (`configurationSchema` in `@ai-office/shared`) as a download; `POST

@@ -152,6 +152,22 @@ export interface Review {
   readonly htmlUrl: string;
 }
 
+/**
+ * A merged pull request, with who merged it as GitHub records it: never a
+ * commit's author, which anyone can write (ADR 0014).
+ */
+export interface MergedPullRequest {
+  readonly number: number;
+  /** The branch it merged into. */
+  readonly base: string;
+  /**
+   * The login of whoever merged it: the App's (`<slug>[bot]`) when AI
+   * Office merged it; null when GitHub does not say.
+   */
+  readonly mergedBy: string | null;
+  readonly htmlUrl: string;
+}
+
 /** A file a pull request changes, as GitHub compares its branches. */
 export interface PullRequestFile {
   /** Its path in the new version (the old one, if it was removed). */
@@ -387,6 +403,28 @@ export interface RepositoryClient {
    * when either does not exist.
    */
   compareBranches(base: string, head: string): Promise<BranchComparison>;
+
+  // Who changed a file (ADR 0014): GitHub's record, never a commit's author
+  /**
+   * The newest commit on `ref` (a branch or a commit) that changed the
+   * file at `path`, as `git log -1 -- <path>` finds it (following, at a
+   * merge, the side the file came from); undefined when none did.
+   */
+  lastCommitChanging(path: string, ref: string): Promise<Commit | undefined>;
+  /**
+   * The merged pull request that brought commit `sha` into the default
+   * branch, as GitHub lists the pull requests of a commit; undefined when
+   * it came some other way, such as a push.
+   */
+  mergedPullRequestOf(sha: string): Promise<MergedPullRequest | undefined>;
+  /**
+   * Who pushed commit `sha` to `branch`, by GitHub's record of the
+   * branch's pushes (its activity): the login of the latest push that
+   * brought it. Undefined when GitHub has no such record, as for a commit
+   * a merge brought, or a push older than GitHub keeps or than the
+   * newest hundred pushes.
+   */
+  pusherOf(sha: string, branch: string): Promise<string | undefined>;
 
   // Pull requests
   createPullRequest(input: {

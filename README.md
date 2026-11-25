@@ -53,6 +53,20 @@ walks through the first run step by step, and through running it all with
 - **The issue pipeline.** Intake, triage, sandboxes, review, QA, the
   designer, docs, the Merge Policy and the Manager's watchdog. See
   [The issue pipeline](docs/guide/issue-pipeline.md).
+- **Guidelines, Specs and Hooks.** Steer Agents up front rather than
+  only in review. **Guidelines** are your rules for a repository, kept in
+  its `.agents/guidelines/`; Agents follow only the versions you approved,
+  each task gets those that apply to its Stage, files and labels, and
+  Agents can propose new ones but never change them. **Specs**, written
+  with `/spec`, agree a feature's requirements (numbered Acceptance
+  Criteria), design and tasks with the Manager phase by phase; the tasks
+  become issues and an approved Batch, reviewers and QA work to the Spec,
+  QA proves each criterion with a test, and the Wrap-up says where the
+  work departed from the design (`/spec amend` brings it up to date).
+  **Hooks** have an Agent run one of the Floor's Skills when an event you
+  chose happens, such as a pull request touching `**/*.sql`, bounded by
+  runs an hour. See
+  [Guidelines, Specs and Hooks](docs/guide/guidelines-specs-and-hooks.md).
 
 ## Screenshots
 
@@ -81,6 +95,7 @@ How AI Office works, part by part, is in [`docs/guide/`](docs/guide/README.md):
 | [GitHub, events and the Manager chat](docs/guide/events-and-chat.md) | The GitHub App client, the event bus, the Activity Feed, the Agent live view, the Manager chat (clearing and compacting it) and its Grilling Sessions, and the direct chats with each Agent and the Terminal. |
 | [Batches, Plans and memory](docs/guide/batches-and-memory.md) | Batches and Plans on the whiteboard, the Kickoff and the Wrap-up, and repository, office-wide and Role memory. |
 | [Notices, the wall board and Skills](docs/guide/notices-and-skills.md) | The Notice Board, browser notifications, the Communications Agent and its Connections (with Wrap-up reports to Confluence, Notion, Google Docs, Slides and Drive, a work log in Google Sheets and an event per Batch in Google Calendar, through Google sign-in for Google), the wall board and the Skill library. |
+| [Guidelines, Specs and Hooks](docs/guide/guidelines-specs-and-hooks.md) | How the Owner steers a Floor's Agents up front: Guidelines, the Owner's rules for a repository that Agents follow only as the Owner approved them; Specs, a feature's requirements, design and tasks agreed phase by phase with `/spec`; Hooks, the Owner's own rules that have an Agent run one of the Floor's Skills when a chosen event happens. |
 | [The web app and the 3D Office](docs/guide/web-app.md) | The company logo, link previews, accessibility, running the web app, the 3D Office and phones. |
 
 ## Documentation

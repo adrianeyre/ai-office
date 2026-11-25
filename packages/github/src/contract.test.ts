@@ -37,8 +37,8 @@ interface Harness {
   /** `owner/name` of a repository the App is installed on. */
   readonly repository: string;
   /**
-   * A commit adding `file` lands on `branch` (as `git push` would);
-   * returns its sha.
+   * A commit adding `file` lands on `branch` (as `git push` would), pushed
+   * by the App; returns its sha.
    */
   pushCommit(branch: string, file: ContractFile): Promise<string>;
   /** CI reports `conclusion` for the commit `sha`, as a check run. */
@@ -87,6 +87,8 @@ const inMemory: Target = {
         Promise.resolve(
           fake.pushCommit(fakeRepository, branch, {
             files: { [path]: content },
+            // As the App pushes a file on GitHub.
+            pusher: fake.botLogin,
           }),
         ),
       finishCI: (sha, conclusion) => {
@@ -125,6 +127,8 @@ const overHttp: Target = {
         Promise.resolve(
           fake.pushCommit(fakeRepository, branch, {
             files: { [path]: content },
+            // As the App pushes a file on GitHub.
+            pusher: fake.botLogin,
           }),
         ),
       finishCI: (sha, conclusion) => {
@@ -841,6 +845,49 @@ for (const target of [inMemory, overHttp, realApp]) {
           repo.mergePullRequest(opened.number, { method: "squash" }),
           405,
         );
+
+        // How the file reached the default branch, as GitHub records it
+        // (ADR 0014): the App's merge of the pull request, not a push.
+        expect(
+          (await repo.lastCommitChanging(file.path, defaultBranch))?.sha,
+        ).toBe(merge.sha);
+        expect(await repo.mergedPullRequestOf(merge.sha)).toEqual({
+          number: opened.number,
+          base: defaultBranch,
+          mergedBy: expect.stringMatching(/\[bot\]$/) as unknown,
+          htmlUrl: opened.htmlUrl,
+        });
+        expect(await repo.pusherOf(merge.sha, defaultBranch)).toBeUndefined();
+      });
+
+      it("finds the newest commit that changed a file, and who pushed it", async () => {
+        const { defaultBranch } = await repo.get();
+        const base = await repo.getBranch(defaultBranch);
+        const branch = `ai-office/contract-pushes-${run}`;
+        branches.push(branch);
+        await repo.createBranch(branch, base?.sha ?? "");
+        const file = {
+          path: `ai-office-contract/${randomBytes(6).toString("hex")}.md`,
+          content: "Pushed by the contract suite.\n",
+        };
+        const changed = await harness.pushCommit(branch, file);
+        const later = await harness.pushCommit(branch, {
+          path: `ai-office-contract/${randomBytes(6).toString("hex")}.md`,
+          content: "Another file.\n",
+        });
+        for (const ref of [branch, later, changed]) {
+          expect((await repo.lastCommitChanging(file.path, ref))?.sha).toBe(
+            changed,
+          );
+        }
+        expect(
+          await repo.lastCommitChanging(file.path, base?.sha ?? ""),
+        ).toBeUndefined();
+        // No pull request merged it: it was pushed, by the App.
+        expect(await repo.mergedPullRequestOf(changed)).toBeUndefined();
+        expect(await repo.pusherOf(changed, branch)).toMatch(/\[bot\]$/);
+        expect(await repo.pusherOf(later, branch)).toMatch(/\[bot\]$/);
+        expect(await repo.pusherOf(changed, defaultBranch)).toBeUndefined();
       });
 
       it("fails with GitHub's status for what does not exist", async () => {

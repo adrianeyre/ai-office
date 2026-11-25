@@ -1,16 +1,19 @@
 import {
   grillWithDocsSkillName,
   grillingSkillName,
+  guidelinesSkillName,
   isGrillingSkillName,
+  specSkillName,
   toSpecSkillName,
   toTicketsSkillName,
   wayfinderSkillName,
 } from "./grilling.ts";
 
-// AI Office's built-in Skills (PRD FR-77, FR-83b), on every Floor. Some
-// start a Grilling Session (`grillingSkillNames`); the rest load their
-// instructions into the Manager chat, as any `/name` does. Every one but
-// `/grilling` is adapted from Matt Pocock's skills
+// AI Office's built-in Skills (PRD FR-77, FR-83b; Guidelines, Specs and
+// Hooks PRD, FR-109, FR-113), on every Floor. Some start a Grilling Session
+// (`grillingSkillNames`); the rest load their instructions into the
+// Manager chat, as any `/name` does. Every one but AI Office's own
+// (`/grilling`, `/guidelines` and `/spec`) is adapted from Matt Pocock's skills
 // (https://github.com/mattpocock/skills, MIT), so the Available Skills
 // list credits him. The server, the web app and the orchestrator share
 // these, so whatever sends a Skill's command (the chat, a Meeting Room)
@@ -54,6 +57,13 @@ export const mattPocockSkillNames = [
   toSpecSkillName,
   ...instructionSkillNames,
 ] as const;
+
+/**
+ * AI Office's own built-in Skills kept as Skill folders beside Matt
+ * Pocock's: `/guidelines` (FR-109) and `/spec` (FR-113). `/grilling` is
+ * written in code.
+ */
+export const ownSkillNames = [guidelinesSkillName, specSkillName] as const;
 
 /** Whether the built-in Skill `name` starts a Grilling Session when run. */
 export const startsGrillingSession = (name: string): boolean =>

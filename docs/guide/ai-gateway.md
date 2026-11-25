@@ -559,7 +559,7 @@ How the Gateway answers a page:
 ### AI Accounts
 
 The Owner adds AI Accounts in AI Settings' **AI Accounts** card (PRD FR-35,
-FR-36); none come from the environment. So far an account is one of:
+FR-36), the first card on the page; none come from the environment. So far an account is one of:
 
 - an **Anthropic Console API key**, with an optional custom endpoint URL in
   place of `https://api.anthropic.com`;
@@ -642,8 +642,10 @@ in this order:
    strategies keep to the best (lowest) priority among them:
    - **Session** (the default): each session stays on the account it
      started on for the session window (300 minutes by default, from 1
-     minute to 7 days), and a new session starts on the account with the
-     fewest sessions for its weight. A session is an Agent's sandbox run (its sandbox
+     minute to 7 days), and a new session starts on the account that has
+     used the least of its five-hour usage window for its weight, the one
+     with the fewest sessions for its weight on a tie (see the note
+     below). A session is an Agent's sandbox run (its sandbox
      sends `x-ai-office-session: <sandbox id>` with its model calls) or,
      for a request without one, the caller's Gateway Key. A session whose
      account is paused, or can no longer serve it, moves and starts a new
@@ -652,9 +654,19 @@ in this order:
      as it is in use. Every call renews it, and it lets go only after the
      session window passes without one, however long the session runs (so
      its prompt cache stays warm). A new session starts on the account
-     with the fewest sessions in use for its weight, the least-used (below)
-     for its weight on a tie, so sessions started together spread out
-     before any has used a token.
+     that has used the least of its five-hour window for its weight, then
+     the one with the fewest sessions in use for its weight, then the
+     least-used (below) for its weight, so sessions started together
+     spread out before any has used a token.
+
+     Both session strategies judge use by the five-hour window each
+     account's AI Provider reports (the bar on the AI Accounts card), as
+     sessions differ a great deal in size: counted by sessions alone, a
+     priority-1 account could take twice the sessions and still have used
+     less. Windows are compared in 5% bands, so accounts close in use for
+     their weight tie and new sessions spread across them. A window that
+     has reset counts as unused. When any account that could serve has no
+     window (an API key), sessions are counted alone.
    - **Drain soonest**: a new session starts on the account whose usage
      window resets first (the sooner of its five-hour and weekly resets,
      as its AI Provider reports them; see [Usage windows](#usage-windows-pause-thresholds-and-force-reset)),

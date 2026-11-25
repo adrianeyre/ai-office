@@ -31,6 +31,11 @@ import {
   triageOutcomes,
   watchdogTriggers,
   grillingSessionStatuses,
+  guidelineApprovals,
+  guidelineNamePattern,
+  guidelineTasks,
+  hookSkipReasons,
+  hookTriggers,
   contractorKinds,
   daySchema,
   statusUpdateTriggers,
@@ -296,10 +301,16 @@ const batchPlanned = event("batch.planned", {
   issues: batchIssues,
   /** The version the Owner edited on the whiteboard, which this replans. */
   editedFrom: z.number().int().positive().optional(),
+  /**
+   * The `/spec` Grilling Session whose issues the Batch was made for, as
+   * they were filed (FR-115); absent for any other Batch, and on replans.
+   */
+  specSessionId: z.number().int().positive().optional(),
 });
 // The Owner approves a Batch's Plan on the whiteboard (FR-25.3), or by
-// asking for its work in the Manager chat (ADR 0004, ADR 0012); its work
-// then starts (`batch.started`).
+// asking for its work in the Manager chat (ADR 0004, ADR 0012), or by
+// confirming the tasks of the Spec whose issues it works (Guidelines,
+// Specs and Hooks PRD, FR-115); its work then starts (`batch.started`).
 const batchApproved = event("batch.approved", {
   floorId,
   batchId,
@@ -312,6 +323,11 @@ const batchApproved = event("batch.approved", {
    * approval; absent when the Owner approved it on the whiteboard.
    */
   messageId: z.number().int().positive().optional(),
+  /**
+   * The `/spec` Grilling Session whose confirmed tasks stand as the
+   * approval (FR-115); absent for any other Batch.
+   */
+  specSessionId: z.number().int().positive().optional(),
 });
 const batchStarted = event("batch.started", {
   floorId,
@@ -419,6 +435,145 @@ const memoryCurated = event("memory.curated", {
   /** The pull request it opened or updated; none when nothing changed. */
   pullRequest: issue.optional(),
   url: z.url().optional(),
+});
+// Guidelines (Guidelines, Specs and Hooks PRD, FR-103, FR-111; ADR 0014):
+// a version of one of a Floor's Guidelines the Owner approved, one waiting
+// for the Owner's approval (Agents keep the last approved one meanwhile),
+// and one the Owner dismissed. Each names the Guideline and its version by
+// its content's hash, never its text.
+const guidelineName = z.string().regex(guidelineNamePattern).max(255);
+/** The SHA-256 of the version's whole file. */
+const guidelineHash = z.string().regex(/^[0-9a-f]{64}$/);
+const gitSha = z.string().regex(/^[0-9a-f]{40,64}$/);
+const guidelineApproved = event("guideline.approved", {
+  floorId,
+  name: guidelineName,
+  contentHash: guidelineHash,
+  approval: z.enum(guidelineApprovals),
+  /** The commit that last changed it; absent for the Floor admin's. */
+  sha: gitSha.optional(),
+  /** The Owner's pull request that merged it, for `owner_merge`. */
+  pullRequest: issue.optional(),
+  /** That pull request, or that commit, on GitHub. */
+  url: z.url().optional(),
+});
+const guidelineAwaiting = event("guideline.awaiting", {
+  floorId,
+  name: guidelineName,
+  contentHash: guidelineHash,
+  /** The commit that last changed it, which the Owner neither merged nor pushed. */
+  sha: gitSha.optional(),
+  /** That commit on GitHub. */
+  url: z.url().optional(),
+});
+const guidelineDismissed = event("guideline.dismissed", {
+  floorId,
+  name: guidelineName,
+  contentHash: guidelineHash,
+});
+// An Agent proposed a new or changed Guideline in its Handoff or QA report
+// (FR-110, FR-111). It waits for the Owner, who may open it as a pull
+// request; no model accepts one, and no Agent gets it until the Owner
+// merges it. Named by its content's hash, never its text.
+const guidelineProposed = event("guideline.proposed", {
+  floorId,
+  /** The Agent that proposed it. */
+  agentId,
+  /** The issue whose Handoff, or QA report, proposed it. */
+  issue,
+  name: guidelineName,
+  contentHash: guidelineHash,
+  /** Whether it is a new Guideline: none of that name was approved. */
+  new: z.boolean(),
+});
+// A task's Guidelines were longer together than the characters a prompt
+// carries (FR-108): those left out are named, never quoted.
+const guidelineOverBudget = event("guideline.over_budget", {
+  floorId,
+  /** The work, the designer's, or the Manager's triage, Plan or chat. */
+  task: z.enum(guidelineTasks),
+  /** The Agent the task is for. */
+  agentId: agentId.optional(),
+  /** The issue it is for, when it is for one. */
+  issue: issue.optional(),
+  /** The most characters of Guidelines its prompt carries. */
+  budget: count,
+  /** How many characters the Guidelines it was to follow had together. */
+  characters: count,
+  /** The Guidelines left out, largest first. */
+  leftOut: z.array(guidelineName).min(1),
+});
+// Hooks (Guidelines, Specs and Hooks PRD, FR-118 to FR-121; ADR 0016): the
+// Owner's own rules on a Floor, each having an Agent run a Skill when a
+// chosen event happens. Every change and every run is an event; each
+// names the Hook by its id and its name as it was then, never what its
+// Skill or the Agent's answer said.
+const hookId = z.number().int().positive();
+const hookName = z.string().min(1).max(60);
+const hookRunShape = {
+  floorId,
+  hookId,
+  name: hookName,
+  trigger: z.enum(hookTriggers),
+  /** The issue the event was about, if one. */
+  issue: issue.optional(),
+  /** The pull request the event was about, if one. */
+  pullRequest: issue.optional(),
+};
+/** The Owner added a Hook in the Floor admin, or by importing configuration. */
+const hookAdded = event("hook.added", {
+  floorId,
+  hookId,
+  name: hookName,
+  trigger: z.enum(hookTriggers),
+});
+/**
+ * A Hook changed: by the Owner, or turned off by its own failed runs
+ * (`failures`, FR-120). `enabled` is whether it is on now.
+ */
+const hookChanged = event("hook.changed", {
+  floorId,
+  hookId,
+  name: hookName,
+  /** Which of its fields changed, such as `enabled` or `filePatterns`. */
+  fields: z.array(z.string().min(1).max(40)).min(1).max(20),
+  by: z.enum(["owner", "failures"]),
+  enabled: z.boolean(),
+});
+const hookRemoved = event("hook.removed", { floorId, hookId, name: hookName });
+/** An Agent started a Hook's run: the Skill it follows. */
+const hookRunStarted = event("hook.run_started", {
+  ...hookRunShape,
+  runId: z.number().int().positive(),
+  /** The Agent running it; absent when none could be found to. */
+  agentId: agentId.optional(),
+  skillName: z.string().min(1).max(64),
+});
+/**
+ * A Hook's run ended. A failed one raises an info Notice; the
+ * `hookFailuresToTurnOff`th in a row turns the Hook off (`turnedOff`).
+ */
+const hookRunFinished = event("hook.run_finished", {
+  ...hookRunShape,
+  runId: z.number().int().positive(),
+  agentId: agentId.optional(),
+  outcome: z.enum(["succeeded", "failed"]),
+  /** Why it failed, for a failed run. */
+  error: z.string().min(1).max(500).optional(),
+  /** Its failed runs in a row, this one included; 0 after a success. */
+  failures: count,
+  turnedOff: z.boolean(),
+  /** The comment the GitHub App posted its answer as, if one. */
+  url: z.url().optional(),
+});
+/**
+ * An event matched a Hook that did not run for it (FR-120): it had made
+ * its runs for the hour, or a run of it was going on the same issue or
+ * pull request.
+ */
+const hookRunSkipped = event("hook.run_skipped", {
+  ...hookRunShape,
+  reason: z.enum(hookSkipReasons),
 });
 // Office-wide and Role memory (PRD FR-54, FR-55, FR-56): the Owner edits
 // the office-wide memory; Agents propose Role memory in their Handoffs, the
@@ -1066,6 +1221,17 @@ export const officeEventSchema = z.discriminatedUnion("type", [
   memoryOfficeChanged,
   memoryRoleProposed,
   memoryRoleChanged,
+  guidelineApproved,
+  guidelineAwaiting,
+  guidelineDismissed,
+  guidelineProposed,
+  guidelineOverBudget,
+  hookAdded,
+  hookChanged,
+  hookRemoved,
+  hookRunStarted,
+  hookRunFinished,
+  hookRunSkipped,
   sandboxStarted,
   sandboxStopped,
   sandboxText,

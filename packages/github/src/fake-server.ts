@@ -784,9 +784,16 @@ export async function serveFakeGitHub(
     "GET",
     "/pulls/:number",
     "pull_requests",
-    async ({ repo, params }) => ({
-      body: restPullRequest(await repo.getPullRequest(number(params[0]))),
-    }),
+    async ({ repo, params }) => {
+      const pullRequest = number(params[0]);
+      const merger = fake.mergerOf(repo.fullName, pullRequest);
+      return {
+        body: {
+          ...restPullRequest(await repo.getPullRequest(pullRequest)),
+          merged_by: merger === null ? null : user(merger),
+        },
+      };
+    },
   );
   repoRoute(
     "PATCH",
@@ -991,6 +998,60 @@ export async function serveFakeGitHub(
     },
   );
 
+  // The fake lists only the newest commit that changed a path.
+  repoRoute("GET", "/commits", "contents", async ({ repo, query }) => {
+    const path = query.get("path");
+    if (path === null || query.get("per_page") !== "1") {
+      throw new HttpError(
+        422,
+        "The fake lists only the newest commit that changed a path",
+      );
+    }
+    const ref = query.get("sha") ?? (await repo.get()).defaultBranch;
+    const commit = await repo.lastCommitChanging(path, ref);
+    return { body: commit === undefined ? [] : [restCommit(commit)] };
+  });
+  repoRoute(
+    "GET",
+    "/commits/:ref/pulls",
+    "pull_requests",
+    async ({ repo, params }) => {
+      const merged = await repo.mergedPullRequestOf(params[0] ?? "");
+      return {
+        body:
+          merged === undefined
+            ? []
+            : [
+                {
+                  ...restPullRequest(await repo.getPullRequest(merged.number)),
+                  merged_at: new Date(0).toISOString(),
+                },
+              ],
+      };
+    },
+  );
+  // A branch's pushes and merges, newest first.
+  repoRoute("GET", "/activity", "contents", ({ repo, query }) => {
+    const ref = query.get("ref") ?? "";
+    const branch = ref.replace(/^refs\/heads\//, "");
+    const perPage = Math.min(100, Number(query.get("per_page") ?? 30));
+    return Promise.resolve({
+      body: fake
+        .activity(repo.fullName)
+        .filter((change) => ref === "" || change.branch === branch)
+        .slice(0, perPage)
+        .map((change) => ({
+          id: change.id,
+          node_id: `RA_${String(change.id)}`,
+          before: change.before,
+          after: change.after,
+          ref: `refs/heads/${change.branch}`,
+          timestamp: change.at,
+          activity_type: change.type,
+          actor: user(change.actor),
+        })),
+    });
+  });
   repoRoute(
     "GET",
     "/commits/:ref/check-runs",

@@ -6,6 +6,12 @@ import {
   type RoleInstructions,
 } from "../coder/prompt.ts";
 import { agentTrailer, type TrailerAgent } from "../git/identity.ts";
+import { qaSpecSection, type IssueSpec } from "../grilling/issue-spec.ts";
+import {
+  withGuidelineProposals,
+  withMountedGuidelines,
+  type GivenGuidelines,
+} from "../guidelines/prompt.ts";
 import { memorySection, proposingMemory } from "../memory/memory.ts";
 import {
   withMountedMemory,
@@ -25,8 +31,13 @@ import { sharedBranchLines, type SharedBranch } from "../sandbox/branch.ts";
 // reports pass, or fail with the steps that reproduce it. Issue text and
 // the reviewers' Handoff are untrusted: each is quoted between markers it
 // cannot close, as what to check, never as rules, as is the repository's
-// memory (FR-53), for which its report may propose entries. The prompt
-// never holds a credential.
+// memory (FR-53), for which its report may propose entries. Given the
+// Spec the issue was filed from (Guidelines, Specs and Hooks PRD, FR-116),
+// it quotes the issue's Acceptance Criteria as the Owner approved them,
+// between `<spec>` markers they cannot close, asks for one property-based
+// test per criterion (an example test where a property does not fit), and
+// for each criterion's id, passed or failed, in the report. Without one,
+// the prompt is as it was. The prompt never holds a credential.
 
 export interface QaPromptInput {
   readonly floor: {
@@ -60,6 +71,18 @@ export interface QaPromptInput {
   readonly round: { readonly number: number; readonly cap: number };
   /** The reviewers' Handoff to QA, if they left one. */
   readonly handoff?: HandoffSummary;
+  /**
+   * The Owner's Guidelines for the task, mounted in its sandbox
+   * (Guidelines PRD, FR-105 to FR-108); none when absent.
+   */
+  readonly guidelines?: GivenGuidelines;
+  /**
+   * The Spec the issue was filed from, as the Owner approved it
+   * (Guidelines, Specs and Hooks PRD, FR-116): the issue's criteria, each
+   * to be tested, quoted within the budget's `spec`. None for an issue
+   * from no Spec.
+   */
+  readonly spec?: IssueSpec;
   /** The repository's memory, redacted, if it has any (FR-53). */
   readonly memory?: string;
   /** The office-wide and Role memory mounted in its sandbox (FR-54, FR-55). */
@@ -79,6 +102,28 @@ export const qaReportForm: readonly string[] = [
   "Steps: for a fail, numbered steps that reproduce it; for a pass, none.",
   "</qa-report>",
 ];
+
+/**
+ * The form of QA's report on an issue: with each Acceptance Criterion's
+ * result, for an issue filed from a Spec (FR-116); as it was otherwise.
+ */
+export function qaReportFormFor(
+  spec: IssueSpec | undefined,
+): readonly string[] {
+  if (spec === undefined) {
+    return qaReportForm;
+  }
+  const [open = "", result = "", summary = "", ...rest] = qaReportForm;
+  return [
+    open,
+    result,
+    summary,
+    "Criteria: every Acceptance Criterion's id, then pass or fail, a line each, such as:",
+    "R1.1 pass",
+    "R1.2 fail",
+    ...rest,
+  ];
+}
 
 export function qaPrompt(input: QaPromptInput): string {
   const { floor, agent, issue, branch, round, role } = input;
@@ -102,6 +147,9 @@ export function qaPrompt(input: QaPromptInput): string {
       issue.body.trim() === "" ? "(No description.)" : issue.body.trim(),
     ),
     "</issue>",
+    ...(input.spec === undefined
+      ? []
+      : ["", ...qaSpecSection(input.spec, input.budget?.spec)]),
     ...(input.handoff === undefined
       ? []
       : [
@@ -114,6 +162,7 @@ export function qaPrompt(input: QaPromptInput): string {
           `Known risks: ${quotedIn("handoff", input.handoff.risks)}`,
           "</handoff>",
         ]),
+    ...withMountedGuidelines(input.guidelines),
     ...(input.memory === undefined
       ? []
       : ["", ...memorySection(input.memory, input.budget?.repositoryMemory)]),
@@ -141,12 +190,15 @@ export function qaPrompt(input: QaPromptInput): string {
     "",
     "## Your report",
     "",
-    "Pass only when every test passes and the change does what the issue asks. End your last message with your report, in this form:",
+    input.spec === undefined
+      ? "Pass only when every test passes and the change does what the issue asks. End your last message with your report, in this form:"
+      : "Pass only when every test passes, every Acceptance Criterion passes its own test, and the change does what the issue asks. End your last message with your report, in this form:",
     "",
-    ...qaReportForm.map((line) => `    ${line}`),
+    ...qaReportFormFor(input.spec).map((line) => `    ${line}`),
     "",
     ...proposingMemory("report"),
     ...withRoleProposals(input.agentMemory, "report"),
+    ...withGuidelineProposals(input.guidelines, "report"),
     ...(extra === ""
       ? []
       : ["", "## The Owner's instructions for you", "", extra]),

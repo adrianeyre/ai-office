@@ -5,10 +5,15 @@ import { memoryPath, repositorySkillFolders } from "@ai-office/shared";
 
 import { diffLimitOf } from "../review/prompt.ts";
 import {
+  changesGuidelines,
+  changesSpecs,
+  guidelinesAndSpecsReason,
+  guidelinesReason,
   maxListedFiles,
   ownerOnly,
   readByAgents,
   runByCi,
+  specsReason,
 } from "./owner-only.ts";
 
 // What the Merge Policy never merges without the Owner (pen-test findings
@@ -134,6 +139,48 @@ describe("what later Agents read (P1-3)", () => {
   });
 });
 
+describe("the Guidelines and Specs (FR-110)", () => {
+  it("are what is in .agents/guidelines/ and .agents/specs/, at any depth and in any case", () => {
+    for (const path of [
+      ".agents/guidelines/tech.md",
+      ".agents/guidelines/notes.txt",
+      ".Agents/Guidelines/Tech.md",
+      "packages/web/.agents/guidelines/tech.md",
+      // A folder replaced by a file (a symbolic link, say).
+      ".agents/guidelines",
+    ]) {
+      expect(changesGuidelines(path), path).toBe(true);
+      expect(changesSpecs(path), path).toBe(false);
+      expect(readByAgents(path), path).toBe(true);
+    }
+    for (const path of [
+      ".agents/specs/checkout/requirements.md",
+      ".agents/specs/checkout/design.md",
+      ".agents/specs/checkout/tasks.md",
+      ".AGENTS/SPECS/checkout/tasks.md",
+      ".agents/specs",
+    ]) {
+      expect(changesSpecs(path), path).toBe(true);
+      expect(changesGuidelines(path), path).toBe(false);
+      expect(readByAgents(path), path).toBe(true);
+    }
+  });
+
+  it("are not other folders of that name, or files beside them", () => {
+    for (const path of [
+      "docs/guidelines/tech.md",
+      "docs/specs/checkout.md",
+      ".agents/guidelines-old/tech.md",
+      ".agents/specs.md",
+      ".agents/MEMORY.md",
+      "guidelines/.agents/tech.md",
+    ]) {
+      expect(changesGuidelines(path), path).toBe(false);
+      expect(changesSpecs(path), path).toBe(false);
+    }
+  });
+});
+
 describe("ownerOnly", () => {
   it("names nothing for a pull request that changes no such file", () => {
     expect(ownerOnly([changed("src/basket.ts"), changed("README.md")])).toEqual(
@@ -171,6 +218,38 @@ describe("ownerOnly", () => {
     expect(ownerOnly([changed("notes.md", memoryPath)])).toEqual([
       "it changes what later Agents read as memory, Skills or instructions",
     ]);
+  });
+
+  it("names the Guidelines and the Specs on their own, not as what later Agents read", () => {
+    expect(ownerOnly([changed(".agents/guidelines/tech.md")])).toEqual([
+      guidelinesReason,
+    ]);
+    expect(
+      ownerOnly([changed(".agents/specs/checkout/requirements.md")]),
+    ).toEqual([specsReason]);
+    expect(
+      ownerOnly([
+        changed(".agents/specs/checkout/tasks.md"),
+        changed(".agents/guidelines/tech.md"),
+        changed(".agents/guidelines/structure.md"),
+      ]),
+    ).toEqual([guidelinesAndSpecsReason]);
+    expect(guidelinesAndSpecsReason).toBe(
+      "it changes the Guidelines and Specs, which only you approve",
+    );
+    expect(
+      ownerOnly([changed(memoryPath), changed(".agents/guidelines/tech.md")]),
+    ).toEqual([
+      "it changes what later Agents read as memory, Skills or instructions",
+      guidelinesReason,
+    ]);
+    // Moving a Guideline out of the folder, or a file into it, changes them.
+    expect(
+      ownerOnly([changed("docs/tech.md", ".agents/guidelines/tech.md")]),
+    ).toEqual([guidelinesReason]);
+    expect(
+      ownerOnly([changed(".agents/guidelines/tech.md", "docs/tech.md")]),
+    ).toEqual([guidelinesReason]);
   });
 
   it("sends a pull request to the Owner when GitHub cannot list every file it changes", () => {

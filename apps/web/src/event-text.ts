@@ -4,6 +4,8 @@ import {
   connectionTypeNames,
   contextUsageText,
   dayName,
+  hookFailuresToTurnOff,
+  hookTriggerText,
   issuePriorityLabels,
   reviewVerdictLabels,
   roleName,
@@ -14,6 +16,17 @@ import {
 
 // How events read to the Owner: in the Activity Feed (PRD FR-52) and an
 // Agent's live view. Text only; links are `sourceLinks`.
+
+/** What a Hook's run was for: " on PR #14", " on #4", or nothing. */
+const hookSubject = (event: {
+  readonly issue?: number | undefined;
+  readonly pullRequest?: number | undefined;
+}): string =>
+  event.pullRequest !== undefined
+    ? ` on PR #${String(event.pullRequest)}`
+    : event.issue !== undefined
+      ? ` on #${String(event.issue)}`
+      : "";
 
 /** Each event type, as a short label. */
 export const eventTypeLabels: Record<EventType, string> = {
@@ -52,6 +65,17 @@ export const eventTypeLabels: Record<EventType, string> = {
   "memory.office_changed": "Office-wide memory changed",
   "memory.role_proposed": "Role memory proposed",
   "memory.role_changed": "Role memory changed",
+  "guideline.approved": "Guideline approved",
+  "guideline.awaiting": "Guideline awaiting approval",
+  "guideline.dismissed": "Guideline change dismissed",
+  "guideline.proposed": "Guideline proposed",
+  "guideline.over_budget": "Guidelines over budget",
+  "hook.added": "Hook added",
+  "hook.changed": "Hook changed",
+  "hook.removed": "Hook deleted",
+  "hook.run_started": "Hook run started",
+  "hook.run_finished": "Hook run finished",
+  "hook.run_skipped": "Hook run skipped",
   "sandbox.started": "Sandbox started",
   "sandbox.stopped": "Sandbox stopped",
   "sandbox.text": "Agent output",
@@ -178,6 +202,27 @@ export const eventTypeGroups: readonly {
       "memory.office_changed",
       "memory.role_proposed",
       "memory.role_changed",
+    ],
+  },
+  {
+    label: "Guidelines",
+    types: [
+      "guideline.approved",
+      "guideline.awaiting",
+      "guideline.dismissed",
+      "guideline.proposed",
+      "guideline.over_budget",
+    ],
+  },
+  {
+    label: "Hooks",
+    types: [
+      "hook.added",
+      "hook.changed",
+      "hook.removed",
+      "hook.run_started",
+      "hook.run_finished",
+      "hook.run_skipped",
     ],
   },
   {
@@ -464,11 +509,17 @@ export function describeEvent(
           : `replanned the Owner's edits to version ${String(event.editedFrom)} as`
       } version ${String(event.planVersion)} of Batch ${String(event.batchId)}'s Plan${
         event.draftedBy === "rules" ? ", by AI Office's rules" : ""
+      }${
+        event.specSessionId === undefined
+          ? ""
+          : `, for the issues filed from the Spec of Grilling Session ${String(event.specSessionId)}`
       }: ${issueList(event.issues)}.`;
     case "batch.approved":
-      return event.messageId === undefined
-        ? `The Owner approved version ${String(event.planVersion)} of Batch ${String(event.batchId)}'s Plan, by ${agent(event.agentId)}.`
-        : `Approved by your request in Manager chat: version ${String(event.planVersion)} of Batch ${String(event.batchId)}'s Plan, by ${agent(event.agentId)}.`;
+      return event.specSessionId !== undefined
+        ? `Approved by the tasks you confirmed in the Spec of Grilling Session ${String(event.specSessionId)}: version ${String(event.planVersion)} of Batch ${String(event.batchId)}'s Plan, by ${agent(event.agentId)}.`
+        : event.messageId === undefined
+          ? `The Owner approved version ${String(event.planVersion)} of Batch ${String(event.batchId)}'s Plan, by ${agent(event.agentId)}.`
+          : `Approved by your request in Manager chat: version ${String(event.planVersion)} of Batch ${String(event.batchId)}'s Plan, by ${agent(event.agentId)}.`;
     case "batch.started":
       return event.issues.length === 0
         ? `Batch ${String(event.batchId)} started; each of its issues waits for the issues it depends on.`
@@ -557,6 +608,98 @@ export function describeEvent(
           : `: ${event.reason.replace(/[.!?]+$/, "")}`
       }.`;
     }
+    case "guideline.approved":
+      return `Guideline "${event.name}" approved: ${
+        {
+          owner_merge:
+            event.pullRequest === undefined
+              ? "the Owner merged the pull request that changed it"
+              : `the Owner merged PR #${String(event.pullRequest)}, which changed it`,
+          owner_push: "the Owner pushed the commit that changed it",
+          owner_admin: "the Owner approved it in the Floor admin",
+        }[event.approval]
+      }. Agents follow this version.`;
+    case "guideline.awaiting":
+      return `Guideline "${event.name}" changed${
+        event.sha === undefined ? "" : ` in ${event.sha.slice(0, 7)}`
+      }, which the Owner neither merged nor pushed: it awaits the Owner's approval, and Agents keep the last version the Owner approved.`;
+    case "guideline.dismissed":
+      return `The Owner dismissed the change to Guideline "${event.name}": Agents keep the last version the Owner approved.`;
+    case "guideline.proposed":
+      return `${agent(event.agentId)} proposed ${
+        event.new ? "a new Guideline" : "a change to Guideline"
+      } "${event.name}" on #${String(event.issue)}: it waits for the Owner in the Floor admin, and no Agent gets it unless the Owner merges it.`;
+    case "guideline.over_budget": {
+      const names = event.leftOut.map((name) => `"${name}"`);
+      const list =
+        names.length === 1
+          ? (names[0] ?? "")
+          : `${names.slice(0, -1).join(", ")} and ${names.at(-1) ?? ""}`;
+      const task = {
+        work: "work",
+        review: "review",
+        qa: "QA",
+        docs: "docs",
+        design: "design review",
+        triage: "triage",
+        plan: "Plan",
+        chat: "chat",
+      }[event.task];
+      return `${
+        event.agentId === undefined ? "A" : `${agent(event.agentId)}'s`
+      } ${task}${
+        event.issue === undefined ? "" : ` of #${String(event.issue)}`
+      } left out Guideline${event.leftOut.length === 1 ? "" : "s"} ${list}: the Guidelines it was to follow have ${event.characters.toLocaleString("en-GB")} characters, over the ${event.budget.toLocaleString("en-GB")} a prompt carries.`;
+    }
+    case "hook.added":
+      return `The Owner added the Hook "${event.name}": ${hookTriggerText({
+        trigger: event.trigger,
+        stage: null,
+        labels: [],
+        filePatterns: [],
+      })}.`;
+    case "hook.changed":
+      return event.by === "failures"
+        ? `The Hook "${event.name}" turned itself off after ${String(hookFailuresToTurnOff)} failed runs in a row: the Owner can turn it on again in the Floor admin.`
+        : `The Owner changed the Hook "${event.name}" (${event.fields.join(", ")})${
+            event.fields.includes("enabled")
+              ? event.enabled
+                ? ": it is on"
+                : ": it is off"
+              : ""
+          }.`;
+    case "hook.removed":
+      return `The Owner deleted the Hook "${event.name}".`;
+    case "hook.run_started":
+      return `${
+        event.agentId === undefined ? "No Agent" : agent(event.agentId)
+      } started running /${event.skillName} for the Hook "${event.name}"${hookSubject(event)}.`;
+    case "hook.run_finished":
+      return event.outcome === "succeeded"
+        ? `${
+            event.agentId === undefined ? "The" : `${agent(event.agentId)}'s`
+          } run of the Hook "${event.name}"${hookSubject(event)} finished${
+            event.url === undefined
+              ? ""
+              : ", and its answer is posted on GitHub"
+          }.`
+        : `${
+            event.agentId === undefined ? "A" : `${agent(event.agentId)}'s`
+          } run of the Hook "${event.name}"${hookSubject(event)} failed${
+            event.error === undefined
+              ? ""
+              : `: ${event.error.replace(/[.!?]+$/, "")}`
+          }${
+            event.turnedOff
+              ? `. That is ${String(event.failures)} in a row, so the Hook is off now.`
+              : "."
+          }`;
+    case "hook.run_skipped":
+      return `The Hook "${event.name}" did not run${hookSubject(event)}: ${
+        event.reason === "rate_limited"
+          ? "it has made all the runs it may this hour"
+          : "a run of it is going on the same issue or pull request"
+      }.`;
     case "sandbox.started":
       return `${agent(event.agentId)} started a sandbox for #${String(event.issue)} on ${event.branch}.`;
     case "sandbox.stopped":

@@ -147,6 +147,22 @@ export function sourceLinks(
       label: `Memory PR #${String(event.pullRequest)} on GitHub`,
     });
   }
+  if (event.type === "guideline.approved" && event.url !== undefined) {
+    links.push({
+      kind: "github",
+      href: event.url,
+      label:
+        event.pullRequest === undefined
+          ? "Commit on GitHub"
+          : `PR #${String(event.pullRequest)} on GitHub`,
+    });
+  }
+  if (event.type === "guideline.awaiting" && event.url !== undefined) {
+    links.push({ kind: "github", href: event.url, label: "Commit on GitHub" });
+  }
+  if (event.type === "hook.run_finished" && event.url !== undefined) {
+    links.push({ kind: "github", href: event.url, label: "Answer on GitHub" });
+  }
   if (floorId !== null) {
     for (const agentId of agentIds) {
       links.push({ kind: "agent", floorId, agentId });

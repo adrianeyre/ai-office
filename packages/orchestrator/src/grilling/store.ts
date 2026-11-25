@@ -4,6 +4,7 @@ import {
   grillingDecisionSchema,
   grillingDocumentsSchema,
   grillingFactSchema,
+  grillingGuidelineSchema,
   grillingIssuesSchema,
   grillingProcessSchema,
   grillingQuestionSchema,
@@ -12,6 +13,7 @@ import {
   grillingSkillName,
   grillingSkillNames,
   grillingSourceSchema,
+  grillingSpecSchema,
   grillingTermSchema,
   type GrillingSessionStatus,
   type GrillingSkillName,
@@ -23,7 +25,8 @@ import type { GrillingSessionRecord } from "./session.ts";
 // Where each Floor's Grilling Sessions are kept (PRD FR-82): the
 // `grilling_sessions` table, or memory for tests. A session's questions,
 // decisions, terms, facts, documents and issues are kept as structured
-// data with it (FR-80, FR-81, FR-88), and every session is kept, ended
+// data with it (FR-80, FR-81, FR-88), as are a `/spec` session's phase,
+// drafts and approved documents (FR-113), and every session is kept, ended
 // ones included. A Floor runs at most one
 // session at a time.
 
@@ -66,6 +69,10 @@ const checked = (session: GrillingSessionRecord): GrillingSessionRecord => ({
   issues:
     session.issues === null ? null : grillingIssuesSchema.parse(session.issues),
   sources: session.sources.map((source) => grillingSourceSchema.parse(source)),
+  guidelines: session.guidelines.map((guideline) =>
+    grillingGuidelineSchema.parse(guideline),
+  ),
+  spec: session.spec === null ? null : grillingSpecSchema.parse(session.spec),
 });
 
 /** Keeps sessions in memory: for tests. */
@@ -187,6 +194,10 @@ const recordOf = (row: Row): GrillingSessionRecord => ({
   sources: arrayOf(row.sources).map((source) =>
     grillingSourceSchema.parse(source),
   ),
+  guidelines: arrayOf(row.guidelines).map((guideline) =>
+    grillingGuidelineSchema.parse(guideline),
+  ),
+  spec: row.spec === null ? null : grillingSpecSchema.parse(row.spec),
   startedAt: row.startedAt,
   updatedAt: row.updatedAt,
   pausedAt: row.pausedAt,
@@ -210,6 +221,8 @@ const valuesOf = (session: NewGrillingSession) => ({
   documents: session.documents,
   issues: session.issues,
   sources: session.sources,
+  guidelines: session.guidelines,
+  spec: session.spec,
   startedAt: session.startedAt,
   updatedAt: session.updatedAt,
   pausedAt: session.pausedAt,

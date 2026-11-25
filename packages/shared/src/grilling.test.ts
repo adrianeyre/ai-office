@@ -7,12 +7,23 @@ import {
   startsGrillingSession,
 } from "./built-in-skills.ts";
 import {
+  amendSpecText,
   composeGrillingAnswers,
   draftGrillingIssuesText,
   fileGrillingIssuesText,
+  grillingDraftsIssues,
   grillingSkillNames,
   grillingSourcePaths,
+  grillingTurnSchema,
   grillingWritesDocuments,
+  grillingWritesGuidelines,
+  grillingWritesSpec,
+  guidelinesSkillName,
+  readSpecAmend,
+  confirmSpecPhaseText,
+  reopenSpecPhaseText,
+  skipSpecDesignText,
+  specSkillName,
   isGrillingSkillName,
   toTicketsSkillName,
   pauseGrillingText,
@@ -179,6 +190,65 @@ describe("readGrillingControl", () => {
     ).toEqual({ kind: "file-issues", session: 4 });
   });
 
+  it("reads \"… in one PR\" after filing a session's issues, for a Spec's Batch (FR-115)", () => {
+    expect(readGrillingControl(fileGrillingIssuesText(7, true))).toEqual({
+      kind: "file-issues",
+      session: 7,
+      onePullRequest: true,
+    });
+    expect(
+      readGrillingControl(
+        "Please file the issues of session 7 as a single pull request.",
+      ),
+    ).toEqual({ kind: "file-issues", session: 7, onePullRequest: true });
+    expect(readGrillingControl("file the issues in one PR, please")).toEqual({
+      kind: "file-issues",
+      session: null,
+      onePullRequest: true,
+    });
+    expect(
+      readGrillingControl("file the issues of session 7 in two PRs"),
+    ).toBeUndefined();
+  });
+
+  it("reads a /spec session's phases: confirm, skip design and reopen (FR-113)", () => {
+    expect(readGrillingControl("confirm requirements")).toEqual({
+      kind: "confirm-phase",
+      phase: "requirements",
+    });
+    expect(readGrillingControl("Yes, confirm the design.")).toEqual({
+      kind: "confirm-phase",
+      phase: "design",
+    });
+    expect(readGrillingControl(confirmSpecPhaseText("tasks"))).toEqual({
+      kind: "confirm-phase",
+      phase: "tasks",
+    });
+    expect(readGrillingControl(skipSpecDesignText)).toEqual({
+      kind: "skip-design",
+    });
+    expect(readGrillingControl("Please skip the design")).toEqual({
+      kind: "skip-design",
+    });
+    expect(readGrillingControl(reopenSpecPhaseText("requirements"))).toEqual({
+      kind: "reopen",
+      phase: "requirements",
+    });
+    expect(readGrillingControl("go back to the design")).toEqual({
+      kind: "reopen",
+      phase: "design",
+    });
+    expect(readGrillingControl("re-open the tasks please")).toEqual({
+      kind: "reopen",
+      phase: "tasks",
+    });
+    expect(readGrillingControl("confirm the plan")).toBeUndefined();
+    expect(
+      readGrillingControl("skip design for the admin pages"),
+    ).toBeUndefined();
+    expect(readGrillingControl("reopen issue 4")).toBeUndefined();
+  });
+
   it("leaves everything else, the Floor's own pause included", () => {
     expect(
       readGrillingControl("file the issues about the basket"),
@@ -190,19 +260,42 @@ describe("readGrillingControl", () => {
 });
 
 describe("the built-in Skills that start a Grilling Session", () => {
-  it("are /grilling and those adapted from Matt Pocock's, and only /to-tickets writes no documents", () => {
+  it("are /grilling, those adapted from Matt Pocock's, /guidelines and /spec, and only /to-tickets writes no documents", () => {
     expect(grillingSkillNames).toEqual([
       "grilling",
       "grill-with-docs",
       "wayfinder",
       "to-tickets",
       "to-spec",
+      "guidelines",
+      "spec",
     ]);
     expect(isGrillingSkillName("wayfinder")).toBe(true);
     expect(isGrillingSkillName("pr")).toBe(false);
     expect(
       grillingSkillNames.filter((name) => !grillingWritesDocuments(name)),
     ).toEqual([toTicketsSkillName]);
+  });
+
+  it("has only /guidelines write Guidelines, and draft no issues", () => {
+    expect(isGrillingSkillName(guidelinesSkillName)).toBe(true);
+    expect(grillingSkillNames.filter(grillingWritesGuidelines)).toEqual([
+      guidelinesSkillName,
+    ]);
+    expect(
+      grillingSkillNames.filter((name) => !grillingDraftsIssues(name)),
+    ).toEqual([guidelinesSkillName]);
+  });
+
+  it("has only /spec write a Spec, which drafts issues from its tasks; /to-spec still writes a PRD", () => {
+    expect(isGrillingSkillName(specSkillName)).toBe(true);
+    expect(grillingSkillNames.filter(grillingWritesSpec)).toEqual([
+      specSkillName,
+    ]);
+    expect(grillingDraftsIssues(specSkillName)).toBe(true);
+    expect(grillingWritesDocuments(specSkillName)).toBe(true);
+    expect(grillingWritesSpec("to-spec")).toBe(false);
+    expect(grillingWritesGuidelines(specSkillName)).toBe(false);
   });
 
   it("reads the PRDs and ADRs /to-tickets names, once each, and nothing else", () => {
@@ -230,11 +323,124 @@ describe("the built-in Skills that start a Grilling Session", () => {
 describe("the built-in Skills' names", () => {
   it("credit Matt Pocock for every built-in Skill but /grilling, and say which start a session", () => {
     expect(isMattPocockSkill("grilling")).toBe(false);
+    expect(isMattPocockSkill("guidelines")).toBe(false);
+    expect(startsGrillingSession("guidelines")).toBe(true);
+    expect(isMattPocockSkill("spec")).toBe(false);
+    expect(startsGrillingSession("spec")).toBe(true);
     for (const name of mattPocockSkillNames) {
       expect(isMattPocockSkill(name)).toBe(true);
     }
     expect(startsGrillingSession("to-tickets")).toBe(true);
     expect(startsGrillingSession("domain-modeling")).toBe(false);
     expect(instructionSkillNames).toContain("pr");
+  });
+});
+
+describe("a /guidelines turn's Guidelines (FR-109)", () => {
+  const turn = (guidelines: unknown[]) =>
+    grillingTurnSchema.safeParse({ guidelines });
+  const problems = (guidelines: unknown[]) => {
+    const parsed = turn(guidelines);
+    return parsed.success
+      ? []
+      : parsed.error.issues.map(({ message }) => message);
+  };
+
+  it("are always by default, with a name, a description and rules", () => {
+    const parsed = grillingTurnSchema.parse({
+      guidelines: [
+        {
+          name: " Tech ",
+          description: "The stack and its tools.",
+          text: "Use pnpm, never npm.",
+        },
+        {
+          name: "migrations",
+          inclusion: "fileMatch",
+          fileMatchPatterns: ["packages/db/**"],
+          description: "How migrations are written.",
+          text: "Plain SQL.",
+        },
+      ],
+    });
+    expect(parsed.guidelines).toEqual([
+      {
+        name: "tech",
+        inclusion: "always",
+        fileMatchPatterns: [],
+        description: "The stack and its tools.",
+        text: "Use pnpm, never npm.",
+      },
+      {
+        name: "migrations",
+        inclusion: "fileMatch",
+        fileMatchPatterns: ["packages/db/**"],
+        description: "How migrations are written.",
+        text: "Plain SQL.",
+      },
+    ]);
+  });
+
+  it("keep FR-102's rules: a fileMatch one needs patterns, an always one takes none, and names are lowercase letters, digits and dashes", () => {
+    const base = { description: "A line.", text: "Rules." };
+    expect(
+      problems([{ ...base, name: "web", inclusion: "fileMatch" }]),
+    ).toEqual([
+      "The web Guideline is fileMatch, so it needs fileMatchPatterns: the globs of the files it applies to.",
+    ]);
+    expect(
+      problems([{ ...base, name: "web", fileMatchPatterns: ["apps/**"] }]),
+    ).toEqual([
+      "The web Guideline is always, so it takes no fileMatchPatterns; make it fileMatch to apply it only to those files.",
+    ]);
+    expect(problems([{ ...base, name: "web_app" }])).toEqual([
+      "A Guideline's name is lowercase letters, digits and dashes, such as migrations.",
+    ]);
+    expect(problems([{ ...base, name: "web", inclusion: "manual" }])).toEqual([
+      "A Guideline's inclusion is always or fileMatch.",
+    ]);
+    expect(
+      problems([{ ...base, name: "web", description: "Two\nlines." }]),
+    ).toEqual(["A Guideline's description is one line."]);
+  });
+
+  it("keep product, tech and structure always", () => {
+    for (const name of ["product", "tech", "structure"]) {
+      expect(
+        problems([
+          {
+            name,
+            inclusion: "fileMatch",
+            fileMatchPatterns: ["src/**"],
+            description: "A line.",
+            text: "Rules.",
+          },
+        ]),
+      ).toEqual([
+        `The ${name} Guideline is always: product, tech and structure apply to every task.`,
+      ]);
+    }
+  });
+});
+
+describe("/spec amend <slug> (FR-117)", () => {
+  it("names the Spec to amend by its folder's slug", () => {
+    expect(amendSpecText("checkout-with-saved-cards")).toBe(
+      "/spec amend checkout-with-saved-cards",
+    );
+    expect(readSpecAmend("amend checkout-with-saved-cards")).toBe(
+      "checkout-with-saved-cards",
+    );
+    expect(readSpecAmend("  Amend Checkout  ")).toBe("checkout");
+    expect(readSpecAmend("amend .agents/specs/checkout/")).toBe("checkout");
+    expect(readSpecAmend("amend checkout-2")).toBe("checkout-2");
+  });
+
+  it("reads any other words as a new Spec's", () => {
+    expect(readSpecAmend("checkout with saved cards")).toBeUndefined();
+    expect(readSpecAmend("amend the checkout")).toBeUndefined();
+    expect(readSpecAmend("amend")).toBeUndefined();
+    expect(readSpecAmend("amendments to checkout")).toBeUndefined();
+    expect(readSpecAmend("")).toBeUndefined();
   });
 });

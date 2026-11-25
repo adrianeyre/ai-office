@@ -9,6 +9,8 @@ import {
   issueFilingOrder,
   maxGrillingIssues,
   pipelineLabels,
+  specCriterionId,
+  specFolder,
   type GrillingFiledIssue,
   type GrillingIssueDraft,
   type GrillingIssues,
@@ -19,6 +21,7 @@ import type { FloorRecord } from "../floors/store.ts";
 import { parseAnswer, type ParsedAnswer } from "../review/verdict.ts";
 import { sessionTitle, slugOf } from "./documents.ts";
 import { numbersInWords, type GrillingSessionRecord } from "./session.ts";
+import { specOf } from "./spec.ts";
 import type { GrillingStore } from "./store.ts";
 
 // A Grilling Session's issues (PRD FR-81, §5 scenario 8). Once the session
@@ -38,6 +41,12 @@ import type { GrillingStore } from "./store.ts";
 // starts on its own: intake leaves issues the App opened alone, and the
 // Owner hands them to the Manager as a Batch ("complete issues 5 to 7"),
 // which takes them as the Owner's (`approvedIssues`).
+//
+// A `/spec` session's issues (Guidelines, Specs and Hooks PRD, FR-115) are
+// its confirmed tasks, one each: each body links the Spec, lists `Meets:`
+// with the ids of the Acceptance Criteria it meets, quotes those criteria
+// as its task list and says what it is blocked by (`specIssueBody`).
+// Filing them starts their Batch at once, in the Manager chat.
 
 /** Reads the Manager's answer as its draft issues. */
 export const parseGrillingIssues = (
@@ -192,10 +201,15 @@ export const batchCommand = (numbers: readonly number[]): string => {
     : `complete issues ${numbersInWords(sorted)}`;
 };
 
-/** What the chat says once the issues are filed, or why some are not. */
+/**
+ * What the chat says once the issues are filed, or why some are not. With
+ * `startsBatch` (a Spec's, FR-115), what their Batch did follows, so it
+ * does not ask for one.
+ */
 export function issuesFiledText(
   session: Pick<GrillingSessionRecord, "id" | "topic">,
   issues: GrillingIssues,
+  startsBatch = false,
 ): string {
   const filed = issues.drafts.flatMap((draft) =>
     draft.filed === null ? [] : [{ draft, filed: draft.filed }],
@@ -226,8 +240,12 @@ export function issuesFiledText(
     `Filed the ${String(all)} ${all === 1 ? "issue" : "issues"} of the ${sessionTitle(session)} on GitHub, labelled ${intakeLabel}, each after those it is blocked by:`,
     "",
     ...lines,
-    "",
-    `${all === 1 ? "It is" : "They are"} ready to become a Batch: say "${batchCommand(filed.map(({ filed: issue }) => issue.number))}".`,
+    ...(startsBatch
+      ? []
+      : [
+          "",
+          `${all === 1 ? "It is" : "They are"} ready to become a Batch: say "${batchCommand(filed.map(({ filed: issue }) => issue.number))}".`,
+        ]),
   ].join("\n");
 }
 
@@ -296,6 +314,74 @@ export function issueBody(
       ? ["None: it can start at once."]
       : context.blockedBy.map((number) => `- #${String(number)}`)),
     ...(cites.length === 0 ? [] : ["", "## Cites", "", ...cites]),
+    "",
+  ].join("\n");
+}
+
+/**
+ * The Spec's folder, linked on the session's branch, from the pull request
+ * that proposes it; its path alone while there is none.
+ */
+const specLink = (session: GrillingSessionRecord, folder: string): string => {
+  const pullRequest = session.documents?.pullRequest;
+  const branch = session.documents?.branch;
+  const repository = pullRequest?.url.replace(/\/pull\/\d+\/?$/, "");
+  return pullRequest == null ||
+    branch == null ||
+    repository === undefined ||
+    repository === pullRequest.url
+    ? `\`${folder}/\``
+    : `[\`${folder}/\`](${repository}/tree/${branch}/${folder})`;
+};
+
+/**
+ * A Spec's issue's body (Guidelines, Specs and Hooks PRD, FR-115): the
+ * Spec it comes from, linked; what to build; `Meets:` with the ids of the
+ * Acceptance Criteria it meets, and those criteria quoted as its task
+ * list; and the issues it is blocked by. Clear by construction, so triage
+ * asks no model of it.
+ */
+export function specIssueBody(
+  draft: GrillingIssueDraft,
+  context: {
+    readonly session: GrillingSessionRecord;
+    readonly manager: string;
+    /** The issue filed for each draft it is blocked by. */
+    readonly blockedBy: readonly number[];
+  },
+): string {
+  const { session } = context;
+  const spec = specOf(session);
+  const folder = specFolder(spec.slug);
+  const pullRequest = session.documents?.pullRequest;
+  const ids = [
+    ...new Set(
+      draft.acceptanceCriteria.flatMap((criterion) => {
+        const id = specCriterionId(criterion);
+        return id === undefined ? [] : [id];
+      }),
+    ),
+  ];
+  return [
+    "## Spec",
+    "",
+    `Filed from the Spec in ${specLink(session, folder)}${pullRequest == null ? "" : ` (pull request #${String(pullRequest.number)})`}: task ${String(draft.id)} of its \`tasks.md\`, which the Owner confirmed in the ${sessionTitle(session)}, drafted by ${context.manager}, the Floor's Manager. Agents work it from the Spec as the Owner approved it.`,
+    "",
+    "## What to build",
+    "",
+    draft.whatToBuild.trim(),
+    "",
+    "## Acceptance criteria",
+    "",
+    `Meets: ${ids.length === 0 ? "none named" : ids.join(", ")}`,
+    "",
+    ...draft.acceptanceCriteria.map((criterion) => `- [ ] ${criterion}`),
+    "",
+    "## Blocked by",
+    "",
+    ...(context.blockedBy.length === 0
+      ? ["None: it can start at once."]
+      : context.blockedBy.map((number) => `- #${String(number)}`)),
     "",
   ].join("\n");
 }
@@ -376,7 +462,7 @@ export function createGrillingIssues(
             .sort((a, b) => a - b);
           const issue = await client.createIssue({
             title: draft.title,
-            body: issueBody(draft, {
+            body: (session.spec === null ? issueBody : specIssueBody)(draft, {
               session,
               manager: manager.name,
               blockedBy,

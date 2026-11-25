@@ -41,6 +41,7 @@ const areaNames: Record<ConfigurationArea, string> = {
   issue_token_caps: "Issues' Token Caps",
   skill_toggle: "Floors' Skill settings",
   role_memory: "Role memory",
+  hook: "Hooks",
 };
 
 /** The file chosen, read and checked, or why it cannot be imported. */

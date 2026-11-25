@@ -1,9 +1,14 @@
 import {
+  foundationGuidelineNames,
   grillingBranch,
+  grillingGuidelinesDirectory,
   grillingSkillName,
   grillingTurnSchema,
   grillingWritesDocuments,
+  grillingWritesGuidelines,
+  grillingWritesSpec,
   maxGrillingFactsPerTurn,
+  maxGrillingGuidelines,
   maxGrillingQuestionsPerTurn,
   type GrillingFact,
   type GrillingQuestion,
@@ -14,6 +19,12 @@ import {
 import { parseAnswer, type ParsedAnswer } from "../review/verdict.ts";
 import type { GrillingSessionRecord } from "./session.ts";
 import { openQuestions, questionsOfRound } from "./session.ts";
+import {
+  specExample,
+  specInstructions,
+  specSection,
+  specTurnLead,
+} from "./spec.ts";
 
 // What the Manager's Model is given and asked for in a Grilling Session
 // (PRD FR-78, FR-79, FR-80, FR-88).
@@ -36,7 +47,13 @@ import { openQuestions, questionsOfRound } from "./session.ts";
 //   a real trade-off) and process docs, which AI Office writes on the
 //   session's branch. A `/to-tickets` session writes none: its section
 //   quotes the documents it read instead, as untrusted data, and its turns
-//   are asked for no documents.
+//   are asked for no documents. A `/guidelines` session writes only the
+//   Floor's Guidelines (Guidelines, Specs and Hooks PRD, FR-109): its
+//   section gives each one settled word for word, and its turns are asked
+//   for Guidelines in place of the PRD's parts. A `/spec` session writes
+//   only its Spec (FR-113): its section gives the phase, every approved
+//   document word for word and the current phase's draft, and its turns
+//   are asked for that phase's document.
 
 /** Reads the Manager's answer as a turn. */
 export const parseGrillingTurn = (answer: string): ParsedAnswer<GrillingTurn> =>
@@ -105,9 +122,13 @@ export function grillingSessionSection(
           ...session.facts.map(factLine),
         ]),
     "",
-    ...(grillingWritesDocuments(session.skill)
-      ? documentsSection(session)
-      : sourcesSection(session.sources)),
+    ...(grillingWritesSpec(session.skill)
+      ? specSection(session)
+      : grillingWritesGuidelines(session.skill)
+        ? guidelinesSection(session)
+        : grillingWritesDocuments(session.skill)
+          ? documentsSection(session)
+          : sourcesSection(session.sources)),
     "",
     "### Open questions",
     "",
@@ -135,6 +156,38 @@ const documentsSection = (session: GrillingSessionRecord): string[] => [
   `ADRs: ${session.adrs.length === 0 ? "none yet." : session.adrs.map(({ title }) => `"${title}"`).join(", ")}`,
   `Process docs: ${session.processes.length === 0 ? "none yet." : session.processes.map(({ title }) => `"${title}"`).join(", ")}`,
 ];
+
+/** The Guidelines a `/guidelines` session keeps current (FR-109), word for word. */
+const guidelinesSection = (session: GrillingSessionRecord): string[] => [
+  "### The Guidelines",
+  "",
+  `AI Office writes each one as \`${grillingGuidelinesDirectory}/<name>.md\`, with its front matter, on the branch ${session.documents?.branch ?? grillingBranch(session.id)} as the session settles it, and opens one pull request with them when the session ends. The Owner's merge of it is their approval. This session writes no PRD, ADRs, glossary or process docs, and drafts no issues.`,
+  "",
+  ...(session.guidelines.length === 0
+    ? ["None yet."]
+    : session.guidelines.flatMap(
+        ({ name, inclusion, fileMatchPatterns, description, text }) => [
+          `#### ${name} (${inclusion === "always" ? "always" : `fileMatch: ${fileMatchPatterns.join(", ")}`})`,
+          "",
+          description,
+          "",
+          text,
+          "",
+        ],
+      )),
+  ...(session.guidelines.length === 0 ? [""] : []),
+  `Still to write: ${foundationStillToWrite(session)}.`,
+];
+
+/** Which of product, tech and structure the session has yet to write. */
+const foundationStillToWrite = (session: GrillingSessionRecord): string => {
+  const missing = foundationGuidelineNames.filter(
+    (name) => !session.guidelines.some((guideline) => guideline.name === name),
+  );
+  return missing.length === 0
+    ? "none of product, tech and structure"
+    : missing.join(", ");
+};
 
 /** Lines that look like the quoting's own markers lose their power. */
 const defused = (text: string): string =>
@@ -187,6 +240,12 @@ const documentsInstructions = [
   "- `processes`: process docs, each `{title, text}` with its whole text, for how some work gets done once this is built; one given again replaces the doc of its title. Most sessions need none.",
 ];
 
+/** What a `/guidelines` turn is asked for of the Guidelines (FR-102, FR-109). */
+const guidelinesInstructions = [
+  `- \`guidelines\`: the Guidelines the answers settled, at most ${String(maxGrillingGuidelines)}, each \`{name, inclusion, fileMatchPatterns, description, text}\` with its whole text; one given again replaces the Guideline of its name, and the rest stay as they are. \`name\` is its file name without \`.md\`, in lowercase letters, digits and dashes. \`product\`, \`tech\` and \`structure\` are \`always\`, with no patterns; any other is \`fileMatch\`, with the globs of the files it applies to, from the top of the repository, such as \`packages/db/**\`. \`description\` is one line. Write only conventions the Owner confirmed, as rules an Agent can follow. Never write a credential, a token or a secret in one.`,
+  "- `outline`, `adrs`, `processes` and `terms`: leave them empty. This session writes only Guidelines; AI Office drops any.",
+];
+
 /**
  * What a turn is asked for, after the session section; with `lookups`, it
  * may have facts found in the repository first.
@@ -200,9 +259,12 @@ export function grillingTurnInstructions(
   const answered = questionsOfRound(session, session.round).filter(
     ({ status }) => status === "answered",
   );
+  const spec = grillingWritesSpec(session.skill);
+  const noTerms = spec || grillingWritesGuidelines(session.skill);
   return [
     "## Your turn",
     "",
+    ...(spec ? specTurnLead(session) : []),
     session.round === 0
       ? `Start the session: ask the first round of questions${session.topic === "" ? ", starting with what the Owner wants to grill" : ""}.`
       : `The Owner has answered every question of round ${String(session.round)}:`,
@@ -223,13 +285,15 @@ export function grillingTurnInstructions(
             questions: [1],
           },
         ],
-        terms: [
-          {
-            term: "Term",
-            definition: "What it means here.",
-            avoid: ["a word not to use for it"],
-          },
-        ],
+        terms: noTerms
+          ? []
+          : [
+              {
+                term: "Term",
+                definition: "What it means here.",
+                avoid: ["a word not to use for it"],
+              },
+            ],
         withdraw: [],
         questions: [
           {
@@ -238,14 +302,30 @@ export function grillingTurnInstructions(
             dependsOn: [],
           },
         ],
-        outline: [
-          {
-            heading: "A section of the PRD",
-            text: "What it says now, in full.",
-          },
-        ],
-        adrs: [],
-        processes: [],
+        ...(spec
+          ? { spec: specExample(session) }
+          : grillingWritesGuidelines(session.skill)
+            ? {
+                guidelines: [
+                  {
+                    name: "tech",
+                    inclusion: "always",
+                    fileMatchPatterns: [],
+                    description: "The stack, its tools and how to run them.",
+                    text: "The rules, in Markdown, in full.",
+                  },
+                ],
+              }
+            : {
+                outline: [
+                  {
+                    heading: "A section of the PRD",
+                    text: "What it says now, in full.",
+                  },
+                ],
+                adrs: [],
+                processes: [],
+              }),
         ...(lookups === undefined
           ? {}
           : {
@@ -263,15 +343,23 @@ export function grillingTurnInstructions(
     "```",
     "",
     `- \`decisions\`: what the answers settled, each naming the questions (by number) it settles. Every answered question should be settled by a decision.`,
-    "- `terms`: glossary terms the answers settled; a term given again replaces the earlier definition.",
+    ...(noTerms
+      ? []
+      : [
+          "- `terms`: glossary terms the answers settled; a term given again replaces the earlier definition.",
+        ]),
     "- `withdraw`: the numbers of open questions the answers made moot.",
     `- \`questions\`: the questions still to settle, at most ${String(maxGrillingQuestionsPerTurn)}. AI Office numbers them from Q${String(next)} in your order. \`dependsOn\` names earlier questions (open ones, or ones you list before it) that must be settled before it is asked; AI Office asks every question whose prerequisites are settled now, and holds the rest for a later round.`,
     "- Leave `questions` empty when nothing remains to settle: AI Office then asks the Owner to confirm that the session can end.",
-    ...(grillingWritesDocuments(session.skill)
-      ? documentsInstructions
-      : [
-          "- `outline`, `adrs` and `processes`: leave them empty, and `terms` too. This session writes no documents; AI Office drops any.",
-        ]),
+    ...(spec
+      ? specInstructions(session)
+      : grillingWritesGuidelines(session.skill)
+        ? guidelinesInstructions
+        : grillingWritesDocuments(session.skill)
+          ? documentsInstructions
+          : [
+              "- `outline`, `adrs` and `processes`: leave them empty, and `terms` too. This session writes no documents; AI Office drops any.",
+            ]),
     ...(lookups === undefined
       ? []
       : [

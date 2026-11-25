@@ -1984,9 +1984,13 @@ export const directChatMessages = pgTable(
 // null until first written; `issues` the issues drafted from them and the
 // issues filed (FR-81, `grillingIssuesSchema`), null until drafted.
 // `skill` is the built-in Skill that started it (`/grilling`,
-// `/grill-with-docs`, `/wayfinder`, `/to-tickets` or `/to-spec`, FR-83b),
-// and `sources` the documents `/to-tickets` read into it
-// (`grillingSourceSchema`). A Floor runs at most one session at a time;
+// `/grill-with-docs`, `/wayfinder`, `/to-tickets` or `/to-spec`, FR-83b; or
+// `/guidelines`, Guidelines, Specs and Hooks PRD FR-109), `sources` the
+// documents `/to-tickets` read into it (`grillingSourceSchema`), and
+// `guidelines` the Guidelines `/guidelines` settled
+// (`grillingGuidelineSchema`). `spec` is a `/spec` session's phase, its
+// drafts and the documents the Owner approved (FR-113, `grillingSpecSchema`),
+// null for every other session. A Floor runs at most one session at a time;
 // the rest are paused or ended, and every one is kept.
 export const grillingSessions = pgTable(
   "grilling_sessions",
@@ -2017,6 +2021,8 @@ export const grillingSessions = pgTable(
     documents: jsonb("documents"),
     issues: jsonb("issues"),
     sources: jsonb("sources").notNull().default([]),
+    guidelines: jsonb("guidelines").notNull().default([]),
+    spec: jsonb("spec"),
     startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
     pausedAt: timestamp("paused_at", { withTimezone: true }),
@@ -2034,7 +2040,7 @@ export const grillingSessions = pgTable(
     check("grilling_sessions_round", sql`${table.round} >= 0`),
     check(
       "grilling_sessions_skill",
-      sql`${table.skill} IN ('grilling', 'grill-with-docs', 'wayfinder', 'to-tickets', 'to-spec')`,
+      sql`${table.skill} IN ('grilling', 'grill-with-docs', 'wayfinder', 'to-tickets', 'to-spec', 'guidelines', 'spec')`,
     ),
     check(
       "grilling_sessions_paused",
@@ -2279,6 +2285,286 @@ export const repositorySkillReviews = pgTable(
       "repository_skill_reviews_digest",
       sql`${table.digest} ~ '^[0-9a-f]{64}$'`,
     ),
+  ],
+);
+
+// The versions of a Floor's Guidelines the Owner approved (Guidelines,
+// Specs and Hooks PRD, FR-103; ADR 0014): each Guideline (`name`, its file
+// in `.agents/guidelines/` without `.md`) in each version (`content`, the
+// whole file, by the SHA-256 of it, `content_hash`), and how the Owner
+// approved it (`approval`): the last commit that changed it reached the
+// default branch through a pull request the Owner merged (`owner_merge`),
+// or the Owner pushed it (`owner_push`), or the Owner approved it in the
+// Floor admin (`owner_admin`). A later read of an approved hash needs no
+// new approval; Agents keep the newest approved version of a file whose
+// version on the default branch is not approved. Rows are kept, so a file
+// put back as it was approved is approved again.
+export const approvedGuidelines = pgTable(
+  "approved_guidelines",
+  {
+    floorId: text("floor_id")
+      .notNull()
+      .references(() => floors.id),
+    name: text("name").notNull(),
+    contentHash: text("content_hash").notNull(),
+    content: text("content").notNull(),
+    approval: text("approval").notNull(),
+    approvedAt: timestamp("approved_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.floorId, table.name, table.contentHash],
+    }),
+    check(
+      "approved_guidelines_name",
+      sql`${table.name} ~ '^[a-z0-9-]+$' AND length(${table.name}) <= 255`,
+    ),
+    check(
+      "approved_guidelines_content_hash",
+      sql`${table.contentHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "approved_guidelines_content",
+      sql`length(${table.content}) <= 12000`,
+    ),
+    check(
+      "approved_guidelines_approval",
+      sql`${table.approval} IN ('owner_merge', 'owner_push', 'owner_admin')`,
+    ),
+  ],
+);
+
+// The versions of a Floor's Guidelines that reached its default branch
+// without the Owner's approval (FR-103; ADR 0014): `awaiting` the Owner's
+// approval, which Agents do not get meanwhile, or `dismissed` by the Owner.
+// `commit_sha` is the last commit that changed the file to it, as it was
+// last checked: the same commit is not asked about again. Each is raised
+// once, as an event and in the Floor's Notice.
+export const guidelineChanges = pgTable(
+  "guideline_changes",
+  {
+    floorId: text("floor_id")
+      .notNull()
+      .references(() => floors.id),
+    name: text("name").notNull(),
+    contentHash: text("content_hash").notNull(),
+    content: text("content").notNull(),
+    commitSha: text("commit_sha"),
+    status: text("status").notNull().default("awaiting"),
+    seenAt: timestamp("seen_at", { withTimezone: true }).notNull(),
+    dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.floorId, table.name, table.contentHash],
+    }),
+    check(
+      "guideline_changes_name",
+      sql`${table.name} ~ '^[a-z0-9-]+$' AND length(${table.name}) <= 255`,
+    ),
+    check(
+      "guideline_changes_content_hash",
+      sql`${table.contentHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check("guideline_changes_content", sql`length(${table.content}) <= 12000`),
+    check(
+      "guideline_changes_commit_sha",
+      sql`${table.commitSha} IS NULL OR ${table.commitSha} ~ '^[0-9a-f]{40,64}$'`,
+    ),
+    check(
+      "guideline_changes_status",
+      sql`${table.status} IN ('awaiting', 'dismissed') AND (${table.status} = 'dismissed') = (${table.dismissedAt} IS NOT NULL)`,
+    ),
+  ],
+);
+
+// The Floors that were suggested `/guidelines` (Guidelines, Specs and Hooks
+// PRD, FR-109): a Floor whose default branch had no Guidelines when they
+// were read got one info Notice suggesting it, once, ever; the row is kept
+// so it is never raised again.
+export const guidelineSuggestions = pgTable("guideline_suggestions", {
+  floorId: text("floor_id")
+    .primaryKey()
+    .references(() => floors.id),
+  suggestedAt: timestamp("suggested_at", { withTimezone: true }).notNull(),
+});
+
+// The new or changed Guidelines Agents proposed (Guidelines, Specs and
+// Hooks PRD, FR-110, FR-111): the coder, the docs Agent or QA (`agent_id`)
+// ended its Handoff or QA report on an issue (`issue`) with one
+// `<guideline name="…">` block, kept here redacted as the whole file
+// (`content`, by its SHA-256, `content_hash`). It waits for the Owner
+// (`proposed`), who opens it as a pull request (`opened`, with its number
+// and address) or rejects it (`rejected`). No model decides one, and no
+// Agent gets one: only the Owner's merge of its pull request approves it
+// (ADR 0014). The same version of a Guideline waits once per Floor.
+export const guidelineProposals = pgTable(
+  "guideline_proposals",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
+    floorId: text("floor_id")
+      .notNull()
+      .references(() => floors.id),
+    name: text("name").notNull(),
+    contentHash: text("content_hash").notNull(),
+    content: text("content").notNull(),
+    agentId: text("agent_id").notNull(),
+    issue: integer("issue").notNull(),
+    status: text("status").notNull().default("proposed"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    pullRequest: integer("pull_request"),
+    url: text("url"),
+  },
+  (table) => [
+    index("guideline_proposals_floor").on(table.floorId, table.status),
+    uniqueIndex("guideline_proposals_waiting")
+      .on(table.floorId, table.name, table.contentHash)
+      .where(sql`${table.status} = 'proposed'`),
+    check(
+      "guideline_proposals_name",
+      sql`${table.name} ~ '^[a-z0-9-]+$' AND length(${table.name}) <= 255`,
+    ),
+    check(
+      "guideline_proposals_content_hash",
+      sql`${table.contentHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "guideline_proposals_content",
+      sql`length(${table.content}) BETWEEN 1 AND 12000`,
+    ),
+    check("guideline_proposals_issue", sql`${table.issue} > 0`),
+    check(
+      "guideline_proposals_status",
+      sql`${table.status} IN ('proposed', 'opened', 'rejected') AND (${table.status} = 'proposed') = (${table.decidedAt} IS NULL) AND (${table.status} = 'opened') = (${table.pullRequest} IS NOT NULL AND ${table.url} IS NOT NULL)`,
+    ),
+  ],
+);
+
+// Hooks (Guidelines, Specs and Hooks PRD, FR-118 to FR-121; ADR 0016): the
+// Owner's own rules on a Floor, kept here and made and changed only by the
+// Owner. When `trigger` happens (narrowed by `labels` and `file_patterns`),
+// the Agent `agent_id`, or any Agent in `role`, runs `skill_name`, at most
+// `runs_per_hour` times an hour. `failures` counts its failed runs in a
+// row; at three it is turned off (`enabled`). Its name is unique on its
+// Floor, whatever its case.
+export const hooks = pgTable(
+  "hooks",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
+    floorId: text("floor_id")
+      .notNull()
+      .references(() => floors.id),
+    name: text("name").notNull(),
+    trigger: text("trigger").notNull(),
+    /** The Stage label watched, for a `stage` Hook. */
+    stage: text("stage"),
+    labels: text("labels").array().notNull(),
+    filePatterns: text("file_patterns").array().notNull(),
+    agentId: text("agent_id"),
+    role: text("role"),
+    skillName: text("skill_name").notNull(),
+    runsPerHour: integer("runs_per_hour").notNull(),
+    enabled: boolean("enabled").notNull(),
+    failures: integer("failures").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("hooks_name_unique").on(
+      table.floorId,
+      sql`lower(${table.name})`,
+    ),
+    check(
+      "hooks_name",
+      sql`length(${table.name}) BETWEEN 1 AND 60 AND ${table.name} = btrim(${table.name})`,
+    ),
+    check(
+      "hooks_trigger",
+      sql`${table.trigger} IN ('stage', 'pull_request_opened', 'push', 'wrap_up', 'spec_filed', 'run_now') AND (${table.trigger} = 'stage') = (${table.stage} IS NOT NULL)`,
+    ),
+    check(
+      "hooks_stage",
+      sql`${table.stage} IS NULL OR ${table.stage} IN ('needs-work', 'needs-review', 'needs-qa', 'needs-docs')`,
+    ),
+    check(
+      "hooks_filters",
+      sql`cardinality(${table.labels}) <= 20 AND cardinality(${table.filePatterns}) <= 20`,
+    ),
+    check(
+      "hooks_action",
+      sql`(${table.agentId} IS NULL) <> (${table.role} IS NULL) AND ${table.role} IS DISTINCT FROM 'manager'`,
+    ),
+    check(
+      "hooks_skill_name",
+      sql`${table.skillName} ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND length(${table.skillName}) <= 64`,
+    ),
+    check("hooks_runs_per_hour", sql`${table.runsPerHour} BETWEEN 1 AND 60`),
+    check("hooks_failures", sql`${table.failures} >= 0`),
+  ],
+);
+
+// Each run of a Hook (FR-119, FR-120): the Agent that ran it, what the
+// event was about, and how it ended, with the Agent's answer (redacted,
+// cut short) and the comment the GitHub App posted it as. A run is
+// `running` until it ends. Deleting a Hook deletes its runs.
+export const hookRuns = pgTable(
+  "hook_runs",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
+    hookId: bigint("hook_id", { mode: "number" })
+      .notNull()
+      .references(() => hooks.id, { onDelete: "cascade" }),
+    floorId: text("floor_id")
+      .notNull()
+      .references(() => floors.id),
+    agentId: text("agent_id"),
+    trigger: text("trigger").notNull(),
+    issue: integer("issue"),
+    pullRequest: integer("pull_request"),
+    status: text("status").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    error: text("error"),
+    result: text("result"),
+    commentUrl: text("comment_url"),
+  },
+  (table) => [
+    index("hook_runs_hook").on(table.hookId, table.startedAt),
+    check(
+      "hook_runs_status",
+      sql`${table.status} IN ('running', 'succeeded', 'failed') AND (${table.status} = 'running') = (${table.finishedAt} IS NULL)`,
+    ),
+    check(
+      "hook_runs_subject",
+      sql`(${table.issue} IS NULL OR ${table.issue} > 0) AND (${table.pullRequest} IS NULL OR ${table.pullRequest} > 0)`,
+    ),
+    check(
+      "hook_runs_result",
+      sql`${table.result} IS NULL OR length(${table.result}) <= 8000`,
+    ),
+  ],
+);
+
+// The default branch's head each Floor's push Hooks last saw (FR-118): a
+// push is the files changed from there to its head now.
+export const hookPushHeads = pgTable(
+  "hook_push_heads",
+  {
+    floorId: text("floor_id")
+      .primaryKey()
+      .references(() => floors.id),
+    sha: text("sha").notNull(),
+    seenAt: timestamp("seen_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    check("hook_push_heads_sha", sql`${table.sha} ~ '^[0-9a-f]{40,64}$'`),
   ],
 );
 

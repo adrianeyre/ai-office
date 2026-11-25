@@ -292,7 +292,7 @@ describe("sending", () => {
     );
     expect(unknown.reply).toMatchObject({
       kind: "hint",
-      text: "There is no Skill /nothing-here on this Floor. Its Skills are /code-review, /codebase-design, /diagnosing-bugs, /domain-modeling, /grill-with-docs, /grilling, /pr, /prototype, /release-notes, /research, /tdd, /to-spec, /to-tickets and /wayfinder.",
+      text: "There is no Skill /nothing-here on this Floor. Its Skills are /code-review, /codebase-design, /diagnosing-bugs, /domain-modeling, /grill-with-docs, /grilling, /guidelines, /pr, /prototype, /release-notes, /research, /spec, /tdd, /to-spec, /to-tickets and /wayfinder.",
       skill: null,
     });
   });

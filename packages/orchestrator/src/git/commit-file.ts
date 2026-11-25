@@ -35,6 +35,8 @@ export interface CommitFilesOptions {
   /** The branch it is pushed to. */
   readonly to: string;
   readonly files: readonly FileToCommit[];
+  /** Paths to take out of the branch, if it has them. */
+  readonly remove?: readonly string[];
   readonly message: string;
   /** Who the commit is by (FR-68). */
   readonly identity: GitIdentity;
@@ -146,6 +148,15 @@ export async function commitFiles(
         ["update-index", "--add", "--cacheinfo", `100644,${blob},${file.path}`],
         { env: index },
       );
+    }
+    if ((options.remove ?? []).length > 0) {
+      // A zero mode takes the entry out; with no work tree, nothing else is touched.
+      await git("take the files out", ["update-index", "--index-info"], {
+        input: (options.remove ?? [])
+          .map((path) => `0 ${"0".repeat(40)}\t${path}\n`)
+          .join(""),
+        env: index,
+      });
     }
     const tree = await git("write the files", ["write-tree"], { env: index });
     const changed = (

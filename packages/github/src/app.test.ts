@@ -234,3 +234,95 @@ describe("the GitHub App client", () => {
     expect(error.message).toMatch(/^GitHub could not be reached/);
   });
 });
+
+// Who brought a file to the default branch, as GitHub records it (ADR
+// 0014), read alike from the fake in memory and by the App over HTTP: a
+// pull request someone merged, or a push of one commit or of several.
+describe("who changed a file, by GitHub's record", () => {
+  const repository = "adrianeyre/web-shop";
+  const path = ".agents/guidelines/tech.md";
+
+  for (const through of ["memory", "HTTP"] as const) {
+    it(`finds the pull request and its merger, or the pusher, through ${through}`, async () => {
+      const { fake, app } = await setUp();
+      const repo = (through === "memory" ? fake : app).repository(repository);
+
+      // Someone's pull request, merged by the Owner on GitHub with a merge
+      // commit: the file's last change is the branch's commit, which the
+      // pull request brought.
+      const proposed = fake.pushCommit(repository, "tech", {
+        files: { [path]: "Use pnpm.\n" },
+        author: "adrianeyre",
+        pusher: "mallory",
+      });
+      const opened = await fake.repository(repository).createPullRequest({
+        title: "Tech",
+        body: "",
+        head: "tech",
+        base: "main",
+      });
+      fake.mergePullRequest(repository, opened.number);
+      expect((await repo.lastCommitChanging(path, "main"))?.sha).toBe(proposed);
+      expect(await repo.mergedPullRequestOf(proposed)).toEqual({
+        number: opened.number,
+        base: "main",
+        mergedBy: "adrianeyre",
+        htmlUrl: opened.htmlUrl,
+      });
+      expect(await repo.pusherOf(proposed, "main")).toBeUndefined();
+      // Only to the branch it was pushed to.
+      expect(await repo.pusherOf(proposed, "tech")).toBe("mallory");
+
+      // A collaborator's squashed merge.
+      fake.pushCommit(repository, "tech-2", {
+        files: { [path]: "Use npm.\n" },
+      });
+      const second = await fake.repository(repository).createPullRequest({
+        title: "Tech again",
+        body: "",
+        head: "tech-2",
+        base: "main",
+      });
+      const squashed = fake.mergePullRequest(repository, second.number, {
+        actor: "mallory",
+        method: "squash",
+      });
+      expect((await repo.lastCommitChanging(path, "main"))?.sha).toBe(squashed);
+      expect(await repo.mergedPullRequestOf(squashed)).toMatchObject({
+        number: second.number,
+        mergedBy: "mallory",
+      });
+
+      // A push of one commit, whatever its author says.
+      const pushed = fake.pushCommit(repository, "main", {
+        files: { [path]: "Use yarn.\n" },
+        author: "adrianeyre",
+        pusher: "mallory",
+      });
+      expect(await repo.mergedPullRequestOf(pushed)).toBeUndefined();
+      expect(await repo.pusherOf(pushed, "main")).toBe("mallory");
+
+      // The Owner's push of several commits at once: the one that changed
+      // the file is not the push's last.
+      const changed = fake.pushCommit(repository, "local", {
+        files: { [path]: "Use pnpm, always.\n" },
+      });
+      const after = fake.pushCommit(repository, "local", {
+        files: { "README.md": "# web-shop\n" },
+      });
+      fake.pushBranch(repository, "main", after, { pusher: "adrianeyre" });
+      expect((await repo.lastCommitChanging(path, "main"))?.sha).toBe(changed);
+      expect(await repo.pusherOf(changed, "main")).toBe("adrianeyre");
+      expect(await repo.pusherOf(after, "main")).toBe("adrianeyre");
+
+      // A file never there; a commit GitHub does not have.
+      expect(
+        await repo.lastCommitChanging(".agents/guidelines/none.md", "main"),
+      ).toBeUndefined();
+      expect(
+        (await failureOf(repo.mergedPullRequestOf("f".repeat(40)))).status,
+      ).toBe(422);
+      expect(await repo.pusherOf("f".repeat(40), "main")).toBeUndefined();
+    });
+  }
+});

@@ -22,7 +22,14 @@ test("the Activity Feed filters by Floor and type, and new events stream in", as
 
   await page.getByRole("link", { name: "Activity" }).click();
   const feed = page.getByRole("list", { name: "Activity" });
-  const entries = feed.locator(":scope > li");
+  // A Floor with no Guidelines is suggested `/guidelines` by an info
+  // Notice (FR-109), raised whenever its Guidelines are first read: at
+  // intake, or as its admin page opens. When it lands depends on timing,
+  // so it is counted apart from the entries this test follows.
+  const suggestion = /No Guidelines on \S+ yet/;
+  const entries = feed
+    .locator(":scope > li")
+    .filter({ hasNotText: suggestion });
   // The Owner's password set, the sign-in, then each Floor and its four
   // Agents.
   await expect(entries).toHaveCount(12);
@@ -72,6 +79,9 @@ test("the Activity Feed filters by Floor and type, and new events stream in", as
   await expect(entries.first()).toContainText(
     "Floor settings changed: roundCap.",
   );
+  // Its admin page read its Guidelines: there are none, so it is
+  // suggested `/guidelines`, once.
+  await expect(feed.getByText("No Guidelines on blog yet")).toHaveCount(1);
   // Another Floor's events do not stream into this one's feed.
   await admin.goto("/floor-settings/web-shop");
   await admin.getByLabel("Round Cap").fill("4");

@@ -998,6 +998,31 @@ pre:focus-visible {
   }
 }
 
+/* A feature told in words alone, with no demo beside it: the copy spans
+   the row, and its three points sit side by side on a wide screen. */
+.feature-steer {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.feature-steer .feature-text > p {
+  max-width: 48rem;
+}
+
+.feature-steer .feature-text > p:last-child {
+  margin: 1.5rem 0 0;
+}
+
+@media (min-width: 64rem) {
+  .feature-steer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .feature-steer .checks {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2rem;
+  }
+}
+
 .feature-text h3 {
   margin: 1.25rem 0 0.75rem;
   font-size: clamp(1.5rem, 1.2rem + 1vw, 2rem);

@@ -842,8 +842,28 @@ with the built-in Skill: `/grilling <what to grill>`.
   defaults (`docs/adr/`, `.scratch/`, a local tracker or a setup Skill).
   `@ai-office/shared` exports their commands' names
   (`grillWithDocsSkillName`, `wayfinderSkillName`, `toTicketsSkillName`,
-  `toSpecSkillName`, and `grillingSkillNames` for all five), for anything
-  that sends them, such as a Meeting Room.
+  `toSpecSkillName`, `guidelinesSkillName`, `specSkillName`, and
+  `grillingSkillNames` for all seven), for anything that sends them, such
+  as a Meeting Room.
+
+  `/guidelines` (Guidelines, Specs and Hooks PRD, FR-109), AI Office's
+  own, starts one too, and writes none of those: only the Floor's
+  Guidelines in `.agents/guidelines/` (`grillingWritesGuidelines`), kept
+  with the session (`guidelines`) and shown under **Read** in place of the
+  PRD's outline. It drafts no issues (`grillingDraftsIssues`). See
+  [Writing them: `/guidelines`](guidelines-specs-and-hooks.md#writing-them-guidelines).
+
+  `/spec <words>` (Guidelines, Specs and Hooks PRD, FR-113), AI Office's
+  own too, writes only a Spec (`grillingWritesSpec`) in
+  `.agents/specs/<slug>/`, in three phases the Owner confirms in the chat
+  ("confirm requirements", "confirm design" or "skip design", "confirm
+  tasks", and "reopen …"; `readGrillingControl`), its phase, drafts and
+  approved documents kept with the session (`spec`). Its issue drafts are
+  its confirmed tasks, written in plain code. `/spec amend <slug>`
+  (`readSpecAmend`, FR-117) starts one that amends the Spec in that
+  folder, back at the requirements with the documents approved last
+  loaded as its drafts. See
+  [Specs](guidelines-specs-and-hooks.md#specs).
 - **`/to-tickets`.** It breaks a plan already written into issues, and
   writes no documents of its own (`grillingWritesDocuments`):
   - **What it reads.** Each path in its arguments under

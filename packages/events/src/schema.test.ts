@@ -10,7 +10,7 @@ import {
 import { exampleEvents } from "./test-support.ts";
 
 describe("officeEventSchema", () => {
-  it("covers Floor, Agent, Contractor, issue, Manager decision, Batch, Status update, memory, sandbox, Grilling Session fact-finding, documents and issues, repository, branch, pull request, review, QA, design review, Handoff, model call, Notice, cap, AI Account, config, Connection, Google sign-in, Skill, Role, Floor Template, sign-in and Gateway Key events", () => {
+  it("covers Floor, Agent, Contractor, issue, Manager decision, Batch, Status update, memory, Guideline, sandbox, Grilling Session fact-finding, documents and issues, repository, branch, pull request, review, QA, design review, Handoff, model call, Notice, cap, AI Account, config, Connection, Google sign-in, Skill, Role, Floor Template, sign-in and Gateway Key events", () => {
     const families = new Set(eventTypes.map((type) => type.split(".")[0]));
     expect([...families].sort()).toEqual(
       [
@@ -28,7 +28,9 @@ describe("officeEventSchema", () => {
         "gateway_key",
         "google",
         "grilling",
+        "guideline",
         "handoff",
+        "hook",
         "issue",
         "manager",
         "memory",
@@ -118,6 +120,16 @@ describe("a Plan's approval in events", () => {
       officeEventSchema.safeParse({ ...approved, messageId: 0 }).success,
     ).toBe(false);
   });
+
+  it("reads one by a Spec's confirmed tasks, naming its session (FR-115)", () => {
+    const approved = exampleEvents["batch.approved"];
+    expect(
+      officeEventSchema.safeParse({ ...approved, specSessionId: 7 }).success,
+    ).toBe(true);
+    expect(
+      officeEventSchema.safeParse({ ...approved, specSessionId: 0 }).success,
+    ).toBe(false);
+  });
 });
 
 describe("subjectOf", () => {
@@ -157,5 +169,90 @@ describe("matchesFilter", () => {
     expect(
       matchesFilter(handoff, { floorId: "web-shop", issue: 4, agentId: "x" }),
     ).toBe(false);
+  });
+});
+
+describe("Guideline events", () => {
+  it("name a Guideline and its version, never its text", () => {
+    const approved = exampleEvents["guideline.approved"];
+    expect(officeEventSchema.parse(approved)).toEqual(approved);
+    // A Floor admin approval has no commit or pull request.
+    expect(
+      officeEventSchema.safeParse({
+        type: "guideline.approved",
+        version: 1,
+        floorId: "web-shop",
+        name: "tech",
+        contentHash: "a".repeat(64),
+        approval: "owner_admin",
+      }).success,
+    ).toBe(true);
+    for (const wrong of [
+      { name: "Tech.md" },
+      { contentHash: "not-a-hash" },
+      { approval: "app_merge" },
+      { content: "Use pnpm." },
+    ]) {
+      expect(
+        officeEventSchema.safeParse({ ...approved, ...wrong }).success,
+      ).toBe(false);
+    }
+    expect(subjectOf(exampleEvents["guideline.awaiting"])).toEqual({
+      floorId: "web-shop",
+      agentIds: [],
+      issue: null,
+    });
+  });
+
+  it("name a proposed Guideline by its hash, with its Agent and issue, never its text", () => {
+    const proposed = exampleEvents["guideline.proposed"];
+    expect(officeEventSchema.parse(proposed)).toEqual(proposed);
+    expect(subjectOf(proposed)).toEqual({
+      floorId: "web-shop",
+      agentIds: ["ada"],
+      issue: 4,
+    });
+    for (const wrong of [
+      { name: "Migrations.md" },
+      { contentHash: "not-a-hash" },
+      { content: "Use pnpm." },
+      { new: "yes" },
+    ]) {
+      expect(
+        officeEventSchema.safeParse({ ...proposed, ...wrong }).success,
+      ).toBe(false);
+    }
+  });
+
+  it("name the Guidelines a prompt left out over its budget, for the task's Agent and issue, never their text", () => {
+    const over = exampleEvents["guideline.over_budget"];
+    expect(officeEventSchema.parse(over)).toEqual(over);
+    expect(subjectOf(over)).toEqual({
+      floorId: "web-shop",
+      agentIds: ["ada"],
+      issue: 12,
+    });
+    // The Manager's chat is for no issue.
+    expect(
+      officeEventSchema.safeParse({
+        type: "guideline.over_budget",
+        version: 1,
+        floorId: "web-shop",
+        task: "chat",
+        budget: 12_000,
+        characters: 13_000,
+        leftOut: ["structure"],
+      }).success,
+    ).toBe(true);
+    for (const wrong of [
+      { leftOut: [] },
+      { leftOut: ["Migrations.md"] },
+      { task: "merge" },
+      { content: "Use pnpm." },
+    ]) {
+      expect(officeEventSchema.safeParse({ ...over, ...wrong }).success).toBe(
+        false,
+      );
+    }
   });
 });

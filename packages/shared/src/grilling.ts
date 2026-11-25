@@ -1,6 +1,13 @@
 import { z } from "zod";
 
 import { grillingIssuesSchema } from "./grilling-issues.ts";
+import { guidelineNamePattern, guidelinesFolder } from "./guidelines.ts";
+import {
+  grillingSpecSchema,
+  specPhases,
+  specTurnSchema,
+  type SpecPhase,
+} from "./spec.ts";
 
 // Grilling Sessions (PRD §6.15, FR-77, FR-78, FR-79, FR-80, FR-82):
 // started in the Manager chat with the built-in `/grilling` Skill, the
@@ -45,6 +52,22 @@ export const toTicketsSkillName = "to-tickets";
  * only about the seams to test at.
  */
 export const toSpecSkillName = "to-spec";
+/**
+ * `/guidelines`: AI Office's own (Guidelines, Specs and Hooks PRD,
+ * FR-109). The Manager reads the repository, asks the Owner to confirm the
+ * conventions it found, and writes the Floor's first Guidelines in
+ * `.agents/guidelines/`; merging their pull request is the Owner's
+ * approval (ADR 0014). It writes no PRD and drafts no issues.
+ */
+export const guidelinesSkillName = "guidelines";
+/**
+ * `/spec <words>`: AI Office's own (Guidelines, Specs and Hooks PRD,
+ * FR-113; ADR 0015). The Manager agrees a Spec with the Owner in three
+ * phases (requirements, design, tasks), each confirmed in the Owner's own
+ * words and committed in `.agents/specs/<slug>/`; the tasks become the
+ * session's issue drafts. It writes no PRD. `/to-spec` is another Skill.
+ */
+export const specSkillName = "spec";
 
 /** Every built-in Skill that starts a Grilling Session, `/grilling` first. */
 export const grillingSkillNames = [
@@ -53,6 +76,8 @@ export const grillingSkillNames = [
   wayfinderSkillName,
   toTicketsSkillName,
   toSpecSkillName,
+  guidelinesSkillName,
+  specSkillName,
 ] as const;
 export type GrillingSkillName = (typeof grillingSkillNames)[number];
 
@@ -65,6 +90,40 @@ export const isGrillingSkillName = (name: string): name is GrillingSkillName =>
  */
 export const grillingWritesDocuments = (skill: GrillingSkillName): boolean =>
   skill !== toTicketsSkillName;
+
+/**
+ * Whether a session started by `skill` writes Guidelines rather than the
+ * PRD, ADRs, glossary and process docs: only `/guidelines` (FR-109).
+ */
+export const grillingWritesGuidelines = (skill: GrillingSkillName): boolean =>
+  skill === guidelinesSkillName;
+
+/**
+ * Whether a session started by `skill` writes a Spec, phase by phase,
+ * rather than the PRD, ADRs, glossary and process docs: only `/spec`
+ * (FR-113).
+ */
+export const grillingWritesSpec = (skill: GrillingSkillName): boolean =>
+  skill === specSkillName;
+
+/**
+ * Whether the Manager drafts issues once a session started by `skill`
+ * ends (FR-81): every one but `/guidelines`, whose pull request is all
+ * it makes. A `/spec` session's drafts are its confirmed tasks.
+ */
+export const grillingDraftsIssues = (skill: GrillingSkillName): boolean =>
+  skill !== guidelinesSkillName;
+
+/**
+ * The Guidelines every `/guidelines` session writes, each `always`
+ * (FR-109): what the product is, its technology, and how the repository
+ * is laid out.
+ */
+export const foundationGuidelineNames = [
+  "product",
+  "tech",
+  "structure",
+] as const;
 
 /** The longest topic `/grilling` takes. */
 export const maxGrillingTopicLength = 500;
@@ -82,6 +141,12 @@ export const maxGrillingDocumentTextLength = 8000;
 export const maxGrillingSources = 5;
 /** The longest document `/to-tickets` keeps; a longer one is cut. */
 export const maxGrillingSourceLength = 40_000;
+/** The most Guidelines one `/guidelines` session writes. */
+export const maxGrillingGuidelines = 20;
+/** The most file patterns one Guideline of a session takes. */
+export const maxGrillingGuidelinePatterns = 10;
+/** The longest Guideline's name, description or file pattern a session writes. */
+export const maxGrillingGuidelineLineLength = 200;
 
 // Where a session's documents go in the Floor's repository (FR-80).
 /** The PRDs' directory. */
@@ -92,6 +157,8 @@ export const grillingAdrDirectory = "docs/architectural-decision-record";
 export const grillingGlossaryPath = "GLOSSARY.md";
 /** The process docs' directory. */
 export const grillingProcessDirectory = "docs/processes";
+/** Where `/guidelines` writes the Floor's Guidelines (FR-102, FR-109). */
+export const grillingGuidelinesDirectory = guidelinesFolder;
 
 /**
  * The documents `/to-tickets` reads from what it was given: each path
@@ -268,6 +335,32 @@ export const grillingProcessSchema = z.object({
 export type GrillingProcess = z.infer<typeof grillingProcessSchema>;
 
 /**
+ * When a Guideline a `/guidelines` session writes applies (FR-109):
+ * `always`, or `fileMatch` for the files its patterns match. A `manual`
+ * Guideline is the Owner's to write by hand.
+ */
+export const grillingGuidelineInclusions = ["always", "fileMatch"] as const;
+export type GrillingGuidelineInclusion =
+  (typeof grillingGuidelineInclusions)[number];
+
+/**
+ * A Guideline a `/guidelines` session settled, written as
+ * `.agents/guidelines/<name>.md` with its front matter (FR-102, FR-109).
+ */
+export const grillingGuidelineSchema = z.object({
+  /** Its file name without `.md`: lowercase letters, digits and dashes. */
+  name: z.string(),
+  inclusion: z.enum(grillingGuidelineInclusions),
+  /** The files it applies to, for `fileMatch`; none for `always`. */
+  fileMatchPatterns: z.array(z.string()),
+  /** One line, shown in the Floor admin and in the list Agents get. */
+  description: z.string(),
+  /** Its rules, in Markdown, below the front matter. */
+  text: z.string(),
+});
+export type GrillingGuideline = z.infer<typeof grillingGuidelineSchema>;
+
+/**
  * Where a session's documents stand on GitHub (FR-80): the branch they
  * are kept on, the files and commit last written, and the one pull
  * request opened when the session ended. Null until first written.
@@ -317,6 +410,10 @@ export const grillingSessionSchema = grillingSessionSummarySchema.extend({
   issues: grillingIssuesSchema.nullable(),
   /** The documents `/to-tickets` read; empty for every other session. */
   sources: z.array(grillingSourceSchema).default([]),
+  /** The Guidelines `/guidelines` settled; empty for every other session. */
+  guidelines: z.array(grillingGuidelineSchema).default([]),
+  /** A `/spec` session's phase and documents; null for every other session. */
+  spec: grillingSpecSchema.nullable().default(null),
 });
 export type GrillingSession = z.infer<typeof grillingSessionSchema>;
 
@@ -377,6 +474,69 @@ const documentText = (what: string) =>
     });
 /** An ADR's reason, which may be left out: an ADR without all three is not kept. */
 const reason = z.string().trim().max(maxGrillingTextLength).default("");
+/** One line of a Guideline's front matter. */
+const guidelineLine = (what: string) =>
+  text(what)
+    .max(maxGrillingGuidelineLineLength, {
+      error: `${what} is at most ${String(maxGrillingGuidelineLineLength)} characters.`,
+    })
+    .refine((line) => !/[\r\n]/.test(line), {
+      error: `${what} is one line.`,
+    });
+
+/**
+ * A Guideline in a `/guidelines` turn (FR-102, FR-109): `fileMatch` needs
+ * its patterns and `always` takes none, and `product`, `tech` and
+ * `structure` are always `always`. Its rules are short enough that the
+ * file, front matter and all, stays within a Guideline's length.
+ */
+const grillingGuidelineTurnSchema = z
+  .object({
+    name: z
+      .string({ error: "A Guideline's name is text." })
+      .trim()
+      .toLowerCase()
+      .regex(guidelineNamePattern, {
+        error:
+          "A Guideline's name is lowercase letters, digits and dashes, such as migrations.",
+      })
+      .max(maxGrillingGuidelineLineLength),
+    inclusion: z
+      .enum(grillingGuidelineInclusions, {
+        error: "A Guideline's inclusion is always or fileMatch.",
+      })
+      .default("always"),
+    fileMatchPatterns: z
+      .array(guidelineLine("A file pattern"))
+      .max(maxGrillingGuidelinePatterns)
+      .default([]),
+    description: guidelineLine("A Guideline's description"),
+    text: documentText("A Guideline's rules"),
+  })
+  .superRefine((guideline, context) => {
+    const { name, inclusion, fileMatchPatterns } = guideline;
+    if (inclusion === "fileMatch" && fileMatchPatterns.length === 0) {
+      context.addIssue({
+        code: "custom",
+        message: `The ${name} Guideline is fileMatch, so it needs fileMatchPatterns: the globs of the files it applies to.`,
+      });
+    }
+    if (inclusion === "always" && fileMatchPatterns.length > 0) {
+      context.addIssue({
+        code: "custom",
+        message: `The ${name} Guideline is always, so it takes no fileMatchPatterns; make it fileMatch to apply it only to those files.`,
+      });
+    }
+    if (
+      (foundationGuidelineNames as readonly string[]).includes(name) &&
+      inclusion !== "always"
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: `The ${name} Guideline is always: product, tech and structure apply to every task.`,
+      });
+    }
+  });
 
 export const grillingTurnSchema = z.object({
   /** A few words to the Owner before the questions; may be empty. */
@@ -463,6 +623,19 @@ export const grillingTurnSchema = z.object({
     )
     .max(10)
     .default([]),
+  /**
+   * Guidelines, `/guidelines` only (FR-109), each replacing one of its
+   * name; every other session drops them.
+   */
+  guidelines: z
+    .array(grillingGuidelineTurnSchema)
+    .max(maxGrillingGuidelines)
+    .default([]),
+  /**
+   * The current phase's document, `/spec` only (FR-113), replacing its
+   * draft; every other session, and every other phase's, is dropped.
+   */
+  spec: specTurnSchema.default({}),
 });
 export type GrillingTurn = z.infer<typeof grillingTurnSchema>;
 
@@ -593,8 +766,25 @@ export type GrillingControl =
    * session numbered, or the latest ended one.
    */
   | { readonly kind: "draft-issues"; readonly session: number | null }
-  /** The Owner approves the draft issues, and the App files them (FR-81). */
-  | { readonly kind: "file-issues"; readonly session: number | null };
+  /**
+   * The Owner approves the draft issues, and the App files them (FR-81).
+   * A Spec's issues then start a Batch (FR-115), in one pull request when
+   * the Owner said "… in one PR" (`onePullRequest`).
+   */
+  | {
+      readonly kind: "file-issues";
+      readonly session: number | null;
+      readonly onePullRequest?: true;
+    }
+  /**
+   * A `/spec` session's phase (FR-113): "confirm requirements", "confirm
+   * design" or "confirm tasks" approves the phase's draft.
+   */
+  | { readonly kind: "confirm-phase"; readonly phase: SpecPhase }
+  /** "skip design": a `/spec` session goes from requirements to tasks. */
+  | { readonly kind: "skip-design" }
+  /** "reopen requirements": a `/spec` session drafts that phase again. */
+  | { readonly kind: "reopen"; readonly phase: SpecPhase };
 
 const pausePattern =
   /^(?:please\s+)?pause\s+(?:the\s+)?(?:grilling(?:\s+session)?|session)(?:\s+please)?$/;
@@ -606,10 +796,21 @@ const draftIssuesPattern = new RegExp(
   `^(?:please\\s+)?(?:re-?)?draft\\s+(?:the\\s+)?issues(?:\\s+again)?${ofSession}(?:\\s+again)?(?:,?\\s+please)?$`,
 );
 const fileIssuesPattern = new RegExp(
-  `^(?:please\\s+)?(?:(?:approve\\s+and\\s+)?file|approve)\\s+(?:the\\s+)?issues${ofSession}(?:,?\\s+please)?$`,
+  `^(?:please\\s+)?(?:(?:approve\\s+and\\s+)?file|approve)\\s+(?:the\\s+)?issues${ofSession}(\\s+(?:in|as)\\s+(?:one|a\\s+single)\\s+(?:pr|pull\\s+request))?(?:,?\\s+please)?$`,
 );
 const endPattern =
   /^(?:please\s+)?(?:end|finish|stop)\s+(?:the\s+)?(?:grilling(?:\s+session)?|session)(?:\s+now)?(?:\s+please)?$/;
+const phases = specPhases.join("|");
+const confirmPhasePattern = new RegExp(
+  `^(?:yes[,\\s]*)?(?:i\\s+)?confirm\\s+(?:the\\s+)?(${phases})(?:\\s+please)?$`,
+);
+const skipDesignPattern =
+  /^(?:please\s+)?skip\s+(?:the\s+)?design(?:\s+please)?$/;
+const reopenPattern = new RegExp(
+  `^(?:please\\s+)?(?:re-?open|go\\s+back\\s+to)\\s+(?:the\\s+)?(${phases})(?:\\s+please)?$`,
+);
+const phaseOf = (word: string | undefined): SpecPhase | undefined =>
+  specPhases.find((phase) => phase === word);
 const confirmPattern =
   /^(?:yes[,\s]*)?(?:i\s+)?confirm(?:ed)?(?:\s*(?:,|and)\s*end(?:\s+(?:the\s+)?(?:grilling\s+)?session)?)?$/;
 
@@ -618,7 +819,10 @@ const confirmPattern =
  * "resume session 3"; "confirm" (the session ends once no open questions
  * remain); "end the session" (it ends now, whatever is still open); and, for an ended session's issues, "draft the issues of
  * session 3" and "file the issues of session 3" (the latest ended session
- * without a number). Undefined for anything else.
+ * without a number), which may end "in one PR" for a Spec's Batch. A `/spec` session's phases too: "confirm
+ * requirements", "confirm design", "confirm tasks", "skip design" and
+ * "reopen requirements" (or "go back to the design"). Undefined for
+ * anything else.
  */
 export function readGrillingControl(text: string): GrillingControl | undefined {
   const said = tidy(text).replaceAll(/\s+/g, " ");
@@ -635,17 +839,31 @@ export function readGrillingControl(text: string): GrillingControl | undefined {
       session: resume[1] === undefined ? null : Number(resume[1]),
     };
   }
-  for (const [pattern, kind] of [
-    [draftIssuesPattern, "draft-issues"],
-    [fileIssuesPattern, "file-issues"],
-  ] as const) {
-    const issues = pattern.exec(said);
-    if (issues !== null) {
-      return {
-        kind,
-        session: issues[1] === undefined ? null : Number(issues[1]),
-      };
-    }
+  const drafting = draftIssuesPattern.exec(said);
+  if (drafting !== null) {
+    return {
+      kind: "draft-issues",
+      session: drafting[1] === undefined ? null : Number(drafting[1]),
+    };
+  }
+  const filing = fileIssuesPattern.exec(said);
+  if (filing !== null) {
+    return {
+      kind: "file-issues",
+      session: filing[1] === undefined ? null : Number(filing[1]),
+      ...(filing[2] === undefined ? {} : { onePullRequest: true as const }),
+    };
+  }
+  const confirmed = phaseOf(confirmPhasePattern.exec(said)?.[1]);
+  if (confirmed !== undefined) {
+    return { kind: "confirm-phase", phase: confirmed };
+  }
+  if (skipDesignPattern.test(said)) {
+    return { kind: "skip-design" };
+  }
+  const reopened = phaseOf(reopenPattern.exec(said)?.[1]);
+  if (reopened !== undefined) {
+    return { kind: "reopen", phase: reopened };
   }
   return confirmPattern.test(said) ? { kind: "confirm" } : undefined;
 }
@@ -659,6 +877,42 @@ export const resumeGrillingText = (session: number): string =>
 /** What the session's Issues send: "draft the issues of session 3" (FR-81). */
 export const draftGrillingIssuesText = (session: number): string =>
   `draft the issues of session ${String(session)}`;
-/** "file the issues of session 3": the Owner approves the drafts (FR-81). */
-export const fileGrillingIssuesText = (session: number): string =>
-  `file the issues of session ${String(session)}`;
+/** What confirms a `/spec` session's phase: "confirm requirements" (FR-113). */
+export const confirmSpecPhaseText = (phase: SpecPhase): string =>
+  `confirm ${phase}`;
+/** What skips a `/spec` session's design (FR-113). */
+export const skipSpecDesignText = "skip design";
+/**
+ * What starts a session that amends the Spec in `.agents/specs/<slug>/`
+ * (FR-117): "/spec amend checkout-with-saved-cards".
+ */
+export const amendSpecText = (slug: string): string =>
+  `/${specSkillName} amend ${slug}`;
+
+/**
+ * The slug of the Spec `/spec`'s arguments ask to amend: "amend
+ * checkout-with-saved-cards", one folder name after "amend", lower case,
+ * digits and dashes (a trailing slash, or the folder's path, allowed).
+ * None for any other words, which start a new Spec.
+ */
+export function readSpecAmend(given: string): string | undefined {
+  const match =
+    /^\s*amend\s+(?:\.agents\/specs\/)?([a-z0-9][a-z0-9-]*)\/?\s*$/i.exec(
+      given,
+    );
+  return match?.[1]?.toLowerCase();
+}
+
+/** What reopens a `/spec` session's earlier phase: "reopen requirements". */
+export const reopenSpecPhaseText = (phase: SpecPhase): string =>
+  `reopen ${phase}`;
+/**
+ * "file the issues of session 3": the Owner approves the drafts (FR-81);
+ * "file the issues of session 3 in one PR" has a Spec's Batch go in one
+ * pull request (FR-115).
+ */
+export const fileGrillingIssuesText = (
+  session: number,
+  onePullRequest = false,
+): string =>
+  `file the issues of session ${String(session)}${onePullRequest ? " in one PR" : ""}`;

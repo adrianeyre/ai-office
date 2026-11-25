@@ -666,8 +666,9 @@ Every Floor also has AI Office's own Skills (PRD FR-77, FR-83b), listed as
 **Built in**. Each is a real Skill in the Agent Skills format, a
 `SKILL.md` with its frontmatter and any supporting files, kept in the
 repository and checked as every Skill is when AI Office starts. Besides
-`/grilling` (`packages/orchestrator/src/grilling/skill.ts`), they are
-adapted from [Matt Pocock's skills](https://github.com/mattpocock/skills)
+`/grilling` (`packages/orchestrator/src/grilling/skill.ts`),
+`/guidelines` (`packages/orchestrator/src/skills/built-in/guidelines/`)
+and `/spec` (`packages/orchestrator/src/skills/built-in/spec/`), they are adapted from [Matt Pocock's skills](https://github.com/mattpocock/skills)
 (MIT), in `packages/orchestrator/src/skills/built-in/<name>/`, each saying
 so ("Adapted from Matt Pocock's skills, MIT") beside his licence
 (`built-in/LICENSE`; see `THIRD-PARTY-NOTICES.md`):
@@ -679,6 +680,8 @@ so ("Adapted from Matt Pocock's skills, MIT") beside his licence
 | `/wayfinder <idea>` | A Grilling Session | Naming the destination, then charting the way breadth-first |
 | `/to-spec [topic]` | A Grilling Session | The PRD from the conversation so far, asking only about the seams |
 | `/to-tickets <paths or description>` | A Grilling Session that writes no documents | Breaking a PRD and its ADRs into vertical-slice issues |
+| `/guidelines` | A Grilling Session that writes only Guidelines | AI Office's own: the Floor's [Guidelines](guidelines-specs-and-hooks.md#writing-them-guidelines), drafted from the repository with the Owner |
+| `/spec <words>` | A Grilling Session in three phases that writes only a Spec | AI Office's own: a feature's [Spec](guidelines-specs-and-hooks.md#specs), its requirements, design and tasks each confirmed by the Owner, its tasks becoming the issue drafts |
 | `/pr` | Instructions | A pull request's body: Summary, Evidence, Merge Danger (its Summary credits Dex Horthy's `show-me`, in `CREDITS.md`) |
 | `/domain-modeling` | Instructions | Sharpening the glossary and recording ADRs (`ADR-FORMAT.md`, `GLOSSARY-FORMAT.md`) |
 | `/research <question>` | Instructions | Primary-source research, sent to a read-only Contractor |

@@ -13,6 +13,7 @@ import {
   type Redactor,
   type TokenUsageRow,
   type WrapUp,
+  type WrapUpDesignCheck,
   type WrapUpOutcome,
 } from "@ai-office/shared";
 
@@ -27,6 +28,8 @@ import { managerGitHub } from "../manager/authority.ts";
 import { issueList } from "../manager/commands.ts";
 import { loads } from "../manager/dispatch.ts";
 import type { Triage, WorkRole } from "../manager/triage.ts";
+import type { IssueSpec, IssueSpecOf } from "../grilling/issue-spec.ts";
+import type { TaskGuidelines } from "../guidelines/tasks.ts";
 import type { RepositoryMemory } from "../memory/memory.ts";
 import type { ModelClient, ModelMessage } from "../models/client.ts";
 import { NoticeError, type Notices } from "../notices/notices.ts";
@@ -36,6 +39,11 @@ import { createRounds } from "../rounds.ts";
 import { batchBranch } from "../sandbox/branch.ts";
 import type { WorkQueueStore } from "../work/store.ts";
 import type { WorkTurns } from "../work/turns.ts";
+import {
+  designCheckPrompt,
+  designCheckRetryMessage,
+  parseDesignCheck,
+} from "./design-check.ts";
 import { BatchError } from "./errors.ts";
 import {
   acknowledgementTokens,
@@ -47,6 +55,7 @@ import {
   changedOrder,
   planByRules,
   planFromDraft,
+  planFromSpec,
   plannableCoders,
   replanByRules,
   replanFromDraft,
@@ -135,7 +144,12 @@ import {
 // Batch finishes: its Wrap-up's results (each issue's outcome, pull
 // request, rounds, tokens and estimated cost) are kept, a `batch.finished`
 // event gathers the Agents again, and an info Notice tells the Owner
-// (FR-25.6, FR-49).
+// (FR-25.6, FR-49). Where its merged issues were filed from a Spec with a
+// design, the Manager's Model first compares each merged pull request with
+// the Spec's `design.md` as the Owner approved it, and the Wrap-up says
+// where the work departs from it (Guidelines, Specs and Hooks PRD, FR-117;
+// `design-check.ts`); a check that cannot be made says why, and finishes
+// the Batch all the same.
 //
 // A request the Owner makes in the Manager chat is a Batch too (FR-24,
 // ADR 0004): the Manager files its issues, and hands them over with the
@@ -164,6 +178,14 @@ import {
 // with theirs), and recording where the shared branch stood as it started.
 // An issue handed to the Owner holds the rest, which never start, and the
 // Batch finishes as its pull request merges or the Owner decides.
+//
+// Filing a Spec's issues starts their Batch (Guidelines, Specs and Hooks
+// PRD, FR-115; `SpecBatchRequest`), "… in one PR" in one pull request. Its
+// Plan follows `tasks.md`'s order and dependencies, by AI Office's rules
+// with no model asked, and the tasks the Owner confirmed stand as its
+// approval, recorded as the Owner's (`batch.approved` naming the session);
+// unless the Owner edited the drafts after confirming the tasks: then it
+// follows the Floor's plan approval, as a command's Batch does.
 
 /** A Batch the Manager makes from one of the Owner's chat requests. */
 export interface ChatBatchRequest {
@@ -183,10 +205,39 @@ export interface ChatBatchRequest {
   readonly plan: PlanDraft;
 }
 
+/**
+ * The Batch of a Spec's issues, which "file the issues of session N"
+ * starts once they are filed (Guidelines, Specs and Hooks PRD, FR-115).
+ */
+export interface SpecBatchRequest {
+  /** The `/spec` Grilling Session whose issues it works. */
+  readonly sessionId: number;
+  /** The Spec's folder, `.agents/specs/<slug>`, as its Plan names it. */
+  readonly folder: string;
+  /**
+   * Its issues, in `tasks.md`'s order (or the Owner's, for edited drafts),
+   * each with the issues its task depends on: its Plan follows them, with
+   * no model asked.
+   */
+  readonly issues: readonly {
+    readonly issue: number;
+    readonly dependsOn: readonly number[];
+  }[];
+  /**
+   * Whether the Owner's confirmation of the tasks stands as the Plan's
+   * approval: the drafts were filed as the tasks made them. Otherwise
+   * (the Owner edited them after confirming the tasks) the Plan follows
+   * the Floor's plan approval, as a command's does.
+   */
+  readonly approved: boolean;
+}
+
 /** How the Owner asked for a Batch to be worked. */
 export interface BatchOptions {
   /** Its issues go in one pull request, from one branch (ADR 0010). */
   readonly onePullRequest?: boolean;
+  /** The Batch of a Spec's issues, whose Plan is its tasks' (FR-115). */
+  readonly spec?: SpecBatchRequest;
 }
 
 /** What handing the Manager a Batch did. */
@@ -198,6 +249,14 @@ export type BatchOutcome =
       readonly started: readonly number[];
       /** Why the Manager's Model did not draft the Plan, if it did not. */
       readonly fallback?: string;
+      /**
+       * The Spec whose issues it works (FR-115): its session, and whether
+       * its confirmed tasks stand as the Plan's approval.
+       */
+      readonly spec?: {
+        readonly sessionId: number;
+        readonly approved: boolean;
+      };
     }
   /** None of the issues named can be worked, so no Batch was made. */
   | { readonly batch: undefined; readonly leftOut: readonly PlanLeftOut[] };
@@ -375,6 +434,17 @@ export interface BatchesOptions {
   /** The repository's memory, which the Manager reads to plan (FR-53). */
   readonly memory?: Pick<RepositoryMemory, "read">;
   /**
+   * The Owner's Guidelines (Guidelines PRD, FR-105): the Manager follows
+   * those for every task in its Plan, told of the rest. None without it.
+   */
+  readonly guidelines?: Pick<TaskGuidelines, "forTask">;
+  /**
+   * The Spec an issue was filed from, as the Owner approved it (FR-116):
+   * a Wrap-up compares its merged work with the Spec's `design.md`
+   * (FR-117). No design check without it.
+   */
+  readonly issueSpec?: IssueSpecOf;
+  /**
    * What requests through the AI Gateway used in [`from`, `to`), for each
    * issue's tokens and estimated cost in a Wrap-up; none without it.
    */
@@ -388,6 +458,8 @@ export interface BatchesOptions {
 
 /** The most tokens the Manager's Plan may use. */
 const maxAnswerTokens = 8192;
+/** The most tokens the Manager's design check may use. */
+const maxDesignCheckTokens = 4096;
 /** The longest title a chat answer quotes. */
 const titleLength = 60;
 
@@ -638,6 +710,11 @@ export function createBatches(options: BatchesOptions): Batches {
     }
     const load = loads(team.active);
     const memory = await options.memory?.read(floor);
+    const guidelines = await options.guidelines?.forTask({
+      floor,
+      task: "plan",
+      agentId: manager.id,
+    });
     const coderName = (agentId: string | null): string | null =>
       team.agents.find(({ id }) => id === agentId)?.name ?? null;
     const roleNames = (ids: readonly string[] | undefined): string[] =>
@@ -661,6 +738,7 @@ export function createBatches(options: BatchesOptions): Batches {
           .filter((coder) => coder.role === role.id)
           .map(({ name }) => name),
       })),
+      ...(guidelines === undefined ? {} : { guidelines }),
       ...(memory === undefined ? {} : { memory }),
       ...(replanning === undefined
         ? {}
@@ -1037,6 +1115,159 @@ export function createBatches(options: BatchesOptions): Batches {
     return records;
   };
 
+  /**
+   * The Manager's comparison of the merged pull requests `pullRequests`
+   * with `spec`'s approved design (FR-117), asked again once if its answer
+   * cannot be read; why not, when it cannot be made.
+   */
+  const checkDesign = async (
+    floor: FloorRecord,
+    batch: BatchRecord,
+    spec: IssueSpec & { readonly design: string },
+    pullRequests: readonly number[],
+  ): Promise<WrapUpDesignCheck> => {
+    const check = {
+      folder: spec.folder,
+      sessionId: spec.sessionId,
+      pullRequests: [...pullRequests],
+    };
+    const failed = (problem: string): WrapUpDesignCheck => ({
+      ...check,
+      departures: [],
+      problem: shorten(redactor.redactText(problem), 500),
+    });
+    const manager = (await options.agents.list(floor.id)).find(
+      ({ id }) => id === batch.agentId,
+    );
+    if (manager === undefined) {
+      return failed("the Floor's Manager is gone.");
+    }
+    if (!manager.enabled) {
+      return failed(`${manager.name} is paused.`);
+    }
+    const model = modelOf(manager, await options.defaultModels?.());
+    if (model === undefined) {
+      return failed(
+        `${manager.name} has no Model (choose a default Model for ${manager.aiProvider} in General Settings).`,
+      );
+    }
+    try {
+      const repository = github.repository(floor.repository);
+      const merged = [];
+      for (const number of pullRequests) {
+        const files = await repository.listPullRequestFiles(number);
+        merged.push({
+          number,
+          files: files.map((file) => ({
+            ...file,
+            patch: file.patch === null ? null : redactor.redactText(file.patch),
+          })),
+        });
+      }
+      const prompt = designCheckPrompt({
+        floor,
+        manager,
+        folder: spec.folder,
+        sessionId: spec.sessionId,
+        design: redactor.redactText(spec.design),
+        pullRequests: merged,
+      });
+      const messages: ModelMessage[] = [{ role: "user", content: prompt.user }];
+      const ask = () =>
+        models.complete({
+          agentId: manager.id,
+          model,
+          system: prompt.system,
+          messages,
+          maxTokens: maxDesignCheckTokens,
+          ...(pullRequests.length === 1 && pullRequests[0] !== undefined
+            ? { pullRequest: pullRequests[0] }
+            : {}),
+        });
+      const first = await ask();
+      let read = parseDesignCheck(first.text);
+      if (!read.ok) {
+        messages.push(
+          { role: "assistant", content: first.text },
+          { role: "user", content: designCheckRetryMessage(read.problem) },
+        );
+        read = parseDesignCheck((await ask()).text);
+      }
+      return read.ok
+        ? {
+            ...check,
+            departures: read.value.map((departure) =>
+              redactor.redactText(departure),
+            ),
+            problem: null,
+          }
+        : failed(
+            `${manager.name} gave no answer AI Office can read: ${read.problem}`,
+          );
+    } catch (error) {
+      return failed(`${manager.name} could not be asked: ${reasonOf(error)}`);
+    }
+  };
+
+  /**
+   * The Batch's merged work compared with the design of each Spec its
+   * merged issues were filed from (FR-117), a check per Spec; none when
+   * no merged issue's Spec has a design.
+   */
+  const designChecksOf = async (
+    floor: FloorRecord,
+    batch: BatchRecord,
+    outcomes: ReadonlyMap<number, WrapUpOutcome>,
+    records: ReadonlyMap<number, IssueRecord>,
+  ): Promise<WrapUpDesignCheck[] | undefined> => {
+    const issueSpec = options.issueSpec;
+    if (issueSpec === undefined) {
+      return undefined;
+    }
+    const bySpec = new Map<
+      number,
+      {
+        spec: IssueSpec & { readonly design: string };
+        pullRequests: Set<number>;
+      }
+    >();
+    for (const [issue, outcome] of outcomes) {
+      const pullRequest = records.get(issue)?.pullRequest;
+      if (outcome !== "merged" || pullRequest == null) {
+        continue;
+      }
+      let spec: IssueSpec | undefined;
+      try {
+        spec = await issueSpec(floor.id, issue);
+      } catch (error) {
+        report(error);
+        continue;
+      }
+      if (spec?.design === undefined) {
+        continue;
+      }
+      const { design } = spec;
+      const entry = bySpec.get(spec.sessionId) ?? {
+        spec: { ...spec, design },
+        pullRequests: new Set<number>(),
+      };
+      entry.pullRequests.add(pullRequest.number);
+      bySpec.set(spec.sessionId, entry);
+    }
+    const checks: WrapUpDesignCheck[] = [];
+    for (const { spec, pullRequests } of bySpec.values()) {
+      checks.push(
+        await checkDesign(
+          floor,
+          batch,
+          spec,
+          [...pullRequests].sort((a, b) => a - b),
+        ),
+      );
+    }
+    return checks.length === 0 ? undefined : checks;
+  };
+
   /** Tells the Owner the Batch finished, with its Wrap-up's results (FR-49). */
   const announceWrapUp = async (
     floor: FloorRecord,
@@ -1145,6 +1376,7 @@ export function createBatches(options: BatchesOptions): Batches {
     records: ReadonlyMap<number, IssueRecord>,
   ): Promise<WrapUp | undefined> => {
     const numbers = plan.items.map(({ issue }) => issue);
+    const designChecks = await designChecksOf(floor, batch, outcomes, records);
     const at = now();
     const wrapUp = wrapUpOf({
       floorId: floor.id,
@@ -1154,6 +1386,7 @@ export function createBatches(options: BatchesOptions): Batches {
       outcomes,
       records,
       usage: (await options.usage?.(batch.createdAt, at)) ?? [],
+      ...(designChecks === undefined ? {} : { designChecks }),
     });
     if (!(await store.markFinished(batch.id, at, wrapUp))) {
       return undefined;
@@ -1793,12 +2026,14 @@ export function createBatches(options: BatchesOptions): Batches {
     batchOptions: BatchOptions = {},
   ): Promise<BatchOutcome> => {
     const onePullRequest = batchOptions.onePullRequest === true;
+    const { spec } = batchOptions;
     const floor = await floorOf(floorId);
     const { manager, ...members } = await teamOf(floor, request !== undefined);
+    // A Spec's issues were filed by the App as the Owner approved them.
     const { issues, leftOut } = await readIssues(
       floor,
-      numbers,
-      new Set(request?.filed ?? []),
+      spec === undefined ? numbers : spec.issues.map(({ issue }) => issue),
+      new Set(request?.filed ?? spec?.issues.map(({ issue }) => issue) ?? []),
     );
     if (issues.length === 0) {
       return { batch: undefined, leftOut };
@@ -1825,16 +2060,41 @@ export function createBatches(options: BatchesOptions): Batches {
             team,
             leftOut,
           );
-    const drafted = settled?.ok
-      ? { plan: settled.value }
-      : await draft(floor, manager, issues, team, leftOut);
+    // A Spec's Plan is its tasks' order and dependencies, in plain code.
+    const drafted =
+      spec !== undefined
+        ? {
+            plan: planFromSpec(
+              spec.issues.flatMap(({ issue, dependsOn }) => {
+                const read = issues.find(({ number }) => number === issue);
+                return read === undefined
+                  ? []
+                  : [
+                      {
+                        number: issue,
+                        title: read.title,
+                        dependsOn: dependsOn.filter((other) => kept.has(other)),
+                      },
+                    ];
+              }),
+              team,
+              leftOut,
+              spec.folder,
+            ),
+          }
+        : settled?.ok
+          ? { plan: settled.value }
+          : await draft(floor, manager, issues, team, leftOut);
+    // The chat request stands as the Plan's approval (ADR 0004), as do a
+    // Spec's confirmed tasks, unless the Owner edited its drafts since
+    // (FR-115).
+    const approvedAlready = request !== undefined || spec?.approved === true;
     const { batch, plan } = await store.create(
       {
         floorId: floor.id,
         issues: issues.map(({ number }) => number),
-        // The chat request stands as the Plan's approval (ADR 0004).
         status:
-          floor.planApproval && request === undefined
+          floor.planApproval && !approvedAlready
             ? "awaiting_approval"
             : "in_progress",
         agentId: manager.id,
@@ -1853,6 +2113,9 @@ export function createBatches(options: BatchesOptions): Batches {
       agentId: manager.id,
       draftedBy: plan.draftedBy,
       issues: plan.items.map(({ issue }) => issue),
+      // A Spec's issues filed (Guidelines, Specs and Hooks PRD, FR-115),
+      // which a Hook may watch (FR-118), approved already or not.
+      ...(spec === undefined ? {} : { specSessionId: spec.sessionId }),
     });
     // The chat request is the Plan's approval, recorded as the Owner's
     // (ADR 0012), as the whiteboard's is.
@@ -1865,6 +2128,18 @@ export function createBatches(options: BatchesOptions): Batches {
         planVersion: plan.version,
         agentId: manager.id,
         messageId: request.messageId,
+      });
+    }
+    // So are a Spec's confirmed tasks, recorded as the Owner's (FR-115).
+    if (spec?.approved === true) {
+      await events.publish({
+        type: "batch.approved",
+        version: 1,
+        floorId: floor.id,
+        batchId: batch.id,
+        planVersion: plan.version,
+        agentId: manager.id,
+        specSessionId: spec.sessionId,
       });
     }
     await kickoff(floor, manager, members.agents, batch, plan);
@@ -1883,6 +2158,9 @@ export function createBatches(options: BatchesOptions): Batches {
       plan,
       started,
       ...(drafted.fallback === undefined ? {} : { fallback: drafted.fallback }),
+      ...(spec === undefined
+        ? {}
+        : { spec: { sessionId: spec.sessionId, approved: spec.approved } }),
     };
   };
 
@@ -1980,9 +2258,11 @@ export function createBatches(options: BatchesOptions): Batches {
       ...planLines(plan, nameOf),
       ...(batch.onePullRequest ? [onePullRequestLine(batch.id), ""] : []),
     ];
+    // A Spec's drafts the Owner edited after confirming its tasks (FR-115).
+    const edited = outcome.spec?.approved === false;
     if (batch.status === "awaiting_approval") {
       lines.push(
-        "Plan approval is on for this Floor, so work starts once you approve the Plan on the Floor's whiteboard, where you can first reorder, drop and annotate its issues, and I replan.",
+        `${edited ? "You edited the issue drafts after confirming the Spec's tasks, so the Plan follows the Floor's plan approval. " : ""}Plan approval is on for this Floor, so work starts once you approve the Plan on the Floor's whiteboard, where you can first reorder, drop and annotate its issues, and I replan.`,
       );
     } else {
       const waiting = plan.items.filter(({ issue }) => !done.has(issue));
@@ -1991,7 +2271,9 @@ export function createBatches(options: BatchesOptions): Batches {
           `${
             fromChat
               ? "Your request stands as the Plan's approval"
-              : "Plan approval is off for this Floor"
+              : outcome.spec?.approved === true
+                ? "The Spec's tasks you confirmed stand as the Plan's approval"
+                : `${edited ? "You edited the issue drafts after confirming the Spec's tasks, so the Plan follows the Floor's plan approval, and " : ""}${edited ? "plan" : "Plan"} approval is off for this Floor`
           }, so work has started${
             started.length === 0 ? "" : ` on ${issueList(started)}`
           }.`,

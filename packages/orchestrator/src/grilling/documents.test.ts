@@ -49,6 +49,8 @@ const session: GrillingSessionRecord = {
   documents: null,
   issues: null,
   sources: [],
+  guidelines: [],
+  spec: null,
   startedAt: at,
   updatedAt: at,
   pausedAt: null,

@@ -633,6 +633,116 @@ export {
   type RepositorySkills,
   type SkillFolderReader,
 } from "./skills/repository.ts";
+export { readFloorGuidelines, readGuidelines } from "./guidelines/read.ts";
+export {
+  createGuidelinesAdmin,
+  type GuidelinesAdmin,
+  type GuidelinesAdminOptions,
+} from "./guidelines/admin.ts";
+export {
+  changedHookFields,
+  createHooksAdmin,
+  HookError,
+  hookFieldsOf,
+  type HooksAdmin,
+  type HooksAdminOptions,
+} from "./hooks/admin.ts";
+export {
+  createHookRunner,
+  hookCauses,
+  hookPushPollMs,
+  openHooksAction,
+  type HookOccurrence,
+  type HookRunner,
+  type HookRunnerOptions,
+  type RunNowRefusal,
+} from "./hooks/runner.ts";
+export {
+  hookAnswerTokens,
+  hookPrompt,
+  maxHookEventFiles,
+  skillInstructions,
+  type HookEventDetails,
+} from "./hooks/prompt.ts";
+export {
+  databaseHookStore,
+  keptHookRuns,
+  memoryHookStore,
+  type HookFields,
+  type HookRecord,
+  type HookRunRecord,
+  type HookStore,
+} from "./hooks/store.ts";
+export {
+  awaitingCount,
+  createGuidelineApprovals,
+  guidelineContentHash,
+  guidelinesNoticeTitle,
+  guidelinesSuggestionTitle,
+  GuidelineVersionError,
+  openGuidelinesAction,
+  withGuidelines,
+  type ApprovedGuideline,
+  type FloorGuidelineApprovals,
+  type GuidelineApprovals,
+  type GuidelineApprovalsOptions,
+  type UnapprovedGuideline,
+} from "./guidelines/approval.ts";
+export {
+  chooseGuidelines,
+  guidelinesWithin,
+  matchesPattern,
+  type ChosenGuidelines,
+  type GuidelineChoice,
+  type GuidelinesWithin,
+} from "./guidelines/choose.ts";
+export {
+  createGuidelineProposals,
+  GuidelineProposalError,
+  keepGuidelineProposal,
+  type GuidelineProposals,
+  type GuidelineProposalsOptions,
+} from "./guidelines/proposals.ts";
+export {
+  droppedProposalReasons,
+  proposedGuideline,
+  proposingGuidelines,
+  withoutGuidelineProposals,
+  type DroppedProposalReason,
+  type ProposalTag,
+  type ProposedGuideline,
+} from "./guidelines/proposal.ts";
+export {
+  databaseGuidelineProposalStore,
+  memoryGuidelineProposalStore,
+  type GuidelineProposalRecord,
+  type GuidelineProposalStore,
+  type NewGuidelineProposal,
+} from "./guidelines/proposal-store.ts";
+export {
+  guidelineFiles,
+  type GivenGuidelines,
+  type GuidelineFile,
+} from "./guidelines/prompt.ts";
+export {
+  createTaskGuidelines,
+  guidelinesBudgetAction,
+  guidelinesOverBudgetTitle,
+  plannedFiles,
+  type GuidelinesRequest,
+  type TaskGuidelines,
+  type TaskGuidelinesOptions,
+} from "./guidelines/tasks.ts";
+export {
+  databaseGuidelineStore,
+  guidelineChangeStatuses,
+  memoryGuidelineStore,
+  type GuidelineApprovalRecord,
+  type GuidelineChangeRecord,
+  type GuidelineChangeStatus,
+  type GuidelineStore,
+  type GuidelineVersion,
+} from "./guidelines/store.ts";
 export {
   databaseRepositorySkillReviewStore,
   memoryRepositorySkillReviewStore,
@@ -785,10 +895,17 @@ export {
   draftIssues,
   issueBody,
   parseGrillingIssues,
+  specIssueBody,
   type FileIssuesInput,
   type GrillingIssuesFiler,
   type GrillingIssuesOptions,
 } from "./grilling/issues.ts";
+export { specIssues } from "./grilling/spec.ts";
+export {
+  issueSpec,
+  type IssueSpec,
+  type IssueSpecOf,
+} from "./grilling/issue-spec.ts";
 export {
   grillingSessionSection,
   grillingTurnInstructions,
@@ -915,6 +1032,7 @@ export {
   type BatchesOptions,
   type ChatBatchRequest,
   type PlanChange,
+  type SpecBatchRequest,
 } from "./batches/batches.ts";
 export { BatchError } from "./batches/errors.ts";
 export {
@@ -972,6 +1090,14 @@ export {
   type IssueRecord,
 } from "./batches/wrap-up.ts";
 export {
+  designCheckLines,
+  designCheckPrompt,
+  designChecksInWords,
+  maxDesignCheckDiff,
+  parseDesignCheck,
+  type DesignCheckInput,
+} from "./batches/design-check.ts";
+export {
   databaseBatchStore,
   memoryBatchStore,
   type AcknowledgementRecord,
@@ -990,7 +1116,7 @@ export {
   proposedMemory,
   proposingMemory,
   readMemoryFile,
-  withoutMemory,
+  withoutProposals,
   type RepositoryMemory,
   type RepositoryMemoryOptions,
 } from "./memory/memory.ts";

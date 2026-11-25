@@ -132,6 +132,9 @@ const managerRepository = (client: RepositoryClient): RepositoryClient => ({
   deleteBranch: refuse("github_delete_branch"),
   listBranches: (prefix) => client.listBranches(prefix),
   compareBranches: (base, head) => client.compareBranches(base, head),
+  lastCommitChanging: (path, ref) => client.lastCommitChanging(path, ref),
+  mergedPullRequestOf: (sha) => client.mergedPullRequestOf(sha),
+  pusherOf: (sha, branch) => client.pusherOf(sha, branch),
 
   createPullRequest: refuse("github_create_pull_request"),
   getPullRequest: (number) => client.getPullRequest(number),

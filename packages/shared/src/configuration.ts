@@ -19,6 +19,7 @@ import {
 import { gatewayRetrySettingsSchema } from "./gateway-retries.ts";
 import { requestBodiesSettingsSchema } from "./gateway-requests.ts";
 import { gitIdentitySchema } from "./git-identity.ts";
+import { hookInputSchema } from "./hooks.ts";
 import { intakeSettingsSchema } from "./intake.ts";
 import {
   loadBalancingSettingsSchema,
@@ -130,6 +131,11 @@ export const configurationFloorSchema = floorSettingsSchema
         enabled: z.boolean(),
       }),
     ),
+    /**
+     * The Floor's Hooks (Guidelines, Specs and Hooks PRD, FR-121), as the
+     * Owner made them, oldest first; none in a document exported before.
+     */
+    hooks: z.array(hookInputSchema).default([]),
     /** Each Role's accepted memory entries (FR-55), oldest first. */
     roleMemory: z.array(
       z.strictObject({
@@ -165,6 +171,12 @@ export const configurationFloorSchema = floorSettingsSchema
         problem(
           `${floor.id} requires ${id}, which is not one of its reviewers.`,
         );
+      }
+    }
+    const hookNames = floor.hooks.map(({ name }) => name.toLowerCase());
+    for (const name of new Set(hookNames)) {
+      if (hookNames.filter((other) => other === name).length > 1) {
+        problem(`${floor.id} has two Hooks named ${name}.`);
       }
     }
     for (const role of new Set(floor.roleMemory.map((entry) => entry.role))) {
@@ -341,6 +353,7 @@ export const configurationAreas = [
   "issue_token_caps",
   "skill_toggle",
   "role_memory",
+  "hook",
 ] as const;
 export type ConfigurationArea = (typeof configurationAreas)[number];
 

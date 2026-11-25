@@ -15,9 +15,10 @@ import { RetriesCard } from "./retries-card.tsx";
 import { TokenCapsCard } from "./token-caps.tsx";
 import { UsageThrottlingCard } from "./usage-throttling-card.tsx";
 
-// AI Settings (PRD FR-65, §6.8): the AI Providers, the Decision Model
-// (FR-17), the AI Accounts the AI Gateway serves from, and the rest of the
-// Gateway's configuration, apart from the office's own settings in Admin.
+// AI Settings (PRD FR-65, §6.8): the AI Accounts the AI Gateway serves from,
+// first because they are what the Owner looks at most, then the AI Providers,
+// the Decision Model (FR-17) and the rest of the Gateway's configuration,
+// apart from the office's own settings in Admin.
 
 export function AiSettingsPage({
   reauthenticate,
@@ -39,9 +40,9 @@ export function AiSettingsPage({
           </>
         }
       />
+      <AiAccountsCard reauthenticate={reauthenticate} aiProvider={aiProvider} />
       <AiProvidersCard />
       <DecisionModelCard />
-      <AiAccountsCard reauthenticate={reauthenticate} aiProvider={aiProvider} />
       <LoadBalancingCard />
       <UsageThrottlingCard />
       <AutoRefreshCard />

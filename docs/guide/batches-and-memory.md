@@ -431,6 +431,11 @@ A Batch that finishes:
   Wrap-up on the whiteboard and each pull request (FR-49).
 - is curated as ended by the Manager's repository memory curation, though
   a blocked issue is still open.
+- for issues filed from a Spec with a design, first has the Manager
+  compare the merged pull requests with the Spec's approved `design.md`,
+  keeping where they depart (`designChecks`), which the Notice, the
+  whiteboard and the Manager chat then say: see
+  [Keeping a Spec current](guidelines-specs-and-hooks.md#keeping-a-spec-current).
 
 It finishes once: a later check or a restart changes nothing. The
 whiteboard shows a finished Batch's **Wrap-up** above its Plan: "Wrap-up:
@@ -574,8 +579,10 @@ full Role memory `409 role_memory_full`.
 
 ## Prompt budgets
 
-Prompts quote the repository's memory, the office-wide memory and the
-Role's memory, and agent tools list the Floor's Skills. On a Model with a
+Prompts quote the repository's memory, the office-wide memory, the
+Role's memory, the Owner's [Guidelines](guidelines-specs-and-hooks.md)
+and the [Spec](guidelines-specs-and-hooks.md#what-agents-get-of-a-spec) an
+issue was filed from, and agent tools list the Floor's Skills. On a Model with a
 32K or 64K context window these could crowd out the issue and the diff,
 so each has a **prompt budget**, in characters (`@ai-office/orchestrator`'s
 `promptBudgetFor`):
@@ -586,6 +593,12 @@ so each has a **prompt budget**, in characters (`@ai-office/orchestrator`'s
 | Office-wide memory | 12,000  | its start, cut there                                          |
 | Role memory        | 12,000  | its newest entries that fit (each entry's text counts)        |
 | Skills listing     | 40,000  | the first Skills that fit (each one's name and description)   |
+| Guidelines         | 12,000  | `always` ones first, then `manual`, then `fileMatch`, each whole, the largest left out first ([how](guidelines-specs-and-hooks.md#how-they-reach-agents)) |
+| A Spec             | 12,000  | the issue's Acceptance Criteria first, each whole, in order; then the design, cut there ([how](guidelines-specs-and-hooks.md#what-agents-get-of-a-spec)) |
+
+The Guidelines' and the Spec's budgets are AI Office's, not the Owner's
+settings: the Guidelines' as long as one Guideline may be, so one always
+fits.
 
 - **The defaults change nothing.** They hold all of each memory AI Office
   keeps (12,000 characters of office-wide memory, 40 Role memory entries
@@ -595,10 +608,12 @@ so each has a **prompt budget**, in characters (`@ai-office/orchestrator`'s
 - **A small window lowers them.** When an Agent's Model's effective
   context window is known (the catalogue's, or the **Context window** set
   on an AI Account: see [the AI Gateway](ai-gateway.md#context-windows)),
-  each memory gets at most a twentieth of it and the Skills a tenth, at
-  3.5 characters a token. A 32,768-token window carries 5,734 characters
-  of each memory and 11,468 of Skills; from about 69,000 tokens (memory)
-  and 115,000 (Skills) up, the budgets are the Owner's.
+  each memory gets at most a twentieth of it and the Skills, the
+  Guidelines and a Spec a tenth, at 3.5 characters a token. A 32,768-token
+  window carries 5,734 characters of each memory and 11,468 of Skills, of
+  Guidelines and of a Spec; from about 69,000 tokens (memory), 35,000
+  (Guidelines, a Spec) and 115,000 (Skills) up, the budgets are the
+  Owner's (and 12,000 for Guidelines and for a Spec).
 - **Truncated, and said so.** A memory over its budget is cut, and its
   quote (or `OFFICE.md`) ends "… (the office-wide memory cut here: it is
   longer than the 5,734 characters a prompt carries)"; the Role's oldest
@@ -610,7 +625,8 @@ so each has a **prompt budget**, in characters (`@ai-office/orchestrator`'s
   budget and says how many more there are. The same memory and budget
   always give the same prompt.
 - **Where.** The coder, reviewer, QA, designer and docs Agents' prompts and
-  memory files, the sandbox's Skills, and the Manager chat's prompt.
+  memory files, the sandbox's Skills, and the Manager chat's prompt; the
+  Guidelines' budget in the Manager's triage and Plan too, at 12,000.
 - **Settings.** General Settings' **Prompt budgets** card sets each, from 0
   to 1,000,000 characters; changes apply from the next task. `GET` and
   `PUT /api/office/prompt-budget` answer and take

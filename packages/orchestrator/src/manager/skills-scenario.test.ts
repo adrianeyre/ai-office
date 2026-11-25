@@ -299,7 +299,7 @@ const cases: Case[] = [
       expect(reply).toMatchObject({
         kind: "hint",
         replyTo: message.id,
-        text: 'There is no Skill /release-note on this Floor. Did you mean "/release-notes"? Its Skills are /code-review, /codebase-design, /diagnosing-bugs, /domain-modeling, /grill-with-docs, /grilling, /pdf, /pr, /prototype, /release-notes, /research, /tdd, /to-spec, /to-tickets and /wayfinder.',
+        text: 'There is no Skill /release-note on this Floor. Did you mean "/release-notes"? Its Skills are /code-review, /codebase-design, /diagnosing-bugs, /domain-modeling, /grill-with-docs, /grilling, /guidelines, /pdf, /pr, /prototype, /release-notes, /research, /spec, /tdd, /to-spec, /to-tickets and /wayfinder.',
       });
       expect(s.model.requests).toEqual([]);
       // The Floor answers its next message: nothing is held.

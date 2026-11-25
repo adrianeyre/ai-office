@@ -1,5 +1,7 @@
 import {
   defaultPromptBudgetSettings,
+  guidelinesBudget,
+  specBudget,
   type PromptBudgetSettings,
 } from "@ai-office/shared";
 
@@ -8,17 +10,32 @@ import type { AgentMemory } from "./shared.ts";
 
 // Prompt budgets: the most characters of the repository's memory, the
 // office-wide memory, the Role's memory and the Floor's Skills listing an
-// Agent's prompt carries (the Owner's settings), each lowered further on
-// a small known context window, so they never take more than their share
-// of it: a twentieth for each memory, a tenth for the Skills. The defaults
-// are within those shares from a window of about 69,000 tokens (memory)
-// and 115,000 (Skills) up, so a large window's prompts do not change. A
+// Agent's prompt carries (the Owner's settings), and of the Floor's
+// Guidelines (12,000, Guidelines PRD FR-108) and of an issue's Spec
+// (12,000, FR-116), each lowered further on a small known context window,
+// so they never take more than their share of it: a twentieth for each
+// memory, a tenth for the Skills, the Guidelines and the Spec. The
+// defaults are within those shares from a window of about 69,000 tokens
+// (memory), 35,000 (Guidelines, the Spec) and 115,000 (Skills) up, so
+// a large window's prompts do not change. A
 // part over its budget is truncated, deterministically, and the prompt
 // says so: the head of a memory file (as the repository's memory always
 // was), the newest of the Role's entries, the first of the Skills.
 
 /** The most characters of each part of the prompt, after the window. */
-export type PromptBudget = PromptBudgetSettings;
+export type PromptBudget = PromptBudgetSettings & {
+  /**
+   * Of the Guidelines a task follows, together (FR-108): not the Owner's
+   * setting, but `guidelinesBudget`, lowered on a small window.
+   */
+  readonly guidelines: number;
+  /**
+   * Of the Spec an issue was filed from (Guidelines, Specs and Hooks PRD,
+   * FR-116): its Acceptance Criteria and approved design, together. Not
+   * the Owner's setting, but `specBudget`, lowered on a small window.
+   */
+  readonly spec: number;
+};
 
 /** The share of the context window, in characters, each part may take. */
 const windowShares: Readonly<Record<keyof PromptBudget, number>> = {
@@ -26,6 +43,8 @@ const windowShares: Readonly<Record<keyof PromptBudget, number>> = {
   officeMemory: 1 / 20,
   roleMemory: 1 / 20,
   skills: 1 / 10,
+  guidelines: 1 / 10,
+  spec: 1 / 10,
 };
 
 /**
@@ -37,12 +56,17 @@ export function promptBudgetFor(
   settings: PromptBudgetSettings,
   contextWindow: number | null,
 ): PromptBudget {
+  const most: PromptBudget = {
+    ...settings,
+    guidelines: guidelinesBudget,
+    spec: specBudget,
+  };
   if (contextWindow === null) {
-    return { ...settings };
+    return most;
   }
   const within = (key: keyof PromptBudget) =>
     Math.min(
-      settings[key],
+      most[key],
       Math.floor(charactersIn(contextWindow) * windowShares[key]),
     );
   return {
@@ -50,6 +74,8 @@ export function promptBudgetFor(
     officeMemory: within("officeMemory"),
     roleMemory: within("roleMemory"),
     skills: within("skills"),
+    guidelines: within("guidelines"),
+    spec: within("spec"),
   };
 }
 
@@ -74,6 +100,8 @@ export const promptBudgetOf =
 /** The default budget: what a prompt carried before budgets. */
 export const defaultPromptBudget: PromptBudget = {
   ...defaultPromptBudgetSettings,
+  guidelines: guidelinesBudget,
+  spec: specBudget,
 };
 
 /**
@@ -84,7 +112,7 @@ export const defaultPromptBudget: PromptBudget = {
  */
 export function agentMemoryWithin(
   memory: AgentMemory,
-  budget: PromptBudget | undefined,
+  budget: Pick<PromptBudget, "officeMemory" | "roleMemory"> | undefined,
 ): AgentMemory {
   if (budget === undefined) {
     return memory;

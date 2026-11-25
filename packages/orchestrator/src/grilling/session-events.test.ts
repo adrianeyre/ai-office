@@ -63,6 +63,8 @@ const session = (
   documents: null,
   issues: null,
   sources: [],
+  guidelines: [],
+  spec: null,
   startedAt: at,
   updatedAt: at,
   pausedAt: null,

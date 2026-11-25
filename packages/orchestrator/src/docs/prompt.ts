@@ -6,6 +6,11 @@ import {
   type RoleInstructions,
 } from "../coder/prompt.ts";
 import { agentTrailer, type TrailerAgent } from "../git/identity.ts";
+import {
+  withGuidelineProposals,
+  withMountedGuidelines,
+  type GivenGuidelines,
+} from "../guidelines/prompt.ts";
 import { memorySection, proposingMemory } from "../memory/memory.ts";
 import {
   withMountedMemory,
@@ -56,6 +61,11 @@ export interface DocsPromptInput {
   readonly pullRequest: number;
   /** The Handoff it takes from QA (or the reviewers), if any. */
   readonly handoff?: HandoffSummary;
+  /**
+   * The Owner's Guidelines for the task, mounted in its sandbox
+   * (Guidelines PRD, FR-105 to FR-108); none when absent.
+   */
+  readonly guidelines?: GivenGuidelines;
   /** The repository's memory, redacted, if it has any (FR-53). */
   readonly memory?: string;
   /** The office-wide and Role memory mounted in its sandbox (FR-54, FR-55). */
@@ -103,6 +113,7 @@ export function docsPrompt(input: DocsPromptInput): string {
           `Known risks: ${quotedIn("handoff", input.handoff.risks)}`,
           "</handoff>",
         ]),
+    ...withMountedGuidelines(input.guidelines),
     ...(input.memory === undefined
       ? []
       : ["", ...memorySection(input.memory, input.budget?.repositoryMemory)]),
@@ -138,6 +149,7 @@ export function docsPrompt(input: DocsPromptInput): string {
     "",
     ...proposingMemory("Handoff"),
     ...withRoleProposals(input.agentMemory, "Handoff"),
+    ...withGuidelineProposals(input.guidelines, "Handoff"),
     ...(extra === ""
       ? []
       : ["", "## The Owner's instructions for you", "", extra]),

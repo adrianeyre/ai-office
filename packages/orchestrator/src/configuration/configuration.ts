@@ -45,6 +45,7 @@ import {
   floorTemplateFromFiles,
 } from "../templates/files.ts";
 import { skillOnFor } from "../skills/toggles.ts";
+import { changedHookFields, hookFieldsOf } from "../hooks/admin.ts";
 import type { OfficeStores } from "../stores.ts";
 
 // Configuration export and import (PRD FR-65): everything the Owner has
@@ -52,7 +53,7 @@ import type { OfficeStores } from "../stores.ts";
 // The office's settings, AI Providers' default Models, the Owner's Model
 // prices, the office-wide memory, the Skill library, the Role library
 // (FR-98), the Owner's own Floor Templates (FR-101), and every Floor with its settings and Merge Policy, Agents,
-// issues' Token Caps, Skill settings and accepted Role memory. An Agent's
+// issues' Token Caps, Skill settings, Hooks and accepted Role memory. An Agent's
 // Role is checked against the Role library here and the document's, never
 // a fixed list (ADR 0003), and a review Stage Role is what makes an Agent
 // a reviewer. AI Accounts, Gateway Keys, the
@@ -252,6 +253,19 @@ export function createConfiguration(
           a.skillName.localeCompare(b.skillName) ||
           a.role.localeCompare(b.role),
       ),
+    // Its Hooks as the Owner made them (FR-121): never their runs.
+    hooks: (await stores.hooks.list(floor.id)).map((hook) => ({
+      name: hook.name,
+      trigger: hook.trigger,
+      stage: hook.stage,
+      labels: [...hook.labels],
+      filePatterns: [...hook.filePatterns],
+      agentId: hook.agentId,
+      role: hook.role,
+      skillName: hook.skillName,
+      runsPerHour: hook.runsPerHour,
+      enabled: hook.enabled,
+    })),
     roleMemory: (await stores.officeMemory.entries(floor.id, ["accepted"])).map(
       ({ role, text, issue, agentId }) => ({ role, text, issue, agentId }),
     ),
@@ -1057,6 +1071,92 @@ export function createConfiguration(
             );
           },
         );
+      }
+
+      // Its Hooks (Guidelines, Specs and Hooks PRD, FR-121; ADR 0016),
+      // each by its name: added, or changed to the document's. Each names
+      // an Agent of the Floor's, or a Role in the library; its Skill is
+      // looked for when it runs, as a repository Skill is read from GitHub.
+      const hooksHere =
+        here === undefined ? [] : await stores.hooks.list(floor.id);
+      const agentIdsAfter = new Set([
+        ...team.map(({ id }) => id),
+        ...floor.agents.map(({ id }) => id),
+      ]);
+      const managers = new Set(
+        [...team, ...floor.agents]
+          .filter(({ role }) => role === managerRole)
+          .map(({ id }) => id),
+      );
+      for (const hook of floor.hooks) {
+        const subject = `${floor.id}: ${hook.name}`;
+        if (
+          hook.agentId !== null &&
+          (!agentIdsAfter.has(hook.agentId) || managers.has(hook.agentId))
+        ) {
+          problems.push(
+            `${floor.id}'s Hook "${hook.name}" names ${hook.agentId}, not one of its Agents.`,
+          );
+          continue;
+        }
+        if (hook.role !== null && !isLibraryRole(hook.role)) {
+          problems.push(
+            `${floor.id}'s Hook "${hook.name}" names the ${hook.role} Role, in neither the Role library here nor the document.`,
+          );
+          continue;
+        }
+        const fields = hookFieldsOf(hook);
+        const current = hooksHere.find(
+          ({ name }) => name.toLowerCase() === hook.name.toLowerCase(),
+        );
+        if (current === undefined) {
+          step(
+            "hook",
+            subject,
+            "add",
+            [],
+            async () => {
+              const added = await stores.hooks.create(floor.id, fields, now());
+              if (added === "name_taken") {
+                throw new Error(`${subject} was not added: its name is taken.`);
+              }
+              await events.publish({
+                type: "hook.added",
+                version: 1,
+                floorId: floor.id,
+                hookId: added.id,
+                name: added.name,
+                trigger: added.trigger,
+              });
+            },
+            `Its Skill /${hook.skillName} is looked for when it runs.`,
+          );
+          continue;
+        }
+        const differs = changedHookFields(current, fields);
+        if (differs.length > 0) {
+          step("hook", subject, "change", differs, async () => {
+            const updated = await stores.hooks.update(
+              floor.id,
+              current.id,
+              fields,
+              now(),
+            );
+            if (updated === undefined || updated === "name_taken") {
+              throw new Error(`${subject} was not changed.`);
+            }
+            await events.publish({
+              type: "hook.changed",
+              version: 1,
+              floorId: floor.id,
+              hookId: updated.id,
+              name: updated.name,
+              fields: differs,
+              by: "owner",
+              enabled: updated.enabled,
+            });
+          });
+        }
       }
 
       // Each Role's accepted memory (FR-55), never a credential (FR-56).
