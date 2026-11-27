@@ -8,6 +8,7 @@ import { createFakeGitHub, type FakeGitHub } from "@ai-office/github/testing";
 import {
   defaultIntakeSettings,
   pipelineLabels,
+  sizeLabels,
   type IntakeSettings,
 } from "@ai-office/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -233,8 +234,9 @@ describe("issue intake", () => {
     const { github, intake } = await setUp();
     expect(github.labels(webShop)).toEqual([]);
     await intake.poll();
+    // The pipeline's labels, and the three that force a Size (FR-132).
     expect(github.labels(webShop)).toEqual(
-      pipelineLabels.map((label) => ({ ...label })),
+      [...pipelineLabels, ...sizeLabels].map((label) => ({ ...label })),
     );
     // Labels the repository already has are left as they are.
     expect(github.labels(blog)).toEqual([]);

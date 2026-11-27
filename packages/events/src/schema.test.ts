@@ -38,6 +38,7 @@ describe("officeEventSchema", () => {
         "notice",
         "pull_request",
         "qa",
+        "recurring_goal",
         "repository",
         "review",
         "role",
