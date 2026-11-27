@@ -1,8 +1,10 @@
 import {
   createRedactor,
   issuePriorities,
+  issueSizes,
   type DecisionModelSettings,
   type IssuePriority,
+  type IssueSize,
   type Redactor,
 } from "@ai-office/shared";
 
@@ -55,6 +57,8 @@ export interface IssueJudgement {
   /** How likely it is that the issue is clear, from 0 to 1. */
   readonly probability: number;
   readonly priority: IssuePriority;
+  /** How big its change is (Scorecards PRD, FR-132). */
+  readonly size: IssueSize;
   /** What it most lacks; `nothing` when it can be worked. */
   readonly gap: IssueGap;
 }
@@ -155,7 +159,10 @@ export interface DecisionModelOptions {
 const cut = (text: string, max: number): string =>
   text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 
-/** The triage questions: is it clear, how soon, and what it most lacks. */
+/**
+ * The triage questions: is it clear, how soon, how big (its Size,
+ * Scorecards PRD, FR-132), and what it most lacks.
+ */
 export const issueQuestions = {
   clear: {
     type: "noul",
@@ -175,6 +182,17 @@ export const issueQuestions = {
       high: "Something is broken, it blocks other work, or it is urgent.",
       normal: "Ordinary work.",
       low: "Polish, or something nice to have that can wait.",
+    },
+  },
+  size: {
+    type: "choice",
+    instructions: "How big the change the issue asks for is.",
+    criteria: {
+      small:
+        "A small, local change: a typo, a copy change, a one-line fix, or a few lines in one or two files.",
+      medium: "An ordinary change: a feature or fix across a few files.",
+      large:
+        "A large change: many files or modules, a new subsystem, a migration, or a change to how parts fit together.",
     },
   },
   gap: {
@@ -222,6 +240,9 @@ export const toolCallQuestions = {
 
 const isIssuePriority = (value: string): value is IssuePriority =>
   (issuePriorities as readonly string[]).includes(value);
+
+const isIssueSize = (value: string): value is IssueSize =>
+  (issueSizes as readonly string[]).includes(value);
 
 const isIssueGap = (value: string): value is IssueGap =>
   (issueGaps as readonly string[]).includes(value);
@@ -292,11 +313,16 @@ export function createDecisionModel(
       }
       const probability = noulOf(answers["clear"]);
       const { choice: priority } = choiceOf(answers["priority"]);
+      const { choice: size } = choiceOf(answers["size"]);
       const { choice: gap } = choiceOf(answers["gap"]);
-      if (!isIssuePriority(priority) || !isIssueGap(gap)) {
+      if (
+        !isIssuePriority(priority) ||
+        !isIssueSize(size) ||
+        !isIssueGap(gap)
+      ) {
         return undefined;
       }
-      return { clear: probability >= 0.5, probability, priority, gap };
+      return { clear: probability >= 0.5, probability, priority, size, gap };
     },
 
     async reviewLoop(floorId, loop) {

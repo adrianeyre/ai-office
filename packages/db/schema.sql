@@ -307,6 +307,8 @@ CREATE TABLE "floors" (
 	"test_command" text DEFAULT '' NOT NULL,
 	"merge_policy" text DEFAULT 'send_to_me' NOT NULL,
 	"round_cap" integer DEFAULT 3 NOT NULL,
+	"owner_only_paths" text[] DEFAULT '{}' NOT NULL,
+	"changed_lines_limit" integer,
 	"daily_token_cap" bigint,
 	"monthly_token_cap" bigint,
 	"concurrency_limit" integer,
@@ -328,6 +330,7 @@ CREATE TABLE "floors" (
 	CONSTRAINT "floors_id_slug" CHECK ("floors"."id" ~ '^[a-z0-9][a-z0-9-]*$'),
 	CONSTRAINT "floors_merge_policy" CHECK ("floors"."merge_policy" IN ('send_to_me', 'auto_merge')),
 	CONSTRAINT "floors_round_cap" CHECK ("floors"."round_cap" >= 1),
+	CONSTRAINT "floors_changed_lines_limit" CHECK ("floors"."changed_lines_limit" IS NULL OR "floors"."changed_lines_limit" >= 1),
 	CONSTRAINT "floors_token_caps" CHECK (("floors"."daily_token_cap" IS NULL OR "floors"."daily_token_cap" > 0) AND ("floors"."monthly_token_cap" IS NULL OR "floors"."monthly_token_cap" > 0)),
 	CONSTRAINT "floors_concurrency_limit" CHECK ("floors"."concurrency_limit" IS NULL OR "floors"."concurrency_limit" >= 1),
 	CONSTRAINT "floors_most_agents" CHECK ("floors"."most_agents" IS NULL OR "floors"."most_agents" >= 1),
@@ -643,9 +646,11 @@ CREATE TABLE "issue_triage" (
 	"notice_id" text,
 	"role" text,
 	"candidates" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"size" text,
 	"triaged_at" timestamp with time zone NOT NULL,
 	CONSTRAINT "issue_triage_floor_id_issue_pk" PRIMARY KEY("floor_id","issue"),
 	CONSTRAINT "issue_triage_issue" CHECK ("issue_triage"."issue" > 0),
+	CONSTRAINT "issue_triage_size" CHECK ("issue_triage"."size" IS NULL OR "issue_triage"."size" IN ('small', 'medium', 'large')),
 	CONSTRAINT "issue_triage_status" CHECK ("issue_triage"."status" IN ('clear', 'waiting', 'routing')),
 	CONSTRAINT "issue_triage_priority" CHECK ("issue_triage"."priority" IN ('high', 'normal', 'low')),
 	CONSTRAINT "issue_triage_judged_by" CHECK ("issue_triage"."judged_by" IN ('model', 'decision_model', 'rules', 'owner'))
@@ -857,6 +862,7 @@ CREATE TABLE "office_settings" (
 	"retention_request_metadata_days" integer,
 	"retention_activity_days" integer,
 	"retention_connection_deliveries_days" integer,
+	"retention_scorecard_days" integer,
 	"github_webhooks_enabled" boolean,
 	"github_webhook_secret" text,
 	"owner_profile" jsonb,
@@ -881,7 +887,7 @@ CREATE TABLE "office_settings" (
 	CONSTRAINT "office_settings_gateway_prompt_cache_ttl" CHECK ("office_settings"."gateway_prompt_cache_ttl" IS NULL OR "office_settings"."gateway_prompt_cache_ttl" IN ('5m', '1h')),
 	CONSTRAINT "office_settings_gateway_keep_alive" CHECK (("office_settings"."gateway_keep_alive_idle_minutes" IS NULL OR "office_settings"."gateway_keep_alive_idle_minutes" BETWEEN 5 AND 480) AND ("office_settings"."gateway_keep_alive_max_per_account_per_hour" IS NULL OR "office_settings"."gateway_keep_alive_max_per_account_per_hour" BETWEEN 1 AND 600)),
 	CONSTRAINT "office_settings_token_caps" CHECK (("office_settings"."daily_token_cap" IS NULL OR "office_settings"."daily_token_cap" > 0) AND ("office_settings"."monthly_token_cap" IS NULL OR "office_settings"."monthly_token_cap" > 0)),
-	CONSTRAINT "office_settings_retention" CHECK (("office_settings"."retention_request_bodies_days" IS NULL OR "office_settings"."retention_request_bodies_days" BETWEEN 0 AND 3650) AND ("office_settings"."retention_request_metadata_days" IS NULL OR "office_settings"."retention_request_metadata_days" BETWEEN 32 AND 3650) AND ("office_settings"."retention_activity_days" IS NULL OR "office_settings"."retention_activity_days" BETWEEN 30 AND 3650) AND ("office_settings"."retention_connection_deliveries_days" IS NULL OR "office_settings"."retention_connection_deliveries_days" BETWEEN 1 AND 3650)),
+	CONSTRAINT "office_settings_retention" CHECK (("office_settings"."retention_request_bodies_days" IS NULL OR "office_settings"."retention_request_bodies_days" BETWEEN 0 AND 3650) AND ("office_settings"."retention_request_metadata_days" IS NULL OR "office_settings"."retention_request_metadata_days" BETWEEN 32 AND 3650) AND ("office_settings"."retention_activity_days" IS NULL OR "office_settings"."retention_activity_days" BETWEEN 30 AND 3650) AND ("office_settings"."retention_connection_deliveries_days" IS NULL OR "office_settings"."retention_connection_deliveries_days" BETWEEN 1 AND 3650) AND ("office_settings"."retention_scorecard_days" IS NULL OR "office_settings"."retention_scorecard_days" BETWEEN 90 AND 3650)),
 	CONSTRAINT "office_settings_github_webhook_secret_sealed" CHECK ("office_settings"."github_webhook_secret" IS NULL OR "office_settings"."github_webhook_secret" LIKE 'aio1:%'),
 	CONSTRAINT "office_settings_github_webhooks_secret" CHECK ("office_settings"."github_webhooks_enabled" IS NOT TRUE OR "office_settings"."github_webhook_secret" IS NOT NULL),
 	CONSTRAINT "office_settings_gateway_circuit_breaker" CHECK (("office_settings"."gateway_circuit_breaker_threshold" IS NULL OR "office_settings"."gateway_circuit_breaker_threshold" BETWEEN 1 AND 100) AND ("office_settings"."gateway_circuit_breaker_cooldown_seconds" IS NULL OR "office_settings"."gateway_circuit_breaker_cooldown_seconds" BETWEEN 1 AND 3600))
@@ -1026,6 +1032,34 @@ CREATE TABLE "schema_meta" (
 	"key" text PRIMARY KEY NOT NULL,
 	"value" text NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE "scorecard_records" (
+	"floor_id" text NOT NULL,
+	"issue" integer NOT NULL,
+	"agent_id" text NOT NULL,
+	"agent_name" text NOT NULL,
+	"role" text NOT NULL,
+	"stage" text NOT NULL,
+	"contractor" boolean DEFAULT false NOT NULL,
+	"model" text NOT NULL,
+	"size" text,
+	"outcome" text NOT NULL,
+	"rounds_to_approval" integer,
+	"qa_rounds_failed" integer DEFAULT 0 NOT NULL,
+	"stalls" integer DEFAULT 0 NOT NULL,
+	"failures" integer DEFAULT 0 NOT NULL,
+	"rounds_reviewed" integer DEFAULT 0 NOT NULL,
+	"blocking_comments" integer DEFAULT 0 NOT NULL,
+	"input_tokens" bigint DEFAULT 0 NOT NULL,
+	"output_tokens" bigint DEFAULT 0 NOT NULL,
+	"estimated_cost_usd" double precision DEFAULT 0 NOT NULL,
+	"ended_at" timestamp with time zone NOT NULL,
+	CONSTRAINT "scorecard_records_floor_id_issue_agent_id_model_pk" PRIMARY KEY("floor_id","issue","agent_id","model"),
+	CONSTRAINT "scorecard_records_outcome" CHECK ("scorecard_records"."outcome" IN ('merged', 'closed', 'handed_to_owner')),
+	CONSTRAINT "scorecard_records_stage" CHECK ("scorecard_records"."stage" IN ('work', 'review', 'qa', 'docs')),
+	CONSTRAINT "scorecard_records_size" CHECK ("scorecard_records"."size" IS NULL OR "scorecard_records"."size" IN ('small', 'medium', 'large')),
+	CONSTRAINT "scorecard_records_counts" CHECK ("scorecard_records"."issue" > 0 AND ("scorecard_records"."rounds_to_approval" IS NULL OR "scorecard_records"."rounds_to_approval" > 0) AND "scorecard_records"."qa_rounds_failed" >= 0 AND "scorecard_records"."stalls" >= 0 AND "scorecard_records"."failures" >= 0 AND "scorecard_records"."rounds_reviewed" >= 0 AND "scorecard_records"."blocking_comments" >= 0 AND "scorecard_records"."input_tokens" >= 0 AND "scorecard_records"."output_tokens" >= 0 AND "scorecard_records"."estimated_cost_usd" >= 0)
 );
 
 CREATE TABLE "sessions" (
@@ -1208,6 +1242,7 @@ CREATE UNIQUE INDEX "qa_reports_one_per_round" ON "qa_reports" USING btree ("flo
 CREATE UNIQUE INDEX "review_verdicts_one_per_round" ON "review_verdicts" USING btree ("floor_id","issue","round","agent_id");
 CREATE INDEX "role_memory_floor_idx" ON "role_memory" USING btree ("floor_id","role","id");
 CREATE UNIQUE INDEX "roles_name_unique" ON "roles" USING btree ("name") WHERE "roles"."floor_id" IS NULL;
+CREATE INDEX "scorecard_records_ended_at" ON "scorecard_records" USING btree ("ended_at");
 CREATE INDEX "sessions_expires_at_idx" ON "sessions" USING btree ("expires_at");
 CREATE INDEX "sign_in_events_occurred_at_idx" ON "sign_in_events" USING btree ("occurred_at");
 CREATE INDEX "work_queue_status_idx" ON "work_queue" USING btree ("status","created_at");

@@ -139,9 +139,9 @@ checks it is clear enough to work, and sets its priority (PRD FR-23;
   the issue and counts against the Manager's Token Caps. Its prompt quotes
   the issue as untrusted text, redacted first (a credential pasted into
   an issue never reaches a model), and its answer must be one JSON object
-  (`triageVerdictSchema` in `@ai-office/shared`): `clear`, `priority`, a
-  `reason`, and the `questions` an unclear issue asks (1 to 5). An answer
-  that is not one is sent back once.
+  (`triageVerdictSchema` in `@ai-office/shared`): `clear`, `priority`, its
+  [`size`](#size), a `reason`, and the `questions` an unclear issue asks (1
+  to 5). An answer that is not one is sent back once.
 - **Plain code decides what it can.** An issue with no description is
   unclear, and no model is asked. An issue the GitHub App filed from one
   of the Floor's [Specs](guidelines-specs-and-hooks.md#filing-a-specs-issues)
@@ -162,6 +162,34 @@ checks it is clear enough to work, and sets its priority (PRD FR-23;
   it again, and the earlier Notice is taken off the board.
 - **Work it as it is**, the Notice's action, has the issue picked up as
   it is at the next check, at the priority the Manager set.
+
+#### Size
+
+Triage also gives each issue its **Size**: `small`, `medium` or `large`,
+how big the change it asks for is (Scorecards PRD, FR-132), so small work
+can go to cheaper Agents ([dispatch by Size](#the-work-queue)):
+
+- **In the same judgement.** The Decision Model, when it judges, answers
+  the Size as one of its questions; otherwise the Manager's Model gives it
+  in its JSON answer (`size` in `triageVerdictSchema`). An answer without a
+  Size, or with another word, is not a triage, and is sent back once as any
+  invalid answer is. `small` is a small, local change (a typo, a copy
+  change, a one-line fix, a few lines in one or two files); `large` a
+  change across many files or modules, a new subsystem or a migration;
+  `medium` anything else.
+- **A `size:small`, `size:medium` or `size:large` label forces it**, as a
+  `role:<name>` label forces a Role, whoever judged the rest (the largest,
+  if an issue has more than one). Intake makes the three labels on each
+  Floor's repository. A label added after triage changes the Size without
+  triaging the issue again, with a short comment saying so.
+- **An issue filed from a Spec** takes the Size its task was given when
+  the Spec's tasks were written (each task's `size` in `tasks.md`).
+- **When no model judges**, AI Office's rules say `medium`.
+
+The Size is in the triage comment ("Its Size is **small**", and where it
+came from when a label or a Spec gave it), in the `issue.triaged` event,
+and kept with the triage in `issue_triage`. The Scorecard records each
+issue's Size and breaks down by it ([Analytics](ai-gateway.md#analytics)).
 
 Every decision is a comment on the issue (starting `<!-- ai-office:triage
 -->`) and an `issue.triaged` event in the Activity Feed, naming who
@@ -1017,6 +1045,35 @@ Floor's **Merge Policy** is in its settings (`mergePolicy` in `PATCH
   as `docs/guidelines/`, is not among them. Merging such a pull request
   is the Owner's approval of the Guidelines it changes ([Only the version
   the Owner approved](guidelines-specs-and-hooks.md#only-the-version-the-owner-approved)).
+- **Owner-only Paths and the changed-lines limit are the Owner's own.**
+  Beside what AI Office never merges, each Floor's settings hold a list
+  of **Owner-only Paths** and an optional **changed-lines limit**
+  (`ownerOnlyPaths` and `changedLinesLimit` in `PATCH /api/floors/:floorId`;
+  Scorecards PRD, FR-122 to FR-125; `owner-only-paths.ts`). Both are empty
+  by default, so a Floor that sets neither merges as before, and both are
+  in configuration export. An Owner-only Path is a glob from the top of
+  the repository, read as a Guideline's `fileMatchPattern` is (`*`, `**`,
+  `?`, `[…]` and `{a,b}`), but whatever its case: `src/auth/**` holds
+  `src/auth/session.ts` and `src/auth/tokens/jwt.ts`, but not
+  `lib/src/auth/x.ts` (`**/auth/**` would), nor `src/authors.ts`. A
+  pull request that changes a matching file (a renamed file's old path
+  too, so moving a file out counts) is never merged automatically: "…
+  not merged automatically, as it changes `src/auth/session.ts`, an
+  Owner-only Path (`src/auth/**`)." Nor is one whose changed lines (lines
+  added plus lines removed, as GitHub counts them) go over the limit: "…
+  as it changes 812 lines, over the Floor's limit of 500." Well-known
+  lockfiles (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`,
+  `Cargo.lock`, `poetry.lock`, `go.sum`, `Gemfile.lock` and the like) are
+  not counted, nor are files the base branch's `.gitattributes` marks
+  `linguist-generated`, as GitHub collapses them in a diff; it is read
+  from the base branch so a pull request cannot mark its own files
+  generated. No label or per-issue setting loosens them, the Owner's
+  `ai-office:auto-merge` included. Each pull request held back is a
+  `pull_request.held_back` event in the Activity Feed, naming the file and
+  glob or the lines and limit, once for each head the Owner is asked
+  about; each change to the settings is a `config.changed` event. They
+  are set in the Floor admin's **Settings**: one glob a line, and the
+  limit, empty for none.
 - **What a chat request built is the Owner's to merge.** An issue a chat
   request's Batch holds goes to the Owner whatever the Floor's policy,
   "… not merged automatically, as it was filed for a chat request." on an

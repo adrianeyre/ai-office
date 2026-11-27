@@ -9,11 +9,13 @@ import {
   ownerFloorTemplateSources,
 } from "./floor-template-library.ts";
 import {
+  changedLinesLimitSchema,
   floorSettingsSchema,
   defaultMostAgents,
   mostAgentsSchema,
   floorTemplateRefSchema,
   floorThemeSchema,
+  ownerOnlyPathsSchema,
   templateIdSchema,
 } from "./floors.ts";
 import { gatewayRetrySettingsSchema } from "./gateway-retries.ts";
@@ -103,6 +105,8 @@ export const configurationFloorSchema = floorSettingsSchema
     mostAgents: mostAgentsSchema.default(defaultMostAgents),
     spinOffFromChat: z.boolean().default(true),
     hourlyStatusUpdates: z.boolean().default(true),
+    ownerOnlyPaths: ownerOnlyPathsSchema.default([]),
+    changedLinesLimit: changedLinesLimitSchema.default(null),
     id: z
       .string()
       .regex(/^[a-z0-9][a-z0-9-]*$/, { error: "A Floor's id is a slug." }),

@@ -56,6 +56,13 @@ import {
   type CiState,
 } from "./gate.ts";
 import { ownerOnly } from "./owner-only.ts";
+import {
+  changedLines,
+  generatedRules,
+  heldBackByFloor,
+  markedGenerated,
+  ownerOnlyPathChanged,
+} from "./owner-only-paths.ts";
 
 // The Merge Policy (PRD FR-29, FR-49; §5 scenario 3; ADR 0002): work queued
 // at `ready-to-merge`, once a pull request has passed review, QA and docs,
@@ -83,7 +90,11 @@ import { ownerOnly } from "./owner-only.ts";
 //   changes only by the Owner's merge (FR-53), and a Skill only with the
 //   Owner's review (FR-76). And so does one that changes the Floor's
 //   Guidelines or Specs (FR-110; ADR 0014), the Notice naming them: an
-//   Agent never changes its own rules.
+//   Agent never changes its own rules. Beside these, each Floor's own
+//   Owner-only Paths and changed-lines limit (`owner-only-paths.ts`;
+//   Scorecards PRD, FR-122 to FR-125) send to the Owner a pull request
+//   that changes a path the Owner chose, or more lines than the limit,
+//   whatever its labels say; each is a `pull_request.held_back` event.
 // - An issue a chat request's Batch holds always goes to the Owner (P2-3,
 //   the Owner's decision in #199): the Plan behind it was written by the
 //   Manager's session, after reading content anyone may have planted, and
@@ -250,6 +261,15 @@ interface IssuePolicy {
   readonly ignored?: string;
   /** Why it goes to the Owner on a Floor that merges automatically. */
   readonly because?: string;
+}
+
+/** What a Floor's own rules held a pull request back for (FR-125). */
+interface HeldBack {
+  readonly rules: readonly ("owner_only_path" | "changed_lines")[];
+  readonly path?: string;
+  readonly pattern?: string;
+  readonly lines?: number;
+  readonly limit?: number;
 }
 
 /** Why a chat request's issue is not merged automatically (P2-3). */
@@ -443,18 +463,58 @@ export function createMergeFlow(options: MergeFlowOptions): MergeFlow {
    * a head that moved as they were listed counts too.
    */
   const changesOwnerOnly = async (
+    floor: FloorRecord,
     client: RepositoryClient,
     pullRequest: PullRequest,
     diffLimit: DiffLimit,
-  ): Promise<string[]> => {
+  ): Promise<{ reasons: string[]; heldBack: HeldBack | undefined }> => {
     const files = await client.listPullRequestFiles(pullRequest.number);
     const { head } = await client.getPullRequest(pullRequest.number);
-    return [
-      ...ownerOnly(files, diffLimit),
-      ...(head.sha === pullRequest.head.sha
+    // The Floor's own rules (FR-122 to FR-125). Generated files are read
+    // from the base branch's `.gitattributes`, only when there is a limit.
+    const rules =
+      floor.changedLinesLimit === null
         ? []
-        : ["its head commit changed as it was being checked"]),
-    ];
+        : generatedRules(
+            (await client
+              .getFileContent(".gitattributes", pullRequest.base)
+              .catch(() => undefined)) ?? "",
+          );
+    const generated = (path: string) => markedGenerated(rules, path);
+    const byFloor = heldBackByFloor(files, floor, generated);
+    const changed = ownerOnlyPathChanged(files, floor.ownerOnlyPaths);
+    const lines =
+      floor.changedLinesLimit === null
+        ? undefined
+        : changedLines(files, generated);
+    const over =
+      lines !== undefined &&
+      floor.changedLinesLimit !== null &&
+      lines > floor.changedLinesLimit
+        ? { lines, limit: floor.changedLinesLimit }
+        : undefined;
+    return {
+      reasons: [
+        ...ownerOnly(files, diffLimit),
+        ...byFloor,
+        ...(head.sha === pullRequest.head.sha
+          ? []
+          : ["its head commit changed as it was being checked"]),
+      ],
+      heldBack:
+        changed === undefined && over === undefined
+          ? undefined
+          : {
+              rules: [
+                ...(changed === undefined ? [] : ["owner_only_path" as const]),
+                ...(over === undefined ? [] : ["changed_lines" as const]),
+              ],
+              ...(changed === undefined
+                ? {}
+                : { path: changed.path, pattern: changed.pattern }),
+              ...over,
+            },
+    };
   };
 
   /**
@@ -487,10 +547,13 @@ export function createMergeFlow(options: MergeFlowOptions): MergeFlow {
     readonly reasons: string[];
     /** The issues whose reviewers should review it again. */
     readonly reviewAgain: Issue[];
+    /** What the Floor's own rules held it back for, if they did. */
+    readonly heldBack: HeldBack | undefined;
   }> => {
     const team = await options.agents.list(floor.id);
     const head = pullRequest.head.sha;
-    const common = await changesOwnerOnly(
+    const { reasons: common, heldBack: byFloor } = await changesOwnerOnly(
+      floor,
       client,
       pullRequest,
       await diffLimitFor(floor),
@@ -540,7 +603,7 @@ export function createMergeFlow(options: MergeFlowOptions): MergeFlow {
         onlyAgain = false;
       }
     }
-    return { reasons, reviewAgain: onlyAgain ? again : [] };
+    return { reasons, reviewAgain: onlyAgain ? again : [], heldBack: byFloor };
   };
 
   /**
@@ -580,6 +643,8 @@ export function createMergeFlow(options: MergeFlowOptions): MergeFlow {
     readonly reasons: readonly string[];
     readonly label?: string | undefined;
     readonly ci: CiState;
+    /** What the Floor's own rules held it back for, if they did. */
+    readonly heldBack?: HeldBack | undefined;
   }): Promise<void> => {
     const { floor, issue, pullRequest } = input;
     const head = pullRequest.head.sha;
@@ -596,6 +661,21 @@ export function createMergeFlow(options: MergeFlowOptions): MergeFlow {
     for (const stale of asking) {
       // Being acted on, it closes itself.
       await notices.dismiss(stale.id).catch(() => undefined);
+    }
+    if (input.heldBack !== undefined) {
+      // Once per head, as its Notice is (FR-125).
+      for (const { number } of input.issues ?? [issue]) {
+        await events.publish({
+          type: "pull_request.held_back",
+          version: 1,
+          floorId: floor.id,
+          issue: number,
+          pullRequest: pullRequest.number,
+          url: pullRequest.htmlUrl,
+          ...input.heldBack,
+          rules: [...input.heldBack.rules],
+        });
+      }
     }
     const run = ciRunOf(input.ci);
     const verdicts: VerdictRecord[] = [];
@@ -817,6 +897,7 @@ export function createMergeFlow(options: MergeFlowOptions): MergeFlow {
         pullRequest,
         reasons: failed === undefined ? reasons : [...reasons, failed],
         ci,
+        heldBack: gate.heldBack,
       });
       return "finished";
     }
@@ -844,6 +925,7 @@ export function createMergeFlow(options: MergeFlowOptions): MergeFlow {
         pullRequest: checked.pullRequest,
         reasons: unmet,
         ci: checked.ci,
+        heldBack: atHead.heldBack,
       });
       return "finished";
     }

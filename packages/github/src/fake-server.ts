@@ -129,6 +129,8 @@ const restPullRequestFile = (file: PullRequestFile) => ({
     ? {}
     : { previous_filename: file.previousPath }),
   ...(file.patch === null ? {} : { patch: file.patch }),
+  ...(file.additions === undefined ? {} : { additions: file.additions }),
+  ...(file.deletions === undefined ? {} : { deletions: file.deletions }),
 });
 
 /** A review's inline comments, as GitHub takes them. */

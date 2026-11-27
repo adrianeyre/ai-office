@@ -78,6 +78,11 @@ const setUp = async (
     readonly basket?: string;
     /** Files the pull request changes besides the basket, by path. */
     readonly files?: Readonly<Record<string, string>>;
+    /** Files on the default branch before the issue's branch starts. */
+    readonly main?: Readonly<Record<string, string>>;
+    /** The Floor's Owner-only Paths and changed-lines limit (FR-122). */
+    readonly ownerOnlyPaths?: readonly string[];
+    readonly changedLinesLimit?: number | null;
   } = {},
 ): Promise<Setup> => {
   const fake = createFakeGitHub();
@@ -98,7 +103,12 @@ const setUp = async (
   await stores.floors.update("web-shop", {
     requiredReviewerAgentIds: [grace.id, quinta.id],
     mergePolicy: options.policy ?? "send_to_me",
+    ownerOnlyPaths: [...(options.ownerOnlyPaths ?? [])],
+    changedLinesLimit: options.changedLinesLimit ?? null,
   });
+  if (options.main !== undefined) {
+    fake.pushCommit(repository, "main", { files: options.main });
+  }
 
   // Issue #1 at ready-to-merge, with its pull request (#2) from its branch.
   fake.createIssue(repository, {
@@ -837,6 +847,117 @@ describe("an Agent's pull request that changes the Guidelines or Specs goes to t
     current.fake.finishCI(repository, branch, { name: "test" });
     expect(await current.run()).toBe("finished");
     expect((await pullRequest(current)).merged).toBe(true);
+  });
+});
+
+describe("a Floor's Owner-only Paths and changed-lines limit hold a pull request back for the Owner (Scorecards PRD, FR-122 to FR-125)", () => {
+  const heldBackEvents = async (setup: Setup) =>
+    (await setup.bus.eventsAfter(0))
+      .map(({ event }) => event)
+      .filter((event) => event.type === "pull_request.held_back");
+
+  it("sends one that touches an Owner-only Path to the Owner on an auto-merge Floor, naming the file and the path", async () => {
+    current = await setUp({
+      policy: "auto_merge",
+      ownerOnlyPaths: ["src/auth/**"],
+      files: { "src/auth/session.ts": "export const session = 1;\n" },
+    });
+    await current.approved(1);
+    current.fake.finishCI(repository, branch, { name: "test" });
+    await heldBackFor(
+      current,
+      "it changes `src/auth/session.ts`, an Owner-only Path (`src/auth/**`)",
+    );
+    // Without waiting for CI: the Owner hears at once.
+    expect(current.waited()).toBe(0);
+    expect(await heldBackEvents(current)).toEqual([
+      {
+        type: "pull_request.held_back",
+        version: 1,
+        floorId: "web-shop",
+        issue: 1,
+        pullRequest: 2,
+        url: (await pullRequest(current)).htmlUrl,
+        rules: ["owner_only_path"],
+        path: "src/auth/session.ts",
+        pattern: "src/auth/**",
+      },
+    ]);
+    // Once per head: the same work again raises nothing new.
+    expect(await current.run()).toBe("finished");
+    expect(await heldBackEvents(current)).toHaveLength(1);
+    expect(await current.openNotices()).toHaveLength(1);
+  });
+
+  it("sends one over the changed-lines limit to the Owner, saying how many lines it changes", async () => {
+    current = await setUp({
+      policy: "auto_merge",
+      changedLinesLimit: 500,
+      basket: "export const line = 1;\n".repeat(812),
+    });
+    await current.approved(1);
+    current.fake.finishCI(repository, branch, { name: "test" });
+    await heldBackFor(
+      current,
+      "it changes 812 lines, over the Floor's limit of 500",
+    );
+    expect(await heldBackEvents(current)).toEqual([
+      expect.objectContaining({
+        rules: ["changed_lines"],
+        lines: 812,
+        limit: 500,
+      }),
+    ]);
+  });
+
+  it("names both, and leaves lockfiles and generated files out of the count", async () => {
+    current = await setUp({
+      policy: "auto_merge",
+      ownerOnlyPaths: ["db/migrations/**"],
+      changedLinesLimit: 10,
+      main: { ".gitattributes": "src/generated/** linguist-generated\n" },
+      files: {
+        "DB/Migrations/0001_basket.sql": "CREATE TABLE basket ();\n",
+        "pnpm-lock.yaml": "lockfileVersion: '9.0'\n".repeat(400),
+        "src/generated/api.ts": "export {};\n".repeat(400),
+      },
+    });
+    await current.approved(1);
+    current.fake.finishCI(repository, branch, { name: "test" });
+    // The lockfile goes to the Owner as what CI runs; its lines and the
+    // generated file's are not counted: 2 lines, under the limit.
+    await heldBackFor(
+      current,
+      "it changes what CI runs; and it changes `DB/Migrations/0001_basket.sql`, an Owner-only Path (`db/migrations/**`)",
+    );
+  });
+
+  it("merges one that touches neither, under the limit", async () => {
+    current = await setUp({
+      policy: "auto_merge",
+      ownerOnlyPaths: ["src/auth/**"],
+      changedLinesLimit: 500,
+      files: { "src/authors.ts": "export const authors = [];\n" },
+    });
+    await current.approved(1);
+    current.fake.finishCI(repository, branch, { name: "test" });
+    expect(await current.run()).toBe("finished");
+    expect((await pullRequest(current)).merged).toBe(true);
+    expect(await heldBackEvents(current)).toEqual([]);
+  });
+
+  it("is not loosened by the Owner's ai-office:auto-merge label (FR-124)", async () => {
+    current = await setUp({
+      labels: [{ name: "ai-office:auto-merge" }],
+      ownerOnlyPaths: ["src/auth/**"],
+      files: { "src/auth/session.ts": "export const session = 1;\n" },
+    });
+    await current.approved(1);
+    current.fake.finishCI(repository, branch, { name: "test" });
+    await heldBackFor(
+      current,
+      "it changes `src/auth/session.ts`, an Owner-only Path (`src/auth/**`)",
+    );
   });
 });
 

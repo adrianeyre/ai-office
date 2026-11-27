@@ -99,6 +99,8 @@ describe("a /spec turn's documents", () => {
         description: "End to end.",
         meets: ["R1.1"],
         dependsOn: [],
+        // Medium unless the Model gives the task a Size (FR-132).
+        size: "medium",
       },
     ]);
   });

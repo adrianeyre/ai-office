@@ -1,5 +1,10 @@
 import { issueTriage, type Database } from "@ai-office/db";
-import type { IssuePriority, TriageJudge } from "@ai-office/shared";
+import {
+  issueSizes,
+  type IssuePriority,
+  type IssueSize,
+  type TriageJudge,
+} from "@ai-office/shared";
 import { and, eq } from "drizzle-orm";
 
 // Where the Manager's triage of each issue is kept (PRD FR-23): the
@@ -31,6 +36,11 @@ export interface TriageRecord {
   readonly role: string | null;
   /** The work Roles the Owner is asked to choose from, while `routing`. */
   readonly candidates: readonly string[];
+  /**
+   * Its Size (Scorecards PRD, FR-132); null for a triage from before
+   * Sizes.
+   */
+  readonly size: IssueSize | null;
   readonly triagedAt: Date;
 }
 
@@ -81,6 +91,7 @@ const toRecord = (row: TriageRow): TriageRecord => ({
   noticeId: row.noticeId,
   role: row.role,
   candidates: row.candidates as string[],
+  size: issueSizes.find((size) => size === row.size) ?? null,
   triagedAt: row.triagedAt,
 });
 
@@ -112,6 +123,7 @@ export function databaseTriageStore(db: Database): TriageStore {
             noticeId: record.noticeId,
             role: record.role,
             candidates: [...record.candidates],
+            size: record.size,
             triagedAt: record.triagedAt,
           },
         });

@@ -125,7 +125,43 @@ export interface RequestHistoryStore {
     bucket: AnalyticsBucket,
     filter?: AnalyticsFilter,
   ): Promise<AnalyticsRow[]>;
+  /**
+   * What the requests naming an issue on a Floor used, per Agent and
+   * Model, as analytics attribute them: those still kept, and what
+   * deleted ones used, a day at a time (the Scorecard, Scorecards PRD,
+   * FR-126). Requests made by no Agent are left out.
+   */
+  issueUsage(floorId: string, issue: number): Promise<IssueUsageRow[]>;
 }
+
+/** What an issue's requests used, by one Agent with one Model. */
+export interface IssueUsageRow {
+  readonly agentId: string;
+  readonly model: string | null;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly estimatedCostUsd: number;
+}
+
+/** Adds `row` into `rows`, by its Agent and Model. */
+const addIssueUsage = (
+  rows: Map<string, IssueUsageRow>,
+  row: IssueUsageRow,
+): void => {
+  const key = JSON.stringify([row.agentId, row.model]);
+  const held = rows.get(key);
+  rows.set(
+    key,
+    held === undefined
+      ? { ...row }
+      : {
+          ...held,
+          inputTokens: held.inputTokens + row.inputTokens,
+          outputTokens: held.outputTokens + row.outputTokens,
+          estimatedCostUsd: held.estimatedCostUsd + row.estimatedCostUsd,
+        },
+  );
+};
 
 /**
  * Which requests analytics add up: one AI Account's (its chart in AI
@@ -533,6 +569,42 @@ export function memoryRequestHistoryStore(): RequestHistoryStore & {
         }
       }
       return Promise.resolve([...rows.values()]);
+    },
+    issueUsage(floorId, issue) {
+      const rows = new Map<string, IssueUsageRow>();
+      for (const request of requests) {
+        if (
+          request.floorId === floorId &&
+          request.issue === issue &&
+          request.agentId !== null
+        ) {
+          addIssueUsage(rows, {
+            agentId: request.agentId,
+            model: request.model,
+            inputTokens: request.inputTokens ?? 0,
+            outputTokens: request.outputTokens ?? 0,
+            estimatedCostUsd: request.estimatedCostUsd ?? 0,
+          });
+        }
+      }
+      for (const row of days.values()) {
+        if (
+          row.floorId === floorId &&
+          row.issue === issue &&
+          row.agentId !== null
+        ) {
+          addIssueUsage(rows, { ...row, agentId: row.agentId });
+        }
+      }
+      return Promise.resolve(
+        [...rows.values()].map((row) => ({
+          agentId: row.agentId,
+          model: row.model,
+          inputTokens: row.inputTokens,
+          outputTokens: row.outputTokens,
+          estimatedCostUsd: row.estimatedCostUsd,
+        })),
+      );
     },
   };
 }
@@ -946,6 +1018,52 @@ export function databaseRequestHistoryStore(db: Database): RequestHistoryStore {
         addAnalytics(all, row);
       }
       return [...all.values()];
+    },
+
+    async issueUsage(floorId, issue) {
+      const total = (column: AnyPgColumn) =>
+        sql<string>`coalesce(sum(${column}), 0)`.mapWith(Number);
+      const kept = await db
+        .select({
+          agentId: gatewayRequests.agentId,
+          model: gatewayRequests.model,
+          inputTokens: total(gatewayRequests.inputTokens),
+          outputTokens: total(gatewayRequests.outputTokens),
+          estimatedCostUsd: total(gatewayRequests.estimatedCostUsd),
+        })
+        .from(gatewayRequests)
+        .where(
+          and(
+            eq(gatewayRequests.floorId, floorId),
+            eq(gatewayRequests.issue, issue),
+            isNotNull(gatewayRequests.agentId),
+          ),
+        )
+        .groupBy(gatewayRequests.agentId, gatewayRequests.model);
+      const deleted = await db
+        .select({
+          agentId: gatewayUsageDays.agentId,
+          model: gatewayUsageDays.model,
+          inputTokens: total(gatewayUsageDays.inputTokens),
+          outputTokens: total(gatewayUsageDays.outputTokens),
+          estimatedCostUsd: total(gatewayUsageDays.estimatedCostUsd),
+        })
+        .from(gatewayUsageDays)
+        .where(
+          and(
+            eq(gatewayUsageDays.floorId, floorId),
+            eq(gatewayUsageDays.issue, issue),
+            isNotNull(gatewayUsageDays.agentId),
+          ),
+        )
+        .groupBy(gatewayUsageDays.agentId, gatewayUsageDays.model);
+      const rows = new Map<string, IssueUsageRow>();
+      for (const row of [...kept, ...deleted]) {
+        if (row.agentId !== null) {
+          addIssueUsage(rows, { ...row, agentId: row.agentId });
+        }
+      }
+      return [...rows.values()];
     },
   };
 }

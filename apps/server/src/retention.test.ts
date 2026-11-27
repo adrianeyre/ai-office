@@ -458,6 +458,7 @@ const cases: Case[] = [
         requestMetadataDays: 90,
         activityDays: 365,
         connectionDeliveriesDays: 90,
+        scorecardDays: 365,
       });
       await office.retention.run();
       expect((await office.requests.get(id ?? 0))?.bodies).toBeNull();

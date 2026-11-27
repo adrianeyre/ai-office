@@ -246,16 +246,22 @@ describe("the fake GitHub's scenario API", () => {
         status: "modified",
         patch:
           "@@ -1,1 +1,3 @@\n-# Web shop\n+# Web shop\n+\n+Now with a basket.",
+        additions: 2,
+        deletions: 0,
       },
       {
         path: "old.txt",
         status: "removed",
         patch: "@@ -1,1 +0,0 @@\n-gone soon",
+        additions: 0,
+        deletions: 1,
       },
       {
         path: "src/basket.ts",
         status: "added",
         patch: "@@ -0,0 +1,1 @@\n+export const basket = [];",
+        additions: 1,
+        deletions: 0,
       },
     ]);
     expect(await repo.getFileContent("old.txt", "main")).toBe("gone soon\n");

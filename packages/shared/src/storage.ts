@@ -48,6 +48,11 @@ const labels: Record<
     description:
       "Each Connection's log of what it sent. Deliveries still waiting to go stay.",
   },
+  scorecards: {
+    label: "Scorecard records",
+    description:
+      "How each piece of work turned out, for the Scorecard on Analytics.",
+  },
 };
 
 export const storageCategoryInfo = Object.fromEntries(

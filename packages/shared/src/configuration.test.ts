@@ -135,6 +135,26 @@ describe("a configuration export", () => {
     ).toBe(true);
   });
 
+  it("reads a Floor exported before Owner-only Paths as having none, and no changed-lines limit", () => {
+    const before = Object.fromEntries(
+      Object.entries(floor).filter(
+        ([key]) => key !== "ownerOnlyPaths" && key !== "changedLinesLimit",
+      ),
+    );
+    const [read] = configurationSchema.parse({
+      ...configuration,
+      floors: [before],
+    }).floors;
+    expect(read?.ownerOnlyPaths).toEqual([]);
+    expect(read?.changedLinesLimit).toBeNull();
+    expect(
+      problems({
+        ...configuration,
+        floors: [{ ...floor, ownerOnlyPaths: ["src/auth/**", "SRC/AUTH/**"] }],
+      }),
+    ).toEqual(["Give each Owner-only Path once."]);
+  });
+
   it("carries each Floor's Hooks, reads an export made before them as having none, and names each once", () => {
     const before = Object.fromEntries(
       Object.entries(floor).filter(([key]) => key !== "hooks"),

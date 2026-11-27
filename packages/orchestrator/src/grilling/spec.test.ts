@@ -12,6 +12,7 @@ import {
   specConfirmationText,
   specFiles,
   specIssueDrafts,
+  specIssues,
   specInstructions,
   specSection,
 } from "./spec.ts";
@@ -68,7 +69,13 @@ const design = {
   testing: "Per criterion.",
 };
 const tasks = [
-  { title: "Vault", description: "The vault.", meets: ["R1.1"], dependsOn: [] },
+  {
+    title: "Vault",
+    description: "The vault.",
+    meets: ["R1.1"],
+    dependsOn: [],
+    size: "small",
+  },
   {
     title: "Tick box",
     description: "The tick box.",
@@ -365,5 +372,54 @@ describe("the Spec's files and issue drafts", () => {
       "R1.1 WHEN a card is saved THE SYSTEM SHALL keep its token.",
     ]);
     expect(issues?.approvedAt).toBeNull();
+  });
+
+  it("give each task a Size as it is written, medium unless the Model says, which its draft and tasks.md carry (Scorecards PRD, FR-132)", async () => {
+    const confirmed = confirmSpecPhase(throughTasks(), at);
+    expect(confirmed.spec?.approved.tasks?.map(({ size }) => size)).toEqual([
+      "small",
+      "medium",
+    ]);
+    const issues = specIssueDrafts(confirmed, at);
+    expect(issues?.drafts.map(({ size }) => size)).toEqual(["small", "medium"]);
+    const tasksFile = specFiles(confirmed).find(({ path }) =>
+      path.endsWith("tasks.md"),
+    );
+    expect(tasksFile?.content).toContain("- **Size:** small");
+    // The issues filed for them take those Sizes at triage.
+    const filed = {
+      ...confirmed,
+      issues:
+        issues === undefined
+          ? null
+          : {
+              ...issues,
+              drafts: issues.drafts.map((draft, index) => ({
+                ...draft,
+                filed: {
+                  number: 40 + index,
+                  url: `https://github.com/adrianeyre/web-shop/issues/${String(40 + index)}`,
+                },
+              })),
+            },
+    };
+    expect(
+      await specIssues({ list: () => Promise.resolve([filed]) }, "web-shop"),
+    ).toEqual(
+      new Map([
+        [40, "small"],
+        [41, "medium"],
+      ]),
+    );
+  });
+
+  it("are refused with a Size that is none of the three", () => {
+    expect(
+      grillingTurnSchema
+        .safeParse({
+          spec: { tasks: [{ ...tasks[0], size: "huge" }] },
+        })
+        .error?.issues.map(({ message }) => message),
+    ).toEqual(['A task\'s size is "small", "medium" or "large".']);
   });
 });

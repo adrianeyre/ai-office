@@ -134,6 +134,7 @@ async function configure(source: Office): Promise<void> {
     requestMetadataDays: 60,
     activityDays: 730,
     connectionDeliveriesDays: 45,
+    scorecardDays: 400,
   });
   const at = new Date("2026-10-09T12:00:00.000Z");
   await stores.tokenCaps.setOfficeCaps(
@@ -207,6 +208,9 @@ async function configure(source: Office): Promise<void> {
     testCommand: "pnpm test",
     mergePolicy: "auto_merge",
     roundCap: 4,
+    // Owner-only Paths and the changed-lines limit (Scorecards PRD, FR-122).
+    ownerOnlyPaths: ["src/auth/**", "migrations/**"],
+    changedLinesLimit: 500,
     tokenCaps: { daily: 1_000_000, monthly: null },
     concurrencyLimit: 2,
     priority: 3,
@@ -584,10 +588,19 @@ const cases: Case[] = [
         requestMetadataDays: 60,
         activityDays: 730,
         connectionDeliveriesDays: 45,
+        scorecardDays: 400,
       });
       expect(floor("web-shop")?.agents).toHaveLength(5);
       // Fresh Start thresholds (FR-86): the Floor's, and an Agent's own.
       expect(floor("web-shop")?.freshStartThreshold).toBe(90);
+      // Owner-only Paths and the changed-lines limit (FR-122).
+      expect(floor("web-shop")?.ownerOnlyPaths).toEqual([
+        "src/auth/**",
+        "migrations/**",
+      ]);
+      expect(floor("web-shop")?.changedLinesLimit).toBe(500);
+      expect(floor("blog")?.ownerOnlyPaths).toEqual([]);
+      expect(floor("blog")?.changedLinesLimit).toBeNull();
       expect(
         floor("web-shop")?.agents.find(({ name }) => name === "Ada Lovelace")
           ?.freshStartThreshold,

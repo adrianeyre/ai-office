@@ -2,6 +2,7 @@ import {
   aiAccountLimitReasons,
   connectionTypes,
   issuePriorities,
+  issueSizes,
   maxCommandIssues,
   maxMemoryEntries,
   maxMemoryEntryLength,
@@ -196,6 +197,11 @@ const issueTriaged = event("issue.triaged", {
   agentId,
   outcome: z.enum(triageOutcomes),
   priority: z.enum(issuePriorities),
+  /**
+   * Its Size (Scorecards PRD, FR-132); absent on a triage from before
+   * Sizes.
+   */
+  size: z.enum(issueSizes).optional(),
   judgedBy: z.enum(triageJudges),
 });
 /**
@@ -834,6 +840,26 @@ const pullRequestMerged = event("pull_request.merged", {
   sha: z.string().regex(/^[0-9a-f]{40,64}$/),
   by: z.enum(["app", "owner"]),
 });
+/**
+ * The Floor's own rules kept a pull request from being merged
+ * automatically (Scorecards PRD, FR-123, FR-125): it changes an
+ * Owner-only Path, or more lines than the Floor's limit. It goes to the
+ * Owner, as its Notice says.
+ */
+const pullRequestHeldBack = event("pull_request.held_back", {
+  floorId,
+  issue,
+  pullRequest: issue,
+  url: z.url(),
+  /** Which of the Floor's rules held it back. */
+  rules: z.array(z.enum(["owner_only_path", "changed_lines"])).min(1),
+  /** The first changed file an Owner-only Path matched, and that glob. */
+  path: z.string().min(1).max(1000).optional(),
+  pattern: z.string().min(1).max(255).optional(),
+  /** The lines it changes, and the Floor's limit, when over it. */
+  lines: count.optional(),
+  limit: z.number().int().positive().optional(),
+});
 
 // Reviews (PRD FR-20, FR-27): a reviewer Agent's verdict, posted on the
 // pull request by the GitHub App.
@@ -1247,6 +1273,7 @@ export const officeEventSchema = z.discriminatedUnion("type", [
   branchPushed,
   pullRequestOpened,
   pullRequestMerged,
+  pullRequestHeldBack,
   reviewPosted,
   qaReported,
   designReported,

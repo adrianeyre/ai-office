@@ -69,6 +69,8 @@ const floor = (overrides: Partial<Floor> = {}): Floor => ({
   testCommand: "",
   mergePolicy: "send_to_me",
   roundCap: 3,
+  ownerOnlyPaths: [],
+  changedLinesLimit: null,
   tokenCaps: { daily: null, monthly: null },
   concurrencyLimit: null,
   priority: 0,
@@ -1099,6 +1101,68 @@ describe("a Floor's own settings page", () => {
       { mostAgents: 12, spinOffFromChat: false, hourlyStatusUpdates: false },
       { mostAgents: null },
     ]);
+  });
+
+  it("sets the Floor's Owner-only Paths and changed-lines limit, and clears them (Scorecards PRD, FR-122)", async () => {
+    const { calls } = stubServer({ floors: [floor()] });
+    renderAt("/floor-settings/web-shop");
+    const settings = await card("Settings");
+    const paths =
+      settings.getByLabelText<HTMLTextAreaElement>("Owner-only Paths");
+    const limit = settings.getByLabelText<HTMLInputElement>(
+      "Changed-lines limit",
+    );
+    expect(paths.value).toBe("");
+    expect(limit.value).toBe("");
+    await userEvent.type(paths, "src/auth/**{enter}{enter}  migrations/**  ");
+    await userEvent.type(limit, "500");
+    await userEvent.click(
+      settings.getByRole("button", { name: "Save settings" }),
+    );
+    expect((await settings.findByRole("status")).textContent).toBe("Saved.");
+    expect(paths.value).toBe("src/auth/**\nmigrations/**");
+    expect(limit.value).toBe("500");
+
+    await userEvent.clear(paths);
+    await userEvent.clear(limit);
+    await userEvent.click(
+      settings.getByRole("button", { name: "Save settings" }),
+    );
+    expect((await settings.findByRole("status")).textContent).toBe("Saved.");
+    expect(changes(calls)).toEqual([
+      {
+        url: "/api/floors/web-shop",
+        method: "PATCH",
+        body: {
+          ownerOnlyPaths: ["src/auth/**", "migrations/**"],
+          changedLinesLimit: 500,
+        },
+        csrf: "csrf-token-1",
+      },
+      {
+        url: "/api/floors/web-shop",
+        method: "PATCH",
+        body: { ownerOnlyPaths: [], changedLinesLimit: null },
+        csrf: "csrf-token-1",
+      },
+    ]);
+  });
+
+  it("refuses an Owner-only Path given twice before sending it", async () => {
+    const { calls } = stubServer({ floors: [floor()] });
+    renderAt("/floor-settings/web-shop");
+    const settings = await card("Settings");
+    await userEvent.type(
+      settings.getByLabelText("Owner-only Paths"),
+      "src/auth/**{enter}SRC/Auth/**",
+    );
+    await userEvent.click(
+      settings.getByRole("button", { name: "Save settings" }),
+    );
+    expect((await settings.findByRole("alert")).textContent).toContain(
+      "Give each Owner-only Path once.",
+    );
+    expect(changes(calls)).toEqual([]);
   });
 
   it("sets the Floor's own Git identity, and clears it", async () => {

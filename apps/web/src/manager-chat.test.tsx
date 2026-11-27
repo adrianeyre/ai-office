@@ -82,6 +82,8 @@ const floor = {
   testCommand: "",
   mergePolicy: "send_to_me",
   roundCap: 3,
+  ownerOnlyPaths: [],
+  changedLinesLimit: null,
   tokenCaps: { daily: null, monthly: null },
   concurrencyLimit: null,
   priority: 0,

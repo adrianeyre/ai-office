@@ -65,6 +65,10 @@ interface FormValues {
   testCommand: string;
   mergePolicy: MergePolicy;
   roundCap: string;
+  /** Owner-only Paths (FR-122): one glob a line. */
+  ownerOnlyPaths: string;
+  /** The changed-lines limit (FR-122): blank for none. */
+  changedLinesLimit: string;
   freshStartThreshold: string;
   dailyTokenCap: string;
   monthlyTokenCap: string;
@@ -93,6 +97,8 @@ const formValues = (floor: Floor): FormValues => ({
   testCommand: floor.testCommand,
   mergePolicy: floor.mergePolicy,
   roundCap: String(floor.roundCap),
+  ownerOnlyPaths: floor.ownerOnlyPaths.join("\n"),
+  changedLinesLimit: text(floor.changedLinesLimit),
   freshStartThreshold: String(floor.freshStartThreshold),
   dailyTokenCap: text(floor.tokenCaps.daily),
   monthlyTokenCap: text(floor.tokenCaps.monthly),
@@ -139,6 +145,15 @@ function settingsUpdate(
   }
   if (dirty.priority === true) {
     update["priority"] = Number(values.priority);
+  }
+  if (dirty.ownerOnlyPaths === true) {
+    update["ownerOnlyPaths"] = values.ownerOnlyPaths
+      .split("\n")
+      .map((path) => path.trim())
+      .filter((path) => path !== "");
+  }
+  if (dirty.changedLinesLimit === true) {
+    update["changedLinesLimit"] = optionalNumber(values.changedLinesLimit);
   }
   if (dirty.freshStartThreshold === true) {
     update["freshStartThreshold"] = Number(values.freshStartThreshold);
@@ -358,6 +373,39 @@ function SettingsForm({
             max={10}
             aria-describedby="floor-round-cap-hint"
             {...register("roundCap")}
+          />
+        </Field>
+        <div className="space-y-2">
+          <Label htmlFor="floor-owner-only-paths">Owner-only Paths</Label>
+          <textarea
+            id="floor-owner-only-paths"
+            rows={3}
+            spellCheck={false}
+            placeholder={"src/auth/**\nmigrations/**"}
+            className="w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-sm"
+            aria-describedby="floor-owner-only-paths-hint"
+            {...register("ownerOnlyPaths")}
+          />
+          <p
+            id="floor-owner-only-paths-hint"
+            className="text-xs text-muted-foreground"
+          >
+            One glob a line, from the top of the repository, whatever its case.
+            A pull request changing a matching file is never merged
+            automatically: it goes to you, whatever its labels say.
+          </p>
+        </div>
+        <Field
+          id="floor-changed-lines-limit"
+          label="Changed-lines limit"
+          hint="A pull request changing more lines than this (added plus removed, lockfiles and generated files left out) goes to you. Empty for no limit."
+        >
+          <Input
+            id="floor-changed-lines-limit"
+            type="number"
+            min={1}
+            aria-describedby="floor-changed-lines-limit-hint"
+            {...register("changedLinesLimit")}
           />
         </Field>
         <Field

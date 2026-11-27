@@ -142,6 +142,8 @@ const settingsOf = (floor: FloorSettings): FloorSettings => ({
   testCommand: floor.testCommand,
   mergePolicy: floor.mergePolicy,
   roundCap: floor.roundCap,
+  ownerOnlyPaths: floor.ownerOnlyPaths,
+  changedLinesLimit: floor.changedLinesLimit,
   tokenCaps: floor.tokenCaps,
   concurrencyLimit: floor.concurrencyLimit,
   priority: floor.priority,

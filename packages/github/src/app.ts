@@ -391,6 +391,8 @@ const toPullRequestFile = (file: {
   status: string;
   previous_filename?: string;
   patch?: string;
+  additions?: number;
+  deletions?: number;
 }): PullRequestFile => ({
   path: file.filename,
   status: fileStatuses.find((status) => status === file.status) ?? "changed",
@@ -398,6 +400,8 @@ const toPullRequestFile = (file: {
     ? {}
     : { previousPath: file.previous_filename }),
   patch: file.patch ?? null,
+  ...(file.additions === undefined ? {} : { additions: file.additions }),
+  ...(file.deletions === undefined ? {} : { deletions: file.deletions }),
 });
 
 const toComparedFile = (file: {

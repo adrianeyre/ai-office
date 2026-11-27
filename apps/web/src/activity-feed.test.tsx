@@ -85,6 +85,8 @@ const floor = (id: string) => ({
   testCommand: "",
   mergePolicy: "send_to_me",
   roundCap: 3,
+  ownerOnlyPaths: [],
+  changedLinesLimit: null,
   tokenCaps: { daily: null, monthly: null },
   concurrencyLimit: null,
   priority: 0,
@@ -795,6 +797,10 @@ describe("event text", () => {
       describeEvent({ ...triaged, judgedBy: "decision_model" }, names),
     ).toBe(
       "Ada triaged #4: clear to work, high priority (by the Decision Model).",
+    );
+    // Its Size (Scorecards PRD, FR-132).
+    expect(describeEvent({ ...triaged, size: "small" }, names)).toBe(
+      "Ada triaged #4: clear to work, high priority, small.",
     );
   });
 

@@ -91,6 +91,7 @@ export const eventTypeLabels: Record<EventType, string> = {
   "branch.pushed": "Branch pushed",
   "pull_request.opened": "Pull request opened",
   "pull_request.merged": "Pull request merged",
+  "pull_request.held_back": "Pull request held back",
   "review.posted": "Review posted",
   "qa.reported": "QA result",
   "design.reported": "Design review",
@@ -249,6 +250,7 @@ export const eventTypeGroups: readonly {
       "qa.reported",
       "design.reported",
       "pull_request.merged",
+      "pull_request.held_back",
     ],
   },
   { label: "Model calls", types: ["model_call.completed"] },
@@ -464,7 +466,7 @@ export function describeEvent(
       return `Picked up #${String(event.issue)}: ${event.title}`;
     case "issue.triaged":
       return event.outcome === "clear"
-        ? `${agent(event.agentId)} triaged #${String(event.issue)}: clear to work, ${issuePriorityLabels[event.priority].toLowerCase()} priority${judgedBy[event.judgedBy]}.`
+        ? `${agent(event.agentId)} triaged #${String(event.issue)}: clear to work, ${issuePriorityLabels[event.priority].toLowerCase()} priority${event.size === undefined ? "" : `, ${event.size}`}${judgedBy[event.judgedBy]}.`
         : `${agent(event.agentId)} triaged #${String(event.issue)}: not clear enough to work, so it waits for the Owner${judgedBy[event.judgedBy]}.`;
     case "issue.routed":
       return `${agent(event.agentId)} gave #${String(event.issue)} to the ${event.roleName} Role${routedBy[event.routedBy]}.`;
@@ -775,6 +777,23 @@ export function describeEvent(
       return `Issue #${String(event.issue)} "${event.title}" filed from Grilling Session ${String(event.sessionId)}, drafted by ${agent(event.agentId)}${event.blockedBy.length === 0 ? "" : `, blocked by ${event.blockedBy.map((number) => `#${String(number)}`).join(", ")}`}.`;
     case "pull_request.merged":
       return `Pull request #${String(event.pullRequest)} for #${String(event.issue)} merged by the GitHub App, ${event.by === "owner" ? "as the Owner approved it" : "as the Merge Policy allowed"}.`;
+    case "pull_request.held_back": {
+      const why = [
+        ...(event.path === undefined || event.pattern === undefined
+          ? event.rules.includes("owner_only_path")
+            ? ["it changes an Owner-only Path"]
+            : []
+          : [
+              `it changes ${event.path}, an Owner-only Path (${event.pattern})`,
+            ]),
+        ...(event.lines === undefined || event.limit === undefined
+          ? []
+          : [
+              `it changes ${event.lines.toLocaleString("en-GB")} lines, over the Floor's limit of ${event.limit.toLocaleString("en-GB")}`,
+            ]),
+      ];
+      return `Pull request #${String(event.pullRequest)} for #${String(event.issue)} was not merged automatically${why.length === 0 ? "" : `, as ${why.join(", and ")}`}: it went to the Owner.`;
+    }
     case "review.posted":
       return `${agent(event.agentId)} reviewed pull request #${String(event.pullRequest)} for #${String(event.issue)} (round ${String(event.round)}): ${reviewVerdictLabels[event.verdict].toLowerCase()}, with ${String(event.blocking)} blocking ${event.blocking === 1 ? "comment" : "comments"} and ${String(event.nits)} ${event.nits === 1 ? "nit" : "nits"}.`;
     case "qa.reported":

@@ -187,6 +187,13 @@ export interface PullRequestFile {
    * null when GitHub gives none, as for a binary file or a huge diff.
    */
   readonly patch: string | null;
+  /**
+   * The lines it adds and removes, as GitHub counts them (Scorecards PRD,
+   * FR-123's changed-lines limit). GitHub always gives them; a file made
+   * without them is counted from its patch.
+   */
+  readonly additions?: number;
+  readonly deletions?: number;
 }
 
 /** A file changed between two commits, with how many lines changed. */

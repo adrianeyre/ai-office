@@ -350,19 +350,21 @@ const cases: Case[] = [
     },
   ],
   [
-    "keeps bodies 7 days, records 90, activity a year and delivery logs 90 days until the Owner chooses otherwise",
+    "keeps bodies 7 days, records 90, activity a year, delivery logs 90 days and Scorecard records a year until the Owner chooses otherwise",
     async ({ settings, bus }) => {
       expect(await settings.retentionSettings()).toEqual({
         requestBodiesDays: 7,
         requestMetadataDays: 90,
         activityDays: 365,
         connectionDeliveriesDays: 90,
+        scorecardDays: 365,
       });
       const chosen = {
         requestBodiesDays: 2,
         requestMetadataDays: 90,
         activityDays: 730,
         connectionDeliveriesDays: 30,
+        scorecardDays: 730,
       };
       expect(await settings.setRetentionSettings(chosen)).toEqual(chosen);
       // The same again changes nothing.
@@ -377,6 +379,7 @@ const cases: Case[] = [
             "retention.requestBodiesDays",
             "retention.activityDays",
             "retention.connectionDeliveriesDays",
+            "retention.scorecardDays",
           ],
         ],
       ]);

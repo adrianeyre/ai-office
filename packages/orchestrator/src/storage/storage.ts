@@ -7,6 +7,7 @@ import {
   events,
   gatewayRequestBodies,
   gatewayRequests,
+  scorecardRecords,
   signInEvents,
   type Database,
 } from "@ai-office/db";
@@ -57,6 +58,7 @@ const tables: Record<StorageCategory, string> = {
   usage_history: "ai_account_usage",
   sign_ins: "sign_in_events",
   connection_deliveries: "connection_deliveries",
+  scorecards: "scorecard_records",
 };
 
 const bytesOf = async (db: Database, table: string): Promise<number> => {
@@ -104,6 +106,10 @@ const countsOf = async (
             oldest: min(connectionDeliveries.createdAt),
           })
           .from(connectionDeliveries);
+      case "scorecards":
+        return db
+          .select({ rows: count(), oldest: min(scorecardRecords.endedAt) })
+          .from(scorecardRecords);
     }
   })();
   return { rows: row?.rows ?? 0, oldest: row?.oldest ?? null };
@@ -161,6 +167,12 @@ export function databaseStorageStore(db: Database): StorageStore {
         case "connection_deliveries":
           // Those still waiting to go are the outbound queue, and stay.
           return deleteConnectionDeliveriesBefore(db, before);
+        case "scorecards": {
+          const deleted = await db
+            .delete(scorecardRecords)
+            .where(lt(scorecardRecords.endedAt, before));
+          return deleted.rowCount ?? 0;
+        }
       }
     },
   };

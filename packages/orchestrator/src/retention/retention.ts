@@ -9,8 +9,8 @@ import {
 // once it is past the period the Owner set in the office admin (FR-65).
 // Request and response bodies go after 7 days, requests' records and AI
 // Accounts' usage readings after 90, the Activity Feed, closed Notices and
-// sign-ins after a year, and Connections' finished deliveries after 90
-// days, by default. Each rule runs on its own, so one
+// sign-ins after a year, Connections' finished deliveries after 90 days,
+// and the Scorecard's records after a year, by default. Each rule runs on its own, so one
 // that fails leaves the others to run. What Token Caps count outlives the
 // records (the request history keeps it a day at a time). Beside the
 // Owner's rules, Manager chat attachments uploaded but never sent go after
@@ -26,6 +26,11 @@ export interface RetentionTargets {
   activity(before: Date): Promise<number>;
   /** Connections' finished deliveries; those still to go stay. */
   connectionDeliveries(before: Date): Promise<number>;
+  /**
+   * The Scorecard's records (Scorecards PRD, FR-127); none deleted when
+   * absent.
+   */
+  scorecards?(before: Date): Promise<number>;
   /**
    * Manager chat attachments uploaded before `before` and never sent
    * (FR-24); sent ones stay with their messages. Run a day back, always.
@@ -85,6 +90,7 @@ const targetOf: Readonly<
   requestMetadataDays: "requestMetadata",
   activityDays: "activity",
   connectionDeliveriesDays: "connectionDeliveries",
+  scorecardDays: "scorecards",
 };
 
 export function createRetention(options: RetentionOptions): Retention {
@@ -101,7 +107,10 @@ export function createRetention(options: RetentionOptions): Retention {
     for (const rule of retentionRules) {
       const before = retentionCutoff(at, settings[rule]);
       try {
-        const count = await options.targets[targetOf[rule]](before);
+        const { targets } = options;
+        const target = targetOf[rule];
+        const count =
+          targets[target] === undefined ? 0 : await targets[target](before);
         deleted.push({ rule, before, count });
       } catch (error) {
         failed.push({ rule, error });

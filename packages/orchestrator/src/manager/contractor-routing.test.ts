@@ -60,6 +60,7 @@ async function setUp() {
 const clear = JSON.stringify({
   clear: true,
   priority: "normal",
+  size: "medium",
   reason: "It has acceptance criteria.",
   questions: [],
 });

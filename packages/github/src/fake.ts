@@ -492,6 +492,7 @@ export function createFakeGitHub(options: FakeGitHubOptions = {}): FakeGitHub {
             ? "removed"
             : "modified",
         patch: wholeFilePatch(base.get(path), head.get(path)),
+        ...lineChanges(base.get(path), head.get(path)),
       }));
   };
 

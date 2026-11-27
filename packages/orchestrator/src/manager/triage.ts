@@ -6,12 +6,16 @@ import {
   builtInRoles,
   createRedactor,
   defaultIssuePriority,
+  defaultIssueSize,
+  sizeLabelName,
+  sizeOfLabels,
   maxRoleCandidates,
   roleLabelName,
   rolesLabelled,
   routingActions,
   triageActions,
   type IssuePriority,
+  type IssueSize,
   type Redactor,
   type RouteJudge,
   type TriageJudge,
@@ -78,6 +82,16 @@ import type { TriageRecord, TriageStore } from "./triage-store.ts";
 // the Acceptance Criteria it meets and quotes them, as the Owner approved
 // them. Triage takes it as clear in plain code, asking no model (neither
 // the Manager's nor the Decision Model), at normal priority.
+//
+// Sizes (Scorecards PRD, FR-132): triage also gives each issue its Size,
+// `small`, `medium` or `large`, with its priority: in the same judgement,
+// from the Decision Model when it judges, otherwise from the Manager's
+// Model. A `size:<small|medium|large>` label forces it, as `role:` labels
+// force a Role (the largest, when an issue has several). An issue filed
+// from a Spec takes the Size its task was given when the Spec's tasks were
+// written. When no model judges, AI Office's rules say `medium`. The Size
+// is in the triage comment and its event, and kept with the triage; a
+// `size:` label added later changes it without triaging the issue again.
 
 /** Whether a picked-up issue may go into the pipeline now. */
 export type TriageDecision =
@@ -97,6 +111,11 @@ export interface Triage {
   ): Promise<TriageDecision>;
   /** The priority the issue's triage set; normal without one. */
   priority(floorId: string, issue: number): Promise<IssuePriority>;
+  /**
+   * The Size the issue's triage gave it (FR-132); null without a triage,
+   * or with one from before Sizes.
+   */
+  size(floorId: string, issue: number): Promise<IssueSize | null>;
   /**
    * The work Role chosen for the issue (a library Role's id); null when
    * none was, and the work goes to any work-Stage Agent.
@@ -155,7 +174,9 @@ export interface TriageOptions {
    * Specs and Hooks PRD, FR-115): clear by construction, so triage takes
    * them as clear with no model asked. None without it.
    */
-  readonly specIssues?: (floorId: string) => Promise<ReadonlySet<number>>;
+  readonly specIssues?: (
+    floorId: string,
+  ) => Promise<ReadonlyMap<number, IssueSize | null>>;
   readonly now?: () => Date;
   /** Told when a comment could not be written or a Notice closed. */
   readonly onError?: (error: unknown) => void;
@@ -185,6 +206,9 @@ export const hasAcceptanceCriteria = (body: string): boolean =>
 interface Judgement {
   readonly outcome: TriageOutcome;
   readonly priority: IssuePriority;
+  readonly size: IssueSize;
+  /** Where the Size came from, when not from whoever judged the rest. */
+  readonly sizeFrom?: "label" | "spec";
   readonly reason: string;
   readonly questions: readonly string[];
   readonly judgedBy: Exclude<TriageJudge, "owner">;
@@ -340,6 +364,7 @@ const percent = (probability: number): string =>
 const byDecisionModel = (judged: IssueJudgement): Judgement => ({
   judgedBy: "decision_model",
   priority: judged.priority,
+  size: judged.size,
   ...(judged.clear
     ? {
         outcome: "clear",
@@ -357,19 +382,22 @@ const byDecisionModel = (judged: IssueJudgement): Judgement => ({
  * An issue filed from a Spec (FR-115): clear, with no model asked. Its
  * body quotes the Acceptance Criteria it meets, which the Owner approved.
  */
-const fromSpec: Judgement = {
+const fromSpec = (size: IssueSize | null): Judgement => ({
   outcome: "clear",
   priority: defaultIssuePriority,
+  size: size ?? defaultIssueSize,
+  ...(size === null ? {} : { sizeFrom: "spec" as const }),
   reason:
     "It was filed from a Spec the Owner approved: its body names the Acceptance Criteria it meets and quotes them as its task list, so it is clear by construction and no model was asked.",
   questions: [],
   judgedBy: "rules",
-};
+});
 
 /** AI Office's own rules, for when the Manager's Model gives no judgement. */
 const byRules = (issue: Issue, fallback?: string): Judgement => {
   const base = {
     priority: defaultIssuePriority,
+    size: defaultIssueSize,
     judgedBy: "rules" as const,
     ...(fallback === undefined ? {} : { fallback }),
   };
@@ -465,8 +493,9 @@ export function createTriage(options: TriageOptions): Triage {
     roles: readonly WorkRole[],
   ): Promise<Judgement> => {
     // Nothing to judge: plain code can tell, and no model is asked.
-    if ((await options.specIssues?.(floor.id))?.has(issue.number) === true) {
-      return fromSpec;
+    const specs = await options.specIssues?.(floor.id);
+    if (specs?.has(issue.number) === true) {
+      return fromSpec(specs.get(issue.number) ?? null);
     }
     if (issue.body.trim() === "") {
       return byRules(issue);
@@ -536,6 +565,7 @@ export function createTriage(options: TriageOptions): Triage {
       const {
         clear,
         priority,
+        size,
         reason,
         questions,
         roles: named,
@@ -544,6 +574,7 @@ export function createTriage(options: TriageOptions): Triage {
       return {
         outcome: clear ? "clear" : "unclear",
         priority,
+        size,
         reason,
         questions,
         judgedBy: "model",
@@ -557,6 +588,16 @@ export function createTriage(options: TriageOptions): Triage {
       );
     }
   };
+
+  /** The line that gives the issue's Size, and where it came from (FR-132). */
+  const sizeLine = (size: IssueSize, from?: "label" | "spec"): string =>
+    `Its Size is **${size}**${
+      from === "label"
+        ? `, as the \`${sizeLabelName(size)}\` label on this issue says`
+        : from === "spec"
+          ? ", as its task in the Spec says"
+          : ""
+    }.`;
 
   /** The lines that log the Manager's triage on the issue (FR-23). */
   const triageLines = (
@@ -573,6 +614,7 @@ export function createTriage(options: TriageOptions): Triage {
                 ? ""
                 : `, as ${judgement.fallback}`
             }`;
+    const size = sizeLine(judgement.size, judgement.sizeFrom);
     const lines =
       judgement.outcome === "clear"
         ? [
@@ -580,12 +622,16 @@ export function createTriage(options: TriageOptions): Triage {
             "",
             `${by}: it is clear enough to work, at **${judgement.priority}** priority.`,
             "",
+            size,
+            "",
             blockQuote(judgement.reason),
           ]
         : [
             "### Triage: waiting for the Owner",
             "",
             `${by}: it is not clear enough to work yet, so work on it waits.`,
+            "",
+            size,
             "",
             blockQuote(judgement.reason),
             "",
@@ -695,7 +741,7 @@ export function createTriage(options: TriageOptions): Triage {
   const publish = (
     record: Pick<
       TriageRecord,
-      "floorId" | "issue" | "agentId" | "priority" | "judgedBy"
+      "floorId" | "issue" | "agentId" | "priority" | "judgedBy" | "size"
     >,
     outcome: TriageOutcome,
   ): Promise<unknown> =>
@@ -709,6 +755,7 @@ export function createTriage(options: TriageOptions): Triage {
           agentId: record.agentId,
           outcome,
           priority: record.priority,
+          ...(record.size === null ? {} : { size: record.size }),
           judgedBy: record.judgedBy,
         });
 
@@ -907,12 +954,23 @@ export function createTriage(options: TriageOptions): Triage {
   return {
     async check(floor, issue, given = {}) {
       const fingerprint = issueFingerprint(issue);
-      const previous = await store.get(floor.id, issue.number);
+      let previous = await store.get(floor.id, issue.number);
       const planned =
         given.planned === undefined || given.planned.length === 0
           ? undefined
           : plannedRouting(await workRolesOf(floor), given.planned);
       if (previous?.fingerprint === fingerprint) {
+        // A `size:` label added since changes the Size, not the triage.
+        const forced = sizeOfLabels(issue.labels);
+        if (forced !== undefined && forced !== previous.size) {
+          previous = { ...previous, size: forced };
+          await store.put(previous);
+          await comment(
+            floor,
+            issue.number,
+            commentOf([`### Size: ${forced}`, "", sizeLine(forced, "label")]),
+          );
+        }
         if (previous.status === "waiting") {
           return { proceed: false };
         }
@@ -943,16 +1001,23 @@ export function createTriage(options: TriageOptions): Triage {
       const labelled = rolesLabelled(issue.labels, workRoles);
       // The Model chooses the Role only when neither the Plan nor a label
       // gives one.
-      const judgement = await judge(
+      const judged = await judge(
         floor,
         manager,
         issue,
         planned === undefined && labelled.length === 0 ? workRoles : [],
       );
+      // A `size:` label forces the Size, whoever judged the rest.
+      const forced = sizeOfLabels(issue.labels);
+      const judgement: Judgement =
+        forced === undefined
+          ? judged
+          : { ...judged, size: forced, sizeFrom: "label" };
       const base = {
         floorId: floor.id,
         issue: issue.number,
         priority: judgement.priority,
+        size: judgement.size,
         judgedBy: judgement.judgedBy,
         agentId: manager.id,
         fingerprint,
@@ -1004,6 +1069,10 @@ export function createTriage(options: TriageOptions): Triage {
       return (
         (await store.get(floorId, issue))?.priority ?? defaultIssuePriority
       );
+    },
+
+    async size(floorId, issue) {
+      return (await store.get(floorId, issue))?.size ?? null;
     },
 
     async role(floorId, issue) {

@@ -133,6 +133,7 @@ export const exampleEvents: { [Type in EventType]: EventOfType<Type> } = {
     agentId: "grace",
     outcome: "clear",
     priority: "high",
+    size: "small",
     judgedBy: "model",
   },
   "issue.routed": {
@@ -576,6 +577,19 @@ export const exampleEvents: { [Type in EventType]: EventOfType<Type> } = {
     url: "https://github.com/adrianeyre/web-shop/pull/14",
     sha: "89abcdef0123456789abcdef0123456789abcdef",
     by: "app",
+  },
+  "pull_request.held_back": {
+    type: "pull_request.held_back",
+    version: 1,
+    floorId: "web-shop",
+    issue: 4,
+    pullRequest: 14,
+    url: "https://github.com/adrianeyre/web-shop/pull/14",
+    rules: ["owner_only_path", "changed_lines"],
+    path: "src/auth/session.ts",
+    pattern: "src/auth/**",
+    lines: 812,
+    limit: 500,
   },
   "review.posted": {
     type: "review.posted",

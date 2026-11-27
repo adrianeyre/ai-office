@@ -84,6 +84,8 @@ const cases: Case[] = [
         testCommand: "",
         mergePolicy: "send_to_me",
         roundCap: 3,
+        ownerOnlyPaths: [],
+        changedLinesLimit: null,
         tokenCaps: { daily: null, monthly: null },
         concurrencyLimit: null,
         // Queued work starts in age order with other Floors' (#25).
@@ -477,6 +479,8 @@ describe("Floors, kept in Postgres 18", () => {
         testCommand: "",
         mergePolicy: "send_to_me" as const,
         roundCap: 3,
+        ownerOnlyPaths: [],
+        changedLinesLimit: null,
         tokenCaps: { daily: null, monthly: null },
         concurrencyLimit: null,
         priority: 0,

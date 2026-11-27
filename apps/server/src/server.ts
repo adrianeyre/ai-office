@@ -55,6 +55,7 @@ import {
   createNoAccountLeftNotices,
   createGuidelineApprovals,
   createHookRunner,
+  createScorecardRecorder,
   createGuidelineProposals,
   createTaskGuidelines,
   plannedFiles,
@@ -589,6 +590,7 @@ export async function startOffice(
       auth: authStore,
       communications: communicationsStore,
       chatAttachments: stores.chatAttachments,
+      scorecards: stores.scorecards,
     }),
     onReport: ({ deleted, failed }) => {
       for (const { rule, error } of failed) {
@@ -1035,6 +1037,27 @@ export async function startOffice(
     redactor,
     onError: (error) => {
       logger.warn({ err: error }, "A Hook could not be run.");
+    },
+  });
+
+  // The Scorecard (Scorecards PRD, FR-126, FR-127): how each piece of work
+  // turned out, recorded as it ends, with what its Gateway requests used.
+  const scorecard = createScorecardRecorder({
+    store: stores.scorecards,
+    floors: stores.floors,
+    agents: stores.agents,
+    roles: stores.roles,
+    events,
+    reviews: stores.reviews,
+    usage: (floorId, issue) => requestStore.issueUsage(floorId, issue),
+    sizeOf: async (floorId, issue) =>
+      (await stores.triage.get(floorId, issue))?.size ?? null,
+    github,
+    onError: (error) => {
+      logger.warn(
+        { err: error },
+        "A piece of work was not recorded for the Scorecard.",
+      );
     },
   });
 
@@ -2189,6 +2212,7 @@ export async function startOffice(
     guidelineApprovals.stop();
     taskGuidelines.stop();
     stopHooks();
+    await scorecard.stop();
     capEnforcement.stop();
     workingAgents.stop();
     await intake.stop();
@@ -2273,6 +2297,7 @@ export async function startOffice(
   memoryCuration.start();
   roleMemoryReview.start();
   retention.start();
+  scorecard.start();
   await communications
     .start()
     .then(async () =>
