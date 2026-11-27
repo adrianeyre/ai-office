@@ -3,6 +3,7 @@ import {
   issuePriorities,
   sandboxStages,
   stageOfLabel,
+  type IssueSize,
   type PipelineStage,
   type Role,
   type Stage,
@@ -35,6 +36,13 @@ import type { WorkItem } from "../work/store.ts";
 //    takes one such piece of waiting work in its Stage, in the order work
 //    starts (its issue's priority, then oldest first), so no Agent stands
 //    idle while work waits for another.
+//
+// 3. **By Size** (Scorecards PRD, FR-133): of the Agents a piece of work
+//    may go to (its Stage's, within its Role), only those that take its
+//    issue's Size, chosen in the Agent editor (all three by default). When
+//    none of them takes that Size, any of them may, as the triage comment
+//    says. When those that take it are busy, the work waits for them: it
+//    never moves to an Agent that does not.
 //
 // No work starts for an Agent paused in the Agent editor or at a Token
 // Cap: the queue holds it until the Agent resumes or the work moves. An
@@ -95,24 +103,88 @@ export const inRole = <
 };
 
 /**
+ * Of `agents` (those a piece of work may go to), the ones that take the
+ * issue's `size` (FR-133); every one of them when none does, or when the
+ * issue has no Size. An Agent that is leaving counts for neither.
+ */
+export const takingSize = <
+  Agent extends Pick<AgentRecord, "sizes" | "leavingAt">,
+>(
+  agents: readonly Agent[],
+  size: IssueSize | null | undefined,
+): Agent[] => {
+  if (size == null) {
+    return [...agents];
+  }
+  const taking = agents.filter(
+    (agent) => agent.leavingAt === null && agent.sizes.includes(size),
+  );
+  return taking.length === 0 ? [...agents] : taking;
+};
+
+/**
+ * Whether any of `agents` (a Role's, or a Stage's) takes `size`: when none
+ * does, any of them may work the issue, and its triage says so.
+ */
+export const noneTakes = (
+  agents: readonly Pick<AgentRecord, "sizes" | "leavingAt">[],
+  size: IssueSize,
+): boolean =>
+  agents.length > 0 &&
+  !agents.some(
+    (agent) => agent.leavingAt === null && agent.sizes.includes(size),
+  );
+
+/**
+ * The Floor's required reviewers who review an issue of `size` (FR-133):
+ * those that take its Size, in the Floor's order; every one of them when
+ * none does, or the issue has no Size. Each review round, and the Merge
+ * Policy's gate, ask the same reviewers.
+ */
+export const reviewersFor = (
+  required: readonly string[],
+  team: readonly Pick<AgentRecord, "id" | "sizes" | "leavingAt">[],
+  size: IssueSize | null | undefined,
+): string[] => {
+  const ofTeam = required.flatMap((id) => {
+    const agent = team.find((member) => member.id === id);
+    return agent === undefined ? [] : [agent];
+  });
+  const taking = takingSize(ofTeam, size).map(({ id }) => id);
+  return required.filter(
+    (id) => taking.includes(id) || !ofTeam.some((agent) => agent.id === id),
+  );
+};
+
+/**
  * Of `agents`, those who may do work at `stage`: when `role` is a Role the
  * work names (`roleOfWork`), only its Agents, whatever their Stage;
  * otherwise those in the label's Stage, within `role`, the work Role
- * chosen for the issue, if any (`inRole`).
+ * chosen for the issue, if any (`inRole`); and of those, the ones that
+ * take the issue's `size` (`takingSize`).
  */
 const eligible = (
   stage: PipelineStage,
   agents: readonly AgentRecord[],
   role: string | null | undefined,
+  size?: IssueSize | null,
 ): AgentRecord[] => {
   const named = roleOfWork({ stage, role });
   if (named !== undefined) {
-    return agents.filter((agent) => agent.role === named);
+    return takingSize(
+      agents.filter((agent) => agent.role === named),
+      size,
+    );
   }
   const inStage = sandboxStageAt(stage);
-  return inRole(
-    agents.filter((agent) => inStage !== undefined && agent.stage === inStage),
-    role,
+  return takingSize(
+    inRole(
+      agents.filter(
+        (agent) => inStage !== undefined && agent.stage === inStage,
+      ),
+      role,
+    ),
+    size,
   );
 };
 
@@ -141,8 +213,9 @@ export function chooseAgent(
   active: readonly WorkItem[],
   paused: readonly string[],
   role?: string | null,
+  size?: IssueSize | null,
 ): string | null {
-  return chooseAgentByLoad(stage, agents, loads(active), paused, role);
+  return chooseAgentByLoad(stage, agents, loads(active), paused, role, size);
 }
 
 /**
@@ -155,8 +228,9 @@ export function chooseAgentByLoad(
   load: ReadonlyMap<string, number>,
   paused: readonly string[],
   role?: string | null,
+  size?: IssueSize | null,
 ): string | null {
-  const enabled = eligible(stage, agents, role).filter(takesWork);
+  const enabled = eligible(stage, agents, role, size).filter(takesWork);
   const working = enabled.filter(({ id }) => !paused.includes(id));
   const candidates = working.length > 0 ? working : enabled;
   const [best] = candidates.reduce<AgentRecord[]>(
@@ -198,6 +272,8 @@ export function rebalance(
   active: readonly WorkItem[],
   paused: readonly string[],
   roleOf: (issue: number) => string | null | undefined = () => null,
+  /** Each issue's Size (FR-133): its work moves only to Agents that take it. */
+  sizeOf: (issue: number) => IssueSize | null | undefined = () => null,
 ): Reassignment[] {
   const load = loads(active);
   const running = new Set(
@@ -249,7 +325,9 @@ export function rebalance(
     for (const agent of free) {
       // The first waiting work this Agent's Role may take.
       const index = waiting.findIndex((item) =>
-        inRole(everyone, roleOfItem(item)).some(({ id }) => id === agent.id),
+        takingSize(inRole(everyone, roleOfItem(item)), sizeOf(item.issue)).some(
+          ({ id }) => id === agent.id,
+        ),
       );
       const [item] = index === -1 ? [] : waiting.splice(index, 1);
       if (item === undefined) {
@@ -284,10 +362,11 @@ export function freeAgent(
   paused: readonly string[],
   except?: string | null,
   role?: string | null,
+  size?: IssueSize | null,
 ): string | null {
   const load = loads(active);
   return (
-    eligible(stage, agents, role).find(
+    eligible(stage, agents, role, size).find(
       ({ id, ...agent }) =>
         takesWork(agent) &&
         id !== except &&

@@ -7,6 +7,7 @@ import {
   roleName,
   whiteboardPath,
   type IntakeSettings,
+  type IssueSize,
   type PlanDraft,
   type PlanEdit,
   type PlanLeftOut,
@@ -561,16 +562,33 @@ export function createBatches(options: BatchesOptions): Batches {
     return { manager, agents, roles };
   };
 
-  /** The Floor's team, as a Plan shares work out across it. */
-  const planTeam = async (team: {
-    agents: AgentRecord[];
-    roles: WorkRole[];
-  }): Promise<PlanTeam> => ({
-    agents: team.agents,
-    active: await options.work.active(),
-    paused: options.pausedAgents?.() ?? [],
-    roles: team.roles,
-  });
+  /**
+   * The Floor's team, as a Plan shares work out across it, with the Size
+   * of each of `issues` from its triage (Scorecards PRD, FR-133).
+   */
+  const planTeam = async (
+    team: {
+      agents: AgentRecord[];
+      roles: WorkRole[];
+    },
+    floorId: string,
+    issues: readonly number[],
+  ): Promise<PlanTeam> => {
+    const sizes = new Map<number, IssueSize>();
+    for (const issue of issues) {
+      const size = await options.triage?.size(floorId, issue);
+      if (size != null) {
+        sizes.set(issue, size);
+      }
+    }
+    return {
+      agents: team.agents,
+      active: await options.work.active(),
+      paused: options.pausedAgents?.() ?? [],
+      roles: team.roles,
+      sizes,
+    };
+  };
 
   /** The issues the Floor's open Batches hold back, by Batch. */
   const holding = async (floorId: string): Promise<Map<number, number>> => {
@@ -1594,7 +1612,11 @@ export function createBatches(options: BatchesOptions): Batches {
       floor,
       batch.chatMessageId !== null,
     );
-    const team = await planTeam(members);
+    const team = await planTeam(
+      members,
+      floor.id,
+      kept.map(({ number }) => number),
+    );
     const replanning: Replanning = { previous: plan, kept, dropped };
     let drafted: { plan: PlanContent; fallback?: string };
     try {
@@ -1778,7 +1800,7 @@ export function createBatches(options: BatchesOptions): Batches {
           floor,
           batch.chatMessageId !== null,
         );
-        const team = await planTeam(members);
+        const team = await planTeam(members, floor.id, order);
         const carryingOn = order.filter((issue) => started.has(issue));
         const content = replanMidBatch(
           plan,
@@ -1868,7 +1890,7 @@ export function createBatches(options: BatchesOptions): Batches {
             plan,
             carryingOn,
             started,
-            await planTeam(members),
+            await planTeam(members, floor.id, carryingOn),
             [
               ...plan.leftOut,
               ...dropped.map((issue) => ({
@@ -2038,7 +2060,11 @@ export function createBatches(options: BatchesOptions): Batches {
     if (issues.length === 0) {
       return { batch: undefined, leftOut };
     }
-    const team = await planTeam(members);
+    const team = await planTeam(
+      members,
+      floor.id,
+      issues.map(({ number }) => number),
+    );
     // A chat request's Plan was settled in the chat; plain code checks it,
     // and the Manager drafts one only if it does not hold. The issues left
     // out leave its Plan, and the issues it waits on.

@@ -98,6 +98,8 @@ export {
 } from "./floors.ts";
 export {
   addAgentRequestSchema,
+  agentSizesSchema,
+  allSizes,
   agentErrorCodes,
   agentListSchema,
   agentNameSchema,

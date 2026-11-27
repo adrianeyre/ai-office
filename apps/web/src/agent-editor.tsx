@@ -5,10 +5,13 @@ import {
   effortsOf,
   floorSchema,
   floorSettingsUpdateSchema,
+  issueSizeLabels,
+  issueSizes,
   pronounsOf,
   updateAgentRequestSchema,
   type Agent,
   type Floor,
+  type IssueSize,
   type UpdateAgentRequest,
 } from "@ai-office/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -38,7 +41,8 @@ import {
 // starts), Model (from the catalogue, or its AI Provider's default),
 // effort where the agent tool takes one, extra instructions, its Token
 // Caps and Fresh Start threshold, whether it is enabled or paused, and,
-// for a reviewer, whether its Floor requires its approval (FR-27). Changes
+// for a reviewer, whether its Floor requires its approval (FR-27), and
+// the Sizes of issues it takes at its Stage (Scorecards PRD, FR-133). Changes
 // apply from the Agent's next task. The UI's pronouns for it follow its
 // Avatar's presentation (FR-14).
 
@@ -59,6 +63,8 @@ interface FormValues {
   freshStartThreshold: string;
   /** Whether every Review Loop round needs its approval; reviewers only. */
   requiredReviewer: boolean;
+  /** The Sizes of issues it takes (FR-133). */
+  sizes: IssueSize[];
 }
 
 /** Whether `floor` requires `agent`'s approval in every review round. */
@@ -76,6 +82,7 @@ const formValues = (agent: Agent, floor: Floor | undefined): FormValues => ({
   monthlyTokenCap: capValue(agent.tokenCaps.monthly),
   freshStartThreshold: capValue(agent.freshStartThreshold),
   requiredReviewer: requires(floor, agent),
+  sizes: [...agent.sizes],
 });
 
 /** The Floor's required reviewers with `agent` added or taken away. */
@@ -103,7 +110,9 @@ function changesOf(agent: Agent, values: FormValues): Record<string, unknown> {
     daily: capOf(values.dailyTokenCap),
     monthly: capOf(values.monthlyTokenCap),
   };
+  const sizes = issueSizes.filter((size) => values.sizes.includes(size));
   return {
+    ...(sizes.join(",") === agent.sizes.join(",") ? {} : { sizes }),
     ...Object.fromEntries(
       Object.entries(next).filter(
         ([key, value]) => agent[key as keyof typeof next] !== value,
@@ -436,6 +445,40 @@ export function AgentEditor({
               approval. The Floor always has at least one.
             </p>
           </div>
+        )}
+        {agent.stage !== null && (
+          <fieldset
+            className="space-y-2 sm:col-span-2"
+            aria-describedby={id("sizes-hint")}
+          >
+            <legend className="text-sm leading-none font-medium">
+              Sizes {pronouns.subject} takes
+            </legend>
+            <div className="flex flex-wrap gap-x-6 gap-y-2 pt-2">
+              {issueSizes.map((size) => (
+                <div key={size} className="flex items-center gap-2">
+                  <input
+                    id={id(`size-${size}`)}
+                    type="checkbox"
+                    className="size-4"
+                    value={size}
+                    {...register("sizes")}
+                  />
+                  <Label htmlFor={id(`size-${size}`)}>
+                    {issueSizeLabels[size]}
+                  </Label>
+                </div>
+              ))}
+            </div>
+            <p id={id("sizes-hint")} className="text-xs text-muted-foreground">
+              Work on an issue of another Size goes to the{" "}
+              {agent.stage === "review"
+                ? "Floor's other required reviewers"
+                : "Role's other Agents"}{" "}
+              that take it, unless none does. Smaller issues can go to Agents on
+              cheaper Models.
+            </p>
+          </fieldset>
         )}
         {(["daily", "monthly"] as const).map((period) => {
           const use = capUse?.[period];

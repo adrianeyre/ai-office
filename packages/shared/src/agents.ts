@@ -6,6 +6,22 @@ import { agentModelSchema } from "./decision-model.ts";
 import { maxMostAgents } from "./floors.ts";
 import { managerRole, roleIdSchema, stages } from "./roles.ts";
 import { tokenCapSchema, tokenCapsSchema } from "./token-caps.ts";
+import { issueSizes, type IssueSize } from "./triage.ts";
+
+/**
+ * The Sizes an Agent takes (Scorecards PRD, FR-133): at least one, each
+ * once, in the order small, medium, large; all three by default.
+ */
+export const agentSizesSchema = z
+  .array(
+    z.enum(issueSizes, { error: 'A Size is "small", "medium" or "large".' }),
+    { error: "The Sizes an Agent takes are a list." },
+  )
+  .min(1, { error: "An Agent takes issues of at least one Size." })
+  .transform((sizes) => issueSizes.filter((size) => sizes.includes(size)));
+
+/** What a new Agent takes: every Size. */
+export const allSizes: readonly IssueSize[] = issueSizes;
 
 // Agents and Roles (PRD §6.3), as the API sends them. The server, the web
 // app and the event schema share these.
@@ -177,6 +193,8 @@ export const agentSchema = z.object({
   leavingAt: z.iso.datetime({ offset: true }).nullable(),
   /** Null for an ordinary Agent; what it is there for, for a Contractor. */
   contractor: contractorSchema.nullable(),
+  /** The Sizes of issues it takes, at every Stage (FR-133). */
+  sizes: z.array(z.enum(issueSizes)),
 });
 export type Agent = z.infer<typeof agentSchema>;
 
@@ -210,6 +228,8 @@ export const updateAgentRequestSchema = z
     tokenCaps: tokenCapsSchema,
     /** Its own Fresh Start threshold in percent; null uses its Floor's. */
     freshStartThreshold: freshStartThresholdSchema.nullable(),
+    /** The Sizes of issues it takes, at least one (FR-133). */
+    sizes: agentSizesSchema,
     /**
      * Its Avatar, from the Avatar Editor (FR-13): how it looks in the
      * Office, at once. It never changes how it works.

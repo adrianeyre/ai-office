@@ -3,6 +3,7 @@ import {
   analyticsDimensions,
   gatewayEndpoints,
   googleRedirectPath,
+  scorecardDimensions,
   skillNamePattern,
 } from "@ai-office/shared";
 import {
@@ -639,13 +640,18 @@ const gatewayRequestRoute = createRoute({
   },
 });
 
-/** The analytics dashboards' search: the range, and the breakdown. */
+/**
+ * The analytics dashboards' search: the range, the breakdown, and the
+ * Scorecard's "by" and Agent (Scorecards PRD, FR-130, FR-131).
+ */
 const analyticsSearchSchema = z.object({
   range: z
     .enum(Object.keys(analyticsRanges) as [AnalyticsRange, ...AnalyticsRange[]])
     .optional()
     .catch(undefined),
   by: z.enum(analyticsDimensions).optional().catch(undefined),
+  scorecard: z.enum(scorecardDimensions).optional().catch(undefined),
+  agent: z.string().min(1).max(200).optional().catch(undefined),
 });
 
 const analyticsRoute = createRoute({
@@ -655,12 +661,14 @@ const analyticsRoute = createRoute({
   validateSearch: (search) => analyticsSearchSchema.parse(search),
   component: function AnalyticsRoute() {
     const search: unknown = analyticsRoute.useSearch();
-    const { range, by } = analyticsSearchSchema.parse(search);
+    const { range, by, scorecard, agent } = analyticsSearchSchema.parse(search);
     const navigate = analyticsRoute.useNavigate();
     return (
       <AnalyticsPage
         range={range ?? "7d"}
         by={by ?? "model"}
+        scorecard={scorecard ?? "agent"}
+        agent={agent}
         onChange={(next) => {
           void navigate({ search: next });
         }}

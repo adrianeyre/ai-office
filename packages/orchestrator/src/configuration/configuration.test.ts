@@ -187,6 +187,8 @@ async function configure(source: Office): Promise<void> {
       extraInstructions: "Keep functions small.",
       tokenCaps: { daily: 300_000, monthly: null },
       freshStartThreshold: 70,
+      // The Sizes it takes (Scorecards PRD, FR-133).
+      sizes: ["medium", "large"],
     }),
   ).toBe("updated");
   expect(
@@ -605,6 +607,14 @@ const cases: Case[] = [
         floor("web-shop")?.agents.find(({ name }) => name === "Ada Lovelace")
           ?.freshStartThreshold,
       ).toBe(70);
+      expect(
+        floor("web-shop")?.agents.find(({ name }) => name === "Ada Lovelace")
+          ?.sizes,
+      ).toEqual(["medium", "large"]);
+      expect(
+        floor("web-shop")?.agents.find(({ name }) => name === "Linus Torvalds")
+          ?.sizes,
+      ).toEqual(["small", "medium", "large"]);
       expect(floor("web-shop")?.roleMemory).toHaveLength(2);
       expect(floor("web-shop")?.skillToggles).toHaveLength(2);
       expect(

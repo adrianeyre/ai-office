@@ -23,6 +23,7 @@ import {
 } from "@ai-office/shared";
 
 import { modelOf } from "../agents/agents.ts";
+import { noneTakes } from "./dispatch.ts";
 import type { AgentRecord, AgentStore } from "../agents/store.ts";
 import type { DefaultModels } from "../ai-providers/ai-providers.ts";
 import type {
@@ -698,6 +699,33 @@ export function createTriage(options: TriageOptions): Triage {
     }
   };
 
+  /**
+   * When none of the Agents that may work the issue takes its Size
+   * (FR-133), any of them may, and the triage comment says so.
+   */
+  const sizeNote = async (
+    floor: FloorRecord,
+    routing: Routing,
+    size: IssueSize | null,
+  ): Promise<string[]> => {
+    if (size === null || routing.kind === "ask") {
+      return [];
+    }
+    const role = routing.kind === "none" ? undefined : routing.role;
+    const workers = (await options.agents.list(floor.id)).filter(
+      (agent) =>
+        agent.stage === "work" &&
+        (role === undefined || agent.role === role.id),
+    );
+    if (!noneTakes(workers, size)) {
+      return [];
+    }
+    const who = role === undefined ? "work" : role.name;
+    return [
+      `None of the Floor's ${who} Agents takes **${size}** issues, so any of them may work it.`,
+    ];
+  };
+
   /** A comment of AI Office's triage, from sections of lines. */
   const commentOf = (...sections: readonly string[][]): string =>
     redactor.redactText(
@@ -791,6 +819,7 @@ export function createTriage(options: TriageOptions): Triage {
     before: string[],
   ): Promise<TriageDecision> => {
     const lines = routingLines(manager, routing);
+    const note = await sizeNote(floor, routing, base.size);
     if (routing.kind === "ask") {
       const notice = await notices.raise({
         kind: "action",
@@ -814,7 +843,7 @@ export function createTriage(options: TriageOptions): Triage {
         role: null,
         candidates: routing.candidates.map(({ id }) => id),
       });
-      await comment(floor, issue.number, commentOf(before, lines));
+      await comment(floor, issue.number, commentOf(before, lines, note));
       return { proceed: false };
     }
     await store.put({
@@ -833,8 +862,8 @@ export function createTriage(options: TriageOptions): Triage {
         routing.kind === "planned" ? "plan" : routing.by,
       );
     }
-    if (before.length > 0 || lines.length > 0) {
-      await comment(floor, issue.number, commentOf(before, lines));
+    if (before.length > 0 || lines.length > 0 || note.length > 0) {
+      await comment(floor, issue.number, commentOf(before, lines, note));
     }
     return { proceed: true, priority: base.priority };
   };

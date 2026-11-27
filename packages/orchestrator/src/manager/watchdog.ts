@@ -7,6 +7,7 @@ import {
   defaultMaxStallRestarts,
   defaultStallTimeoutMinutes,
   managerActionLabels,
+  type IssueSize,
   type ManagerAction,
   type PipelineStage,
   type Redactor,
@@ -132,6 +133,14 @@ export interface WatchdogOptions {
   readonly decisions: DecisionStore;
   /** The Agents paused at a Token Cap: never free to take work. */
   readonly pausedAgents?: () => readonly string[];
+  /**
+   * An issue's Size (Scorecards PRD, FR-133): work it reassigns goes only
+   * to an Agent that takes it, when any of those it may go to does.
+   */
+  readonly issueSize?: (
+    floorId: string,
+    issue: number,
+  ) => Promise<IssueSize | null>;
   readonly limits?: Partial<WatchdogLimits>;
   /**
    * The Owner's time limits (General Settings), read at each check: work
@@ -541,6 +550,7 @@ export function createWatchdog(options: WatchdogOptions): Watchdog {
         [...paused(), ...chosen],
         item.agentId,
         workRoleOf(team, item),
+        (await options.issueSize?.(floor.id, item.issue)) ?? null,
       );
       if (other !== null) {
         chosen.push(other);
@@ -661,6 +671,7 @@ export function createWatchdog(options: WatchdogOptions): Watchdog {
         [...paused(), ...chosen],
         latest.agentId,
         workRoleOf(team, latest),
+        (await options.issueSize?.(floor.id, latest.issue)) ?? null,
       );
       if (other !== null) {
         chosen.push(other);

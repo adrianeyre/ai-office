@@ -150,6 +150,7 @@ async function setUp(
     events: bus,
     limit: () => Promise.resolve(3),
     issuePriority: (floorId, issue) => triage.priority(floorId, issue),
+    issueSize: (floorId, issue) => triage.size(floorId, issue),
   });
   const intake = createIntake({
     floors: stores.floors,
@@ -886,6 +887,81 @@ const cases: Case[] = [
       expect(await setup.triaged()).toMatchObject([
         { size: "medium", judgedBy: "rules" },
       ]);
+    },
+  ],
+  [
+    "dispatches by Size: a small issue goes to the coder that takes small issues, another waits for it while it is busy, and with no coder taking its Size any coder works it, as the triage comment says (Scorecards PRD, FR-133)",
+    async (setup) => {
+      const { github, model, manager, intake, stores, workStore } = setup;
+      const [ada] = (await stores.agents.list("web-shop")).filter(
+        ({ role }) => role === "coder",
+      );
+      if (ada === undefined) {
+        throw new Error("A new Floor has a coder.");
+      }
+      // Ada on Opus takes medium and large issues; Hal on Haiku, small.
+      await stores.agents.update({ ...ada, sizes: ["medium", "large"] });
+      const hal = {
+        ...ada,
+        id: "web-shop-hal",
+        name: "Hal Haiku",
+        modelOverride: "claude-haiku-5-5",
+        sizes: ["small" as const],
+        createdAt: new Date("2026-10-09T13:00:00.000Z"),
+      };
+      expect(await stores.agents.create(hal)).toBe("created");
+      const answer = (size: "small" | "medium" | "large") =>
+        triageAnswer({
+          clear: true,
+          priority: "normal",
+          size,
+          reason: "Clear.",
+        });
+      const typo = github.createIssue(webShop, {
+        ...clearIssue,
+        title: "Fix a typo in the footer",
+      });
+      const another = github.createIssue(webShop, {
+        ...clearIssue,
+        title: "Fix another typo",
+      });
+      model.answer(manager.id, answer("small"), answer("small"));
+      await intake.poll();
+      const queuedFor = async () =>
+        Object.fromEntries(
+          (await workStore.active()).map(({ issue, agentId }) => [
+            issue,
+            agentId,
+          ]),
+        );
+      // Both small: Hal's, the second waiting behind the first, though
+      // Ada is free.
+      expect(await queuedFor()).toEqual({
+        [typo.number]: hal.id,
+        [another.number]: hal.id,
+      });
+
+      // No coder takes large issues once Ada takes only medium ones: any
+      // coder may, and the triage comment says so.
+      await stores.agents.update({
+        ...((await stores.agents.list("web-shop")).find(
+          ({ id }) => id === ada.id,
+        ) ?? ada),
+        sizes: ["medium"],
+      });
+      const big = github.createIssue(webShop, {
+        ...clearIssue,
+        title: "Rework the checkout",
+      });
+      model.answer(manager.id, answer("large"));
+      await intake.poll();
+      expect((await queuedFor())[big.number]).toBe(ada.id);
+      expect((await setup.comments(big.number))[0]).toContain(
+        "None of the Floor's coder Agents takes **large** issues, so any of them may work it.",
+      );
+      expect((await setup.comments(typo.number))[0]).not.toContain(
+        "None of the Floor's",
+      );
     },
   ],
   [

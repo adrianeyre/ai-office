@@ -12,6 +12,7 @@ import {
 import {
   mergeActions,
   mergePolicyOverrides,
+  type IssueSize,
   type MergePolicy,
 } from "@ai-office/shared";
 
@@ -34,6 +35,7 @@ import {
   positionOf,
   type Pipeline,
 } from "../pipeline/pipeline.ts";
+import { reviewersFor } from "../manager/dispatch.ts";
 import { everyRoundLinks } from "../qa/caps.ts";
 import { reviewersDiffLimit } from "../review/diff-limit.ts";
 import type { DiffLimit } from "../review/prompt.ts";
@@ -173,6 +175,15 @@ export interface MergeFlowOptions {
    * review Stage does.
    */
   readonly contextWindow?: ContextWindowOf;
+  /**
+   * An issue's Size (Scorecards PRD, FR-133): the gate asks for the
+   * approval of the required reviewers that take it, as its rounds were
+   * reviewed by them.
+   */
+  readonly issueSize?: (
+    floorId: string,
+    issue: number,
+  ) => Promise<IssueSize | null>;
   /** How long to wait for CI; the defaults otherwise. */
   readonly ci?: Partial<CiWait>;
   /** Waits `ms`, or rejects once `signal` aborts. */
@@ -575,7 +586,11 @@ export function createMergeFlow(options: MergeFlowOptions): MergeFlow {
           : endOf(batch, issue.number);
       const input = {
         head: end ?? head,
-        reviewers: floor.requiredReviewerAgentIds.map((id) => ({
+        reviewers: reviewersFor(
+          floor.requiredReviewerAgentIds,
+          team,
+          (await options.issueSize?.(floor.id, issue.number)) ?? null,
+        ).map((id) => ({
           id,
           name: team.find((agent) => agent.id === id)?.name ?? id,
         })),

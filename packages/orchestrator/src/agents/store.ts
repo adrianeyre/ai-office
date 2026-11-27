@@ -4,8 +4,10 @@ import {
   contractorKinds,
   sameAvatar,
   stages,
+  issueSizes,
   type Avatar,
   type ContractorKind,
+  type IssueSize,
   type Role,
   type Stage,
 } from "@ai-office/shared";
@@ -75,6 +77,11 @@ export interface AgentRecord {
    * keeps it on the team, which makes it an ordinary Agent.
    */
   readonly contractor: ContractorRecord | null;
+  /**
+   * The Sizes of issues it takes, at every Stage (Scorecards PRD, FR-133):
+   * all three by default.
+   */
+  readonly sizes: readonly IssueSize[];
 }
 
 /** What adding an Agent did: added it, or found what was in the way. */
@@ -152,6 +159,7 @@ const configOf = (agent: AgentRecord) => ({
   enabled: agent.enabled,
   tokenCaps: agent.tokenCaps,
   freshStartThreshold: agent.freshStartThreshold,
+  sizes: [...agent.sizes],
   avatar: agent.avatar,
 });
 
@@ -325,6 +333,7 @@ const toRecord = (
   avatar: avatarSchema.parse(row.avatar),
   tokenCaps: { daily: row.dailyTokenCap, monthly: row.monthlyTokenCap },
   freshStartThreshold: row.freshStartThreshold,
+  sizes: issueSizes.filter((size) => row.sizes.includes(size)),
   createdAt: row.createdAt,
   leavingAt: row.leavingAt,
   contractor: contractorOf(
@@ -349,6 +358,7 @@ export const agentRow = (agent: AgentRecord): typeof agents.$inferInsert => ({
   dailyTokenCap: agent.tokenCaps.daily,
   monthlyTokenCap: agent.tokenCaps.monthly,
   freshStartThreshold: agent.freshStartThreshold,
+  sizes: [...agent.sizes],
   createdAt: agent.createdAt,
   leavingAt: agent.leavingAt,
   contractorKind: agent.contractor?.kind ?? null,

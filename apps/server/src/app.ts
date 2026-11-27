@@ -1132,6 +1132,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     batches: stores.batches,
     floors: stores.floors,
     plans: options.plans,
+    triage: stores.triage,
   });
   const gatewayKeys =
     options.gatewayKeys ??
@@ -1194,6 +1195,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     accounts: aiAccounts,
     floors: stores.floors,
     agents: stores.agents,
+    scorecards: stores.scorecards,
+    roles: stores.roles,
     now,
   });
   // Token accounting and caps (FR-31, FR-32), from the request history.

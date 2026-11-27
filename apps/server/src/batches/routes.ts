@@ -4,6 +4,7 @@ import {
   type AcknowledgementRecord,
   type BatchRecord,
   type BatchStore,
+  type TriageStore,
   type Batches,
   type FloorStore,
   type PlanRecord,
@@ -104,6 +105,8 @@ export function registerBatchRoutes(
     readonly floors: FloorStore;
     /** Edits and approves Plans; absent without the GitHub App. */
     readonly plans?: Pick<Batches, "edit" | "approve"> | undefined;
+    /** Each issue's triage, for its Size (Scorecards PRD, FR-134). */
+    readonly triage?: Pick<TriageStore, "get">;
   },
 ): void {
   const { batches, floors, plans } = options;
@@ -144,10 +147,18 @@ export function registerBatchRoutes(
     if (batch === undefined || found === undefined) {
       return undefined;
     }
-    return {
-      batch: found,
-      plans: (await batches.plans(batch.id)).map(planBody),
-    };
+    const all = (await batches.plans(batch.id)).map(planBody);
+    const issues = [
+      ...new Set(all.flatMap(({ items }) => items.map(({ issue }) => issue))),
+    ];
+    const sizes: BatchDetail["sizes"] = [];
+    for (const issue of issues) {
+      const size = (await options.triage?.get(floorId, issue))?.size;
+      if (size != null) {
+        sizes.push({ issue, size });
+      }
+    }
+    return { batch: found, plans: all, sizes };
   };
 
   /** Answers a refused edit or approval with its status. */

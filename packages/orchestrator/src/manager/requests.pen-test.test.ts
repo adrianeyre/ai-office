@@ -89,6 +89,7 @@ const manager: AgentRecord = {
   freshStartThreshold: null,
   createdAt: new Date(0),
   leavingAt: null,
+  sizes: ["small", "medium", "large"],
   contractor: null,
 };
 

@@ -118,6 +118,7 @@ const ada = {
   tokenCaps: { daily: null, monthly: null },
   createdAt: at(0),
   leavingAt: null,
+  sizes: ["small", "medium", "large"],
   contractor: null,
 };
 

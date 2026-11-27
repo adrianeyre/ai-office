@@ -2002,6 +2002,7 @@ describe("the Manager chat as an agent session (FR-24, ADR 0004)", () => {
       freshStartThreshold: null,
       createdAt: "2026-10-08T12:00:00.000Z",
       leavingAt: null,
+      sizes: ["small", "medium", "large"],
       contractor: null,
     };
     let current = manager;

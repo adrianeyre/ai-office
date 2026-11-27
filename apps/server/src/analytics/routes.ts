@@ -8,8 +8,20 @@ import {
   type AnalyticsNames,
   type RequestHistory,
 } from "@ai-office/gateway";
-import type { AgentStore, FloorStore } from "@ai-office/orchestrator";
 import {
+  agentScorecardOf,
+  scorecardOf,
+  type AgentStore,
+  type FloorStore,
+  type RoleStore,
+  type ScorecardStore,
+} from "@ai-office/orchestrator";
+import {
+  agentScorecardDays,
+  floorErrorCodes,
+  scorecardQuerySchema,
+  type AgentScorecard,
+  type Scorecard,
   analyticsBreakdownQuerySchema,
   analyticsRangeSchema,
   analyticsSeriesQuerySchema,
@@ -36,7 +48,13 @@ import { sendInvalidRequest } from "../auth/responses.ts";
 // - `GET /api/analytics/insights`: the top consumers, and the accounts
 //   close to their limits;
 // - `GET /api/analytics/usage-windows`: each account's usage-window
-//   readings.
+//   readings;
+// - `GET /api/analytics/scorecard?by=`: the Scorecard (Scorecards PRD,
+//   FR-128 to FR-130, FR-135), how the work of each Agent, Role, Model,
+//   Floor or Size turned out, from its own records, for the work that
+//   ended in the range; only one Agent's, with `agentId`;
+// - `GET /api/floors/:floorId/scorecards`: each of a Floor's Agents' one
+//   line, over the last 30 days (FR-131).
 // Every route needs a signed-in session.
 
 /** The most usage readings read per account. */
@@ -47,6 +65,10 @@ export interface AnalyticsRoutesOptions {
   readonly accounts: AiAccounts;
   readonly floors: FloorStore;
   readonly agents: AgentStore;
+  /** The Scorecard's records (FR-126); no Scorecard without them. */
+  readonly scorecards?: Pick<ScorecardStore, "list">;
+  /** The Role library, for the Roles' names. */
+  readonly roles?: Pick<RoleStore, "list">;
   readonly now: () => Date;
 }
 
@@ -145,6 +167,62 @@ export function registerAnalyticsRoutes(
       return {
         topConsumers: topConsumersOf(rows, named),
         accountsNearLimits: accountsNearLimits(all, options.now()),
+      };
+    },
+  );
+
+  app.get(
+    "/api/analytics/scorecard",
+    { config: { access: "owner" } },
+    async (request, reply): Promise<Scorecard> => {
+      const query = scorecardQuerySchema.safeParse(request.query);
+      if (!query.success) {
+        return sendInvalidRequest(reply, query.error);
+      }
+      const { by, agentId } = query.data;
+      const entries = (
+        (await options.scorecards?.list(
+          new Date(query.data.from),
+          new Date(query.data.to),
+        )) ?? []
+      ).filter((entry) => agentId === undefined || entry.agentId === agentId);
+      const floors = await options.floors.list({ includeArchived: true });
+      const floorNames = new Map(floors.map(({ id, name }) => [id, name]));
+      const roleNames = new Map(
+        ((await options.roles?.list()) ?? []).map(({ id, name }) => [id, name]),
+      );
+      return scorecardOf(entries, by, {
+        floor: (id) => floorNames.get(id) ?? id,
+        role: (id) => roleNames.get(id) ?? id,
+      });
+    },
+  );
+
+  app.get(
+    "/api/floors/:floorId/scorecards",
+    { config: { access: "owner" } },
+    async (request, reply): Promise<{ scorecards: AgentScorecard[] }> => {
+      const { floorId } = request.params as { floorId: string };
+      const floor = await options.floors.get(floorId);
+      if (floor === undefined) {
+        const error: ApiError = {
+          error: floorErrorCodes.floorNotFound,
+          message: "There is no such Floor.",
+        };
+        return reply.code(404).send(error);
+      }
+      const to = options.now();
+      const from = new Date(
+        to.getTime() - agentScorecardDays * 24 * 60 * 60 * 1000,
+      );
+      const entries = ((await options.scorecards?.list(from, to)) ?? []).filter(
+        (entry) => entry.floorId === floorId,
+      );
+      const team = await options.agents.list(floorId);
+      return {
+        scorecards: team
+          .filter(({ role }) => role !== "manager")
+          .map(({ id }) => agentScorecardOf(id, entries, agentScorecardDays)),
       };
     },
   );

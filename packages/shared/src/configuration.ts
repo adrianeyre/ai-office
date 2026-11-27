@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import { agentNameSchema, maxExtraInstructions } from "./agents.ts";
+import {
+  agentNameSchema,
+  agentSizesSchema,
+  allSizes,
+  maxExtraInstructions,
+} from "./agents.ts";
 import { avatarSchema } from "./avatar.ts";
 import { freshStartThresholdSchema } from "./context-usage.ts";
 import {
@@ -95,6 +100,11 @@ export const configurationAgentSchema = z.strictObject({
   tokenCaps: tokenCapsSchema,
   /** Its own Fresh Start threshold (FR-86); null for its Floor's. */
   freshStartThreshold: freshStartThresholdSchema.nullable(),
+  /**
+   * The Sizes it takes (Scorecards PRD, FR-133); every one in a document
+   * exported before Sizes.
+   */
+  sizes: agentSizesSchema.default([...allSizes]),
 });
 export type ConfigurationAgent = z.infer<typeof configurationAgentSchema>;
 

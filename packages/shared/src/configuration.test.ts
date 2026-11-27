@@ -28,6 +28,7 @@ const agent = (id: string, role: "manager" | "coder" | "reviewer") => ({
   avatar: randomAvatar(seededRandom(id), []),
   tokenCaps: { daily: null, monthly: null },
   freshStartThreshold: null,
+  sizes: ["small", "medium", "large"] as ("small" | "medium" | "large")[],
 });
 
 const floor = {
@@ -153,6 +154,25 @@ describe("a configuration export", () => {
         floors: [{ ...floor, ownerOnlyPaths: ["src/auth/**", "SRC/AUTH/**"] }],
       }),
     ).toEqual(["Give each Owner-only Path once."]);
+  });
+
+  it("reads an Agent exported before Sizes as taking every Size, and refuses one taking none", () => {
+    const [manager, ...rest] = floor.agents;
+    const before = Object.fromEntries(
+      Object.entries(manager ?? {}).filter(([key]) => key !== "sizes"),
+    );
+    expect(
+      configurationSchema.parse({
+        ...configuration,
+        floors: [{ ...floor, agents: [before, ...rest] }],
+      }).floors[0]?.agents[0]?.sizes,
+    ).toEqual(["small", "medium", "large"]);
+    expect(
+      problems({
+        ...configuration,
+        floors: [{ ...floor, agents: [{ ...manager, sizes: [] }, ...rest] }],
+      }),
+    ).toEqual(["An Agent takes issues of at least one Size."]);
   });
 
   it("carries each Floor's Hooks, reads an export made before them as having none, and names each once", () => {

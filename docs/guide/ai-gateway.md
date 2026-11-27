@@ -204,6 +204,8 @@ days (by the day), in UTC. The range is kept in the address
   as "Other"), and a table of all of them.
 - **Usage-window history**: each AI Account's five-hour and weekly
   windows over the range (the highest reading each hour or day).
+- **The [Scorecard](#the-scorecard)**: how the work of each Agent, Role,
+  Model, Floor or Size turned out, and what it cost.
 
 The charts follow the app's design system (`.viz` tokens in
 `apps/web/src/styles.css`, light and dark). Every chart has a legend when
@@ -230,7 +232,12 @@ under 768 px wide the widgets stack in one column and do not move.
     account there is none of), as AI Settings charts each account;
   - `GET /api/analytics/breakdown?from&to&by=ai_account|ai_provider|model|floor|agent|issue|owner_tool`;
   - `GET /api/analytics/insights?from&to`;
-  - `GET /api/analytics/usage-windows?from&to`.
+  - `GET /api/analytics/usage-windows?from&to`;
+  - `GET /api/analytics/scorecard?from&to&by=agent|role|model|floor|size`,
+    with `&agentId=<id>` for one Agent's records alone (see
+    [The Scorecard](#the-scorecard));
+  - `GET /api/floors/:floorId/scorecards`: each of a Floor's Agents'
+    one-line Scorecard, over the last 30 days.
 
   They roll up from one `GROUP BY` over `gateway_requests` per bucket,
   account, Model and caller. By the day, they add what requests deleted by
@@ -241,6 +248,59 @@ under 768 px wide the widgets stack in one column and do not move.
   carries `keepAliveRequests` and `keepAliveCostUsd`: the
   [prompt-cache keep-alives](#prompt-cache-keep-alive) among its requests,
   deleted ones included.
+
+#### The Scorecard
+
+Analytics shows what each Agent and Model costs; the **Scorecard** shows
+how their work turned out (Scorecards PRD, FR-126 to FR-131, FR-135;
+`scorecardOf` in `@ai-office/orchestrator`), so the Owner can compare
+Agents, Roles and Models by results and cost before choosing a Model for
+an Agent.
+
+- **What is recorded.** When a piece of work ends (its issue merged, by
+  the App or the Owner; handed to the Owner at `needs-human`; or closed
+  without being merged, which a sweep of the issues picked up in the last
+  30 days finds once an hour), AI Office records it in a store of its own,
+  `scorecard_records` (`createScorecardRecorder`): a row for each Agent
+  that worked a Stage of it (Contractors included, marked as such; the
+  Manager, which triages and plans, is not) and each Model that actually
+  served that Agent's requests on the issue. An Agent worked it when its
+  events say so (a sandbox started, a branch pushed, a pull request
+  opened, a review, a QA or design report, a Handoff) or its Gateway
+  requests name the issue. Each row keeps the outcome; the Review Loop
+  rounds until every reviewer approved; the QA rounds that failed; the
+  stalls and failures the watchdog recorded, each charged to the Agent
+  holding the work then (its `manager.decision`'s `fromAgentId`); for a
+  reviewer, the rounds it reviewed and its blocking comments; the tokens
+  and estimated cost of the Gateway requests naming the issue, by Agent
+  and Model as Analytics attributes them, summed while the requests are
+  kept (with what deleted ones used, by the day); and the issue's
+  [Size](issue-pipeline.md#size) from its triage. A piece of work that
+  ends again (handed to the Owner, then merged) is recorded afresh, in
+  place of what it had.
+- **Kept on its own.** The records have their own retention rule,
+  **Scorecard records** in General Settings' **Retention** card (365 days by
+  default, at least 90), and a row in **Storage** (see
+  [Retention](running.md#retention)), so the Scorecard outlives the events
+  (by default a year, at least 30 days) and Gateway requests (90 days) it
+  was built from.
+- **What it shows.** Two widgets on the Analytics grid, for the work that
+  ended in the page's range, each with its chart and its table view:
+  - **Work, QA and docs**: issues merged, mean Review Loop rounds until
+    approval, QA rounds failed, stalls and failures, issues handed to the
+    Owner, and tokens and estimated cost per merged issue. An issue's own
+    course (its outcome, rounds and QA) counts once in a group however
+    many of its rows the group holds.
+  - **Reviewers**: rounds reviewed, blocking comments, and blocking
+    comments per round.
+- **By Agent, Role, Model, Floor or Size**, chosen beside it and kept in
+  the address (`?scorecard=model`). Work counts toward the Model that
+  served it. By Size, smallest first, with **No Size** for work triaged
+  before Sizes.
+- **On each Agent's card**: see [Floors and Agents](floors-and-agents.md).
+  Its link opens the Scorecard for the last 30 days filtered to that Agent
+  (`?range=30d&scorecard=agent&agent=<id>`), with **Show everyone** to
+  see the rest.
 
 ### Request history and live streams
 

@@ -299,6 +299,35 @@ const cases: Case[] = [
     },
   ],
   [
+    "sets the Sizes an Agent takes, all three at first (Scorecards PRD, FR-133)",
+    async (setup) => {
+      const { server, owner, bus } = setup;
+      const [, coder] = await webShop(setup);
+      if (coder === undefined) {
+        throw new Error("The Floor has no coder.");
+      }
+      expect(coder.sizes).toEqual(["small", "medium", "large"]);
+      const response = await server.inject({
+        method: "PATCH",
+        url: `/api/floors/web-shop/agents/${coder.id}`,
+        headers: owner.headers,
+        // In any order, each once: kept smallest first.
+        payload: { sizes: ["large", "small", "large"] },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(agentSchema.parse(response.json()).sizes).toEqual([
+        "small",
+        "large",
+      ]);
+      expect(
+        (await bus.eventsAfter(0))
+          .map(({ event }) => event)
+          .filter((event) => event.type === "config.changed")
+          .at(-1),
+      ).toMatchObject({ scope: "agent", agentId: coder.id, keys: ["sizes"] });
+    },
+  ],
+  [
     "refuses what the Agent editor may not set",
     async (setup) => {
       const { server, owner } = setup;
@@ -363,6 +392,9 @@ const cases: Case[] = [
         400,
         "invalid_request",
       );
+      // At least one Size, each one of the three (FR-133).
+      await refused({ sizes: [] }, 400, "invalid_request");
+      await refused({ sizes: ["huge"] }, 400, "invalid_request");
       await refused({ enabled: false }, 404, "agent_not_found", "nobody");
       await refused(
         { enabled: false },

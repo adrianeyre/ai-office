@@ -170,6 +170,7 @@ function stubServer(initial: Notice[]) {
                 tokenCaps: { daily: null, monthly: null },
                 createdAt: "2026-10-08T12:00:00.000Z",
                 leavingAt: null,
+                sizes: ["small", "medium", "large"],
                 contractor: null,
               },
             ],

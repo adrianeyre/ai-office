@@ -63,6 +63,7 @@ const agent = (id: string, name: string, role: string) => ({
   freshStartThreshold: null,
   createdAt: "2026-10-01T00:00:00.000Z",
   leavingAt: null,
+  sizes: ["small", "medium", "large"],
   contractor: null,
 });
 

@@ -721,12 +721,21 @@ carries on as it began.
   Gateway Key calls no model while it is paused (pen-testing G1-4), so
   work it had running stops at its next model call. Enabled again, the
   same key works again.
+- **The Sizes it takes** (Scorecards PRD, FR-133): small, medium or large,
+  at least one; all three by default, and for the Manager none applies.
+  Each issue gets its [Size at triage](issue-pipeline.md#size), and
+  dispatch gives an issue's work, at every Stage, only to Agents of its
+  Role that take its Size ([the work queue](issue-pipeline.md#the-work-queue)),
+  so a coder on a cheap Model can take only small issues while one on a
+  frontier Model takes the rest. The Scorecard, by Size, shows how that
+  holds up ([The Scorecard](ai-gateway.md#the-scorecard)).
 
 The editor speaks of the Agent as he, she or they, following its Avatar's
 presentation (FR-14). `PATCH /api/floors/:floorId/agents/:agentId` takes
 any of `name`, `aiProvider`, `modelOverride` (null for the default),
-`effort` (null for the default), `extraInstructions`, `enabled` and
-`avatar` (from the [Avatar Editor](#the-avatar-editor)), and
+`effort` (null for the default), `extraInstructions`, `enabled`, `sizes`
+(`["small"]`, say; at least one) and `avatar` (from the
+[Avatar Editor](#the-avatar-editor)), and
 answers the Agent. Each change is a `config.changed` event (scope
 `agent`) naming the settings, never their values. Agents on an archived
 Floor cannot be edited.
@@ -782,7 +791,13 @@ opening on wherever the lift is; its **Floor** list picks the lobby or
 another Floor (`?floor=web-shop`, `?floor=lobby`).
 
 - **On a Floor**, each Agent's card gives its Role, sex, AI Provider and
-  Model, whether it is enabled, and its Token Caps. **Edit Ada's
+  Model, whether it is enabled, and its Token Caps, and, but for the
+  Manager's, a one-line [Scorecard](ai-gateway.md#the-scorecard) for the
+  last 30 days (Scorecards PRD, FR-131): "12 merged · 1.4 rounds · $0.38
+  an issue" for work, QA and docs, "11 rounds reviewed · 0.6 blocking a
+  round" for a reviewer, or "No finished work in the last 30 days". It
+  links to the Scorecard on Analytics, last 30 days, filtered to that
+  Agent, so the Owner sees how its Model is doing where they choose it. **Edit Ada's
   settings** opens the [Agent editor](#the-agent-editor) (name, AI
   Provider, Model, effort, Token Caps, Fresh Start threshold, extra
   instructions, enabled or paused); **Edit Ada's Avatar** opens the

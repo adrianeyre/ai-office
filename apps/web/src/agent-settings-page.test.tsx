@@ -81,6 +81,7 @@ const agent = (
   tokenCaps: { daily: 200_000, monthly: null },
   createdAt: "2026-10-08T12:00:00.000Z",
   leavingAt: null,
+  sizes: ["small", "medium", "large"],
   contractor: null,
 });
 
@@ -190,6 +191,47 @@ function stubServer() {
           );
         case "/api/floors/web-shop/agents":
           return Promise.resolve(Response.json({ agents: team }));
+        // Each Agent's one-line Scorecard (Scorecards PRD, FR-131).
+        case "/api/floors/web-shop/scorecards":
+          return Promise.resolve(
+            Response.json({
+              scorecards: [
+                {
+                  agentId: "ada",
+                  days: 30,
+                  stage: "work",
+                  issues: 13,
+                  issuesMerged: 12,
+                  meanRoundsToApproval: 1.4,
+                  costPerMergedIssue: 0.38,
+                  roundsReviewed: 0,
+                  blockingPerRound: null,
+                },
+                {
+                  agentId: "rex",
+                  days: 30,
+                  stage: "review",
+                  issues: 9,
+                  issuesMerged: 0,
+                  meanRoundsToApproval: null,
+                  costPerMergedIssue: null,
+                  roundsReviewed: 11,
+                  blockingPerRound: 0.6,
+                },
+                {
+                  agentId: "sam",
+                  days: 30,
+                  stage: null,
+                  issues: 0,
+                  issuesMerged: 0,
+                  meanRoundsToApproval: null,
+                  costPerMergedIssue: null,
+                  roundsReviewed: 0,
+                  blockingPerRound: null,
+                },
+              ],
+            }),
+          );
         case "/api/roles":
           return Promise.resolve(
             Response.json({
@@ -406,6 +448,39 @@ describe("Agent Settings", () => {
     expect(screen.queryByRole("form", { name: "Edit Ada" })).toBeNull();
   });
 
+  it("shows each Agent's one-line Scorecard for the last 30 days, linking to the Scorecard filtered to it (Scorecards PRD, FR-131)", async () => {
+    stubServer();
+    renderAt("/agent-settings?floor=web-shop&agent=ada");
+    const line = await screen.findByRole("link", {
+      name: "Ada's Scorecard, last 30 days: 12 merged · 1.4 rounds · $0.38 an issue",
+    });
+    expect(line.textContent).toBe("12 merged · 1.4 rounds · $0.38 an issue");
+    expect(line.getAttribute("href")).toBe(
+      "/analytics?range=30d&scorecard=agent&agent=ada",
+    );
+    // A reviewer's line is its rounds and blocking comments.
+    await userEvent.click(screen.getByRole("tab", { name: "Rex" }));
+    expect(
+      (
+        await screen.findByRole("link", {
+          name: /^Rex's Scorecard, last 30 days/,
+        })
+      ).textContent,
+    ).toBe("11 rounds reviewed · 0.6 blocking a round");
+    // An Agent with no finished work says so.
+    const tabs = within(
+      screen.getByRole("tablist", { name: "Agents on Web shop" }),
+    );
+    await userEvent.click(tabs.getByRole("tab", { name: "Sam" }));
+    expect(
+      (
+        await screen.findByRole("link", {
+          name: /^Sam's Scorecard, last 30 days/,
+        })
+      ).textContent,
+    ).toBe("No finished work in the last 30 days");
+  });
+
   it("opens the tab of the Agent the address names", async () => {
     stubServer();
     renderAt("/agent-settings?floor=web-shop&agent=rex");
@@ -466,6 +541,35 @@ describe("an Agent's settings in Agent Settings", () => {
     expect(
       rex.getByRole("checkbox", { name: "Required reviewer" }),
     ).toBeDefined();
+  });
+
+  it("chooses the Sizes an Agent takes, all three at first, and at least one (Scorecards PRD, FR-133)", async () => {
+    const { patches } = stubServer();
+    renderAt("/agent-settings?floor=web-shop");
+    const ada = await editorOf("Ada");
+    const sizes = within(ada.getByRole("group", { name: "Sizes she takes" }));
+    const box = (name: string) =>
+      sizes.getByRole<HTMLInputElement>("checkbox", { name });
+    expect(
+      ["Small", "Medium", "Large"].map((name) => box(name).checked),
+    ).toEqual([true, true, true]);
+    // Taking none is refused before anything is sent.
+    for (const name of ["Small", "Medium", "Large"]) {
+      await userEvent.click(box(name));
+    }
+    await userEvent.click(ada.getByRole("button", { name: "Save Ada" }));
+    expect((await ada.findByRole("alert")).textContent).toContain(
+      "An Agent takes issues of at least one Size.",
+    );
+    expect(patches).toEqual([]);
+    // Small issues only: what a cheap Model's coder takes.
+    await userEvent.click(box("Small"));
+    await userEvent.click(ada.getByRole("button", { name: "Save Ada" }));
+    await waitFor(() => {
+      expect(patches).toEqual([
+        { url: "/api/floors/web-shop/agents/ada", body: { sizes: ["small"] } },
+      ]);
+    });
   });
 
   it("puts an Agent on any AI Provider, with whichever one's default Model and effort", async () => {

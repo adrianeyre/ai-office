@@ -1030,6 +1030,14 @@ export const agents = pgTable(
      * (FR-86); null uses its Floor's.
      */
     freshStartThreshold: integer("fresh_start_threshold"),
+    /**
+     * The Sizes of issues it takes, at every Stage (Scorecards PRD,
+     * FR-133): all three by default.
+     */
+    sizes: text("sizes")
+      .array()
+      .notNull()
+      .default(sql`'{small,medium,large}'`),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     /**
      * When the Owner removed it while it was in the middle of a task
@@ -1052,6 +1060,10 @@ export const agents = pgTable(
     }).references((): AnyPgColumn => batches.id),
   },
   (table) => [
+    check(
+      "agents_sizes",
+      sql`cardinality(${table.sizes}) >= 1 AND ${table.sizes} <@ ARRAY['small', 'medium', 'large']::text[]`,
+    ),
     check(
       "agents_contractor_kind",
       sql`${table.contractorKind} IS NULL OR ${table.contractorKind} IN ('work', 'research')`,

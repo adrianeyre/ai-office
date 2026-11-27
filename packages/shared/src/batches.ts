@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { maxCommandIssues, maxIssueNumber } from "./manager-chat.ts";
+import { issueSizes } from "./triage.ts";
 
 // Batches and Plans (PRD FR-25, §5 scenario 1). A Batch is the set of
 // issues the Owner hands a Floor's Manager in one command, such as
@@ -407,6 +408,14 @@ export const batchDetailSchema = z.object({
   batch: batchSchema,
   /** Oldest version first. */
   plans: z.array(planSchema),
+  /**
+   * The Size each issue in the Plans was triaged at (Scorecards PRD,
+   * FR-134), for the whiteboard to flag one given to an Agent that does
+   * not take it; none for an issue not triaged yet.
+   */
+  sizes: z
+    .array(z.object({ issue: issueNumberSchema, size: z.enum(issueSizes) }))
+    .default([]),
 });
 export type BatchDetail = z.infer<typeof batchDetailSchema>;
 

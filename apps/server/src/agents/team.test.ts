@@ -229,6 +229,7 @@ const cases: Case[] = [
           tokenCaps: { daily: 50_000, monthly: null },
           enabled: true,
           leavingAt: null,
+          sizes: ["small", "medium", "large"],
         });
       }
       const all = await team(setup);
@@ -357,6 +358,7 @@ const cases: Case[] = [
         aiProvider: first.aiProvider,
         model: first.model,
         leavingAt: null,
+        sizes: ["small", "medium", "large"],
       });
       const designer = await server.inject({
         method: "POST",

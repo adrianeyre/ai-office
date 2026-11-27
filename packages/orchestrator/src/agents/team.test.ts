@@ -168,6 +168,7 @@ const cases: Case[] = [
           tokenCaps: { daily: 50_000, monthly: null },
           enabled: true,
           leavingAt: null,
+          sizes: ["small", "medium", "large"],
         });
       }
       const team = await agents.list("web-shop");

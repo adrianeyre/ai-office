@@ -301,6 +301,12 @@ panel (`Whiteboard` in `apps/web/src/whiteboard.tsx`).
   version, each saying how it came to be ("drafted", or "replanned after
   your edits to version 1", and whether by AI Office's rules). It
   changes live, on `batch.*` events.
+- **An issue given to an Agent that does not take its Size** (Scorecards
+  PRD, FR-134) is flagged on it, "Ada takes only small issues", with the
+  issue's Size from its triage (`sizes` in the Batch's detail). The Plan
+  stands as the Owner approves it: the flag is there to be seen before
+  approval, and dispatch follows the Plan (see
+  [dispatch by Size](issue-pipeline.md#the-work-queue)).
 - **A Grilling Session.** While one runs, the whiteboard shows it above
   the Plans: its live outline, the decisions settled so far and where its
   documents are kept (PRD FR-80; see

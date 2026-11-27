@@ -11,6 +11,7 @@ import {
   type AnalyticsDimension,
   type AnalyticsSeries,
   type AnalyticsTotals,
+  type ScorecardDimension,
 } from "@ai-office/shared";
 import {
   keepPreviousData,
@@ -45,6 +46,7 @@ import { AgentLink } from "./agent-link.tsx";
 import { getJson } from "./api.ts";
 import { useFloorNames } from "./floors.ts";
 import { currencyName, formatTotal, useMoney, type Money } from "./money.ts";
+import { scorecardWidgets } from "./scorecard.tsx";
 import { useStoredLayout, WidgetGrid, type Widget } from "./widget-grid.tsx";
 import type { WidgetLayout } from "./widget-layout.ts";
 
@@ -52,8 +54,10 @@ import type { WidgetLayout } from "./widget-layout.ts";
 // the headline totals; requests, tokens by type, estimated cost, latency
 // and error rate over time; a breakdown by AI Account, AI Provider, Model,
 // Floor, Agent, issue or Owner tool; insights (the top consumers, and the
-// AI Accounts close to their limits); and each account's usage-window
-// history. The range is the one filter, above everything it scopes.
+// AI Accounts close to their limits); each account's usage-window
+// history; and the Scorecard (Scorecards PRD, FR-130), how the work of
+// each Agent, Role, Model, Floor or Size turned out. The range is the one
+// filter, above everything it scopes.
 
 /** The ranges the dashboard offers, newest last. */
 export const analyticsRanges = {
@@ -945,19 +949,43 @@ export const defaultAnalyticsLayout: WidgetLayout = {
   models: { x: 0, y: 73, w: 12, h: 8 },
   breakdown: { x: 0, y: 81, w: 12, h: 6 },
   "usage-windows": { x: 0, y: 87, w: 12, h: 9 },
+  "scorecard-work": { x: 0, y: 96, w: 12, h: 11 },
+  "scorecard-review": { x: 0, y: 107, w: 12, h: 9 },
 };
+
+/** What the page's address says: the range, the breakdown, the Scorecard's. */
+export interface AnalyticsView {
+  readonly range: AnalyticsRange;
+  readonly by: AnalyticsDimension;
+  /** The Scorecard's "by" (FR-130). */
+  readonly scorecard?: ScorecardDimension | undefined;
+  /** Only this Agent's Scorecard, from its card (FR-131). */
+  readonly agent?: string | undefined;
+}
 
 export function AnalyticsPage({
   range,
   by,
+  scorecard = "agent",
+  agent,
   onChange,
   now = () => new Date(),
 }: {
   range: AnalyticsRange;
   by: AnalyticsDimension;
-  onChange: (next: { range: AnalyticsRange; by: AnalyticsDimension }) => void;
+  scorecard?: ScorecardDimension;
+  agent?: string | undefined;
+  onChange: (next: AnalyticsView) => void;
   now?: () => Date;
 }) {
+  /** The view, as it is now, with `changes`. */
+  const view = (changes: Partial<AnalyticsView>): AnalyticsView => ({
+    range,
+    by,
+    scorecard,
+    ...(agent === undefined ? {} : { agent }),
+    ...changes,
+  });
   // The bounds stay put while the page is open, so queries do not chase
   // the clock; choosing a range again reads afresh.
   const [anchor, setAnchor] = useState(now);
@@ -992,7 +1020,7 @@ export function AnalyticsPage({
             aria-pressed={key === range}
             onClick={() => {
               setAnchor(now());
-              onChange({ range: key, by });
+              onChange(view({ range: key }));
             }}
             className={cn(
               "font-normal",
@@ -1127,7 +1155,7 @@ export function AnalyticsPage({
                 to={to}
                 by={by}
                 onByChange={(next) => {
-                  onChange({ range, by: next });
+                  onChange(view({ by: next }));
                 }}
               />
             ),
@@ -1143,6 +1171,18 @@ export function AnalyticsPage({
                   ),
                 },
               ]),
+          ...scorecardWidgets({
+            from,
+            to,
+            by: scorecard,
+            agentId: agent,
+            onByChange: (next) => {
+              onChange(view({ scorecard: next }));
+            },
+            onShowEveryone: () => {
+              onChange({ range, by, scorecard });
+            },
+          }),
         ]}
       />
     </section>

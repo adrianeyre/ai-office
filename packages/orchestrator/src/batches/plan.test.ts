@@ -51,6 +51,7 @@ const agent = (
   tokenCaps: { daily: null, monthly: null },
   createdAt: new Date("2026-10-09T09:00:00.000Z"),
   leavingAt: null,
+  sizes: ["small", "medium", "large"],
   contractor: null,
   ...overrides,
 });

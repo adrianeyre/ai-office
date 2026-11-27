@@ -1548,6 +1548,9 @@ export async function startOffice(
     // A diff too large for a reviewer's context window goes to the Owner.
     defaultModels: () => aiProviders.defaultModels(),
     contextWindow,
+    // The reviewers that take the issue's Size (Scorecards PRD, FR-133).
+    issueSize: async (floorId, issue) =>
+      (await stores.triage.get(floorId, issue))?.size ?? null,
   });
   // The turns of the work Roles a Plan gives an issue (PRD FR-25 (1)): the
   // coder flow hands it from one to the next, the Review Loop sends a fix
@@ -1605,6 +1608,8 @@ export async function startOffice(
               "needs-review": createReviewFlow({
                 floors: stores.floors,
                 agents: workingAgents,
+                issueSize: async (floorId, issue) =>
+                  (await stores.triage.get(floorId, issue))?.size ?? null,
                 github: stageGitHub,
                 pipeline,
                 notices,
@@ -1800,6 +1805,8 @@ export async function startOffice(
     // the one its triage chose.
     issueRole: async (floorId: string, issue: number) =>
       (await turns.role(floorId, issue)) ?? triage.role(floorId, issue),
+    // Its Size from its triage (Scorecards PRD, FR-133).
+    issueSize: (floorId: string, issue: number) => triage.size(floorId, issue),
     onError: (error) => {
       logger.error({ err: error }, "The work queue failed.");
     },
@@ -1841,6 +1848,7 @@ export async function startOffice(
           events,
           decisions: stores.decisions,
           pausedAgents: () => capEnforcement.pausedAgents(),
+          issueSize: (floorId, issue) => triage.size(floorId, issue),
           // The Owner's stall timeouts, read at each check.
           timeLimits: () => officeSettings.watchdogSettings(),
           redactor,

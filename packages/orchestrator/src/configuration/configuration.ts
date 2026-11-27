@@ -169,6 +169,7 @@ const agentOf = (agent: AgentRecord): ConfigurationAgent => ({
   avatar: agent.avatar,
   tokenCaps: agent.tokenCaps,
   freshStartThreshold: agent.freshStartThreshold,
+  sizes: [...agent.sizes],
 });
 
 /** A library Role as a document has it. */

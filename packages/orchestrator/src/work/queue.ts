@@ -3,6 +3,7 @@ import {
   defaultIssuePriority,
   sandboxStages,
   type IssuePriority,
+  type IssueSize,
   type PipelineStage,
   type Role,
 } from "@ai-office/shared";
@@ -136,6 +137,15 @@ export interface WorkQueueOptions {
     floorId: string,
     issue: number,
   ) => Promise<string | null>;
+  /**
+   * An issue's Size, from the Manager's triage (Scorecards PRD, FR-133):
+   * its work at every Stage goes only to Agents that take it, when any
+   * of those it may go to does.
+   */
+  readonly issueSize?: (
+    floorId: string,
+    issue: number,
+  ) => Promise<IssueSize | null>;
   /** How often to look for work that can start, besides each change. */
   readonly pollMs?: number;
   readonly now?: () => Date;
@@ -207,6 +217,13 @@ export function createWorkQueue(options: WorkQueueOptions): WorkQueue {
       ? ((await options.issueRole?.(floorId, issue)) ?? null)
       : null;
 
+  /** The Size of an issue, for its work at every Stage (FR-133). */
+  const sizeFor = async (
+    floorId: string,
+    issue: number,
+  ): Promise<IssueSize | null> =>
+    (await options.issueSize?.(floorId, issue)) ?? null;
+
   /** The Agent the Manager dispatches new work to. */
   const assign = async (work: QueuedWork): Promise<string | null> =>
     chooseAgent(
@@ -215,6 +232,7 @@ export function createWorkQueue(options: WorkQueueOptions): WorkQueue {
       await store.active(),
       paused(),
       roleOfWork(work) ?? (await roleFor(work.floorId, work.issue, work.stage)),
+      await sizeFor(work.floorId, work.issue),
     );
 
   /**
@@ -261,16 +279,22 @@ export function createWorkQueue(options: WorkQueueOptions): WorkQueue {
           .flatMap(({ agentId }) => (agentId === null ? [] : [agentId])),
       );
       const roles = new Map<number, string | null>();
+      const sizes = new Map<number, IssueSize | null>();
       for (const item of onFloor) {
         if (item.status === "queued" && !roles.has(item.issue)) {
           roles.set(
             item.issue,
             await roleFor(floorId, item.issue, "needs-work"),
           );
+          sizes.set(item.issue, await sizeFor(floorId, item.issue));
         }
       }
-      const moves = rebalance(agents, onFloor, paused(), (issue) =>
-        roles.get(issue),
+      const moves = rebalance(
+        agents,
+        onFloor,
+        paused(),
+        (issue) => roles.get(issue),
+        (issue) => sizes.get(issue),
       );
       for (const move of moves) {
         if (!(await store.reassign(move.id, move.from, move.to))) {

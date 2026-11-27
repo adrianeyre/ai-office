@@ -547,6 +547,24 @@ restart (PRD FR-22).
   Each assignment is an `issue.assigned` event in the Activity Feed. An
   Agent works one task at a time, no work starts for a paused Agent, and
   `agent.queue_changed` records how many wait for each.
+- **By Size** (Scorecards PRD, FR-133). Each Agent takes the
+  [Sizes](#size) the Owner chose for it in the
+  [Agent editor](floors-and-agents.md#the-agent-editor), all three by
+  default. Of the Agents a piece of work may go to (its Stage's, within its
+  issue's work Role), dispatch gives it only to those that take its
+  issue's Size, at every Stage: work, QA, docs and review. When none of
+  them takes that Size, any of them may, and the issue's triage comment
+  says so ("None of the Floor's coder Agents takes **large** issues, so
+  any of them may work it."). When those that take it are busy, the work
+  waits for them: it never moves to a free Agent that does not take it,
+  nor does the watchdog reassign it to one. A review round is reviewed by
+  the required reviewers that take the issue's Size (every required
+  reviewer when none does), and the Merge Policy's gate asks for those
+  same reviewers' approval. An issue triaged before Sizes has none, and
+  goes to any Agent as before. A Plan drafted by AI Office's rules gives
+  an issue to a coder that takes its Size; a [Plan](batches-and-memory.md)
+  that gives it to one that does not stands, as the Owner approves it, but
+  the whiteboard flags it first ("Ada takes only small issues").
 - **Restarts and archiving.** Work left running by a server that
   stopped is queued again when it starts. Work on archived Floors does
   not start.
