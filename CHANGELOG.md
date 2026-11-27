@@ -1,3 +1,11 @@
+## [1.17.0](https://github.com/adrianeyre/ai-office/compare/v1.16.1...v1.17.0) (2026-11-27)
+
+### Features
+
+* Owner-only Paths, Scorecard records and Sizes at triage ([3f7541c](https://github.com/adrianeyre/ai-office/commit/3f7541c73e85007b57589edec9062392d16d1f22)), references [#55](https://github.com/adrianeyre/ai-office/issues/55) [#56](https://github.com/adrianeyre/ai-office/issues/56) [#57](https://github.com/adrianeyre/ai-office/issues/57)
+* Recurring Goals, whose Plan waits for the Owner ([e9a9f5c](https://github.com/adrianeyre/ai-office/commit/e9a9f5cb5c404e98109afff31be25bdf4541b827)), references [#58](https://github.com/adrianeyre/ai-office/issues/58) [#61](https://github.com/adrianeyre/ai-office/issues/61)
+* the Scorecard on Analytics and Agents' cards, and dispatch by Size ([c054ff8](https://github.com/adrianeyre/ai-office/commit/c054ff89f4ec9fa08460db1775b6d2e493569c1a)), references [#59](https://github.com/adrianeyre/ai-office/issues/59) [#60](https://github.com/adrianeyre/ai-office/issues/60) [#62](https://github.com/adrianeyre/ai-office/issues/62)
+
 ## [1.16.1](https://github.com/adrianeyre/ai-office/compare/v1.16.0...v1.16.1) (2026-11-25)
 
 ### Bug Fixes
