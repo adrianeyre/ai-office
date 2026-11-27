@@ -90,6 +90,10 @@ _Avoid_: Classifier, judge
 
 ## Work
 
+**Size**:
+How big an issue's change is (small, medium or large), judged when the issue is triaged. Each Agent takes issues of the Sizes the Owner chose for it.
+_Avoid_: Complexity, effort, estimate, points
+
 **Batch**:
 The set of issues a Manager works as one: those the Owner hands it in one command, such as "complete issues 1 to 5", or those one Goal names or has the Manager file.
 _Avoid_: Sprint, job, run, task list
@@ -97,6 +101,10 @@ _Avoid_: Sprint, job, run, task list
 **Goal**:
 A chat request or `/goal`: what the Owner asks for in their own words, which stands as the Plan's approval.
 _Avoid_: Objective, mission
+
+**Recurring Goal**:
+A Goal the Owner saves on a Floor with a schedule, which the Manager works each time it comes round. Unlike a Goal typed in the chat, it does not stand as the Plan's approval: its Plan waits for the Owner.
+_Avoid_: Scheduled task, cron job, routine
 
 **One-pull-request Batch**:
 A Batch the Owner hands over "in one PR", by command or in a Goal's words: its issues are worked one at a time, in the Plan's order, on one shared branch, and merge together in one pull request that closes them all.
@@ -209,3 +217,11 @@ _Avoid_: Iteration limit, max retries
 **Merge Policy**:
 A Floor's rule for what happens when a pull request passes its Review Loop: merge automatically, or send it to the Owner via a Notice. Overridable per issue.
 _Avoid_: Auto-merge setting, approval mode
+
+**Owner-only Path**:
+A file path, set by the Owner for a Floor, that keeps any pull request changing it from being merged automatically, whatever the Merge Policy. A pull request changing more lines than the Floor's limit is held back the same way.
+_Avoid_: Protected path, sensitive file, CODEOWNERS
+
+**Scorecard**:
+How the work of each Agent, Role and Model has turned out: issues merged, rounds needed, failures, stalls, hand-offs to the Owner and what each merged issue cost. Work counts toward the Model that actually served it.
+_Avoid_: Leaderboard, performance, stats
