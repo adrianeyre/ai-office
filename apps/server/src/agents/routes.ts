@@ -55,6 +55,7 @@ export const agentBody = (
   return {
     ...agent,
     model: modelOf(agent, defaults) ?? "",
+    sizes: [...agent.sizes],
     createdAt: agent.createdAt.toISOString(),
     leavingAt: agent.leavingAt?.toISOString() ?? null,
     contractor:

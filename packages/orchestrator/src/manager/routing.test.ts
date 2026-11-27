@@ -107,6 +107,7 @@ const answer = (fields: { roles?: string[]; roleReason?: string }): string =>
   JSON.stringify({
     clear: true,
     priority: "normal",
+    size: "medium",
     reason: "It has acceptance criteria and one change.",
     questions: [],
     ...fields,

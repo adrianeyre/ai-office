@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import { agentNameSchema, maxExtraInstructions } from "./agents.ts";
+import {
+  agentNameSchema,
+  agentSizesSchema,
+  allSizes,
+  maxExtraInstructions,
+} from "./agents.ts";
 import { avatarSchema } from "./avatar.ts";
 import { freshStartThresholdSchema } from "./context-usage.ts";
 import {
@@ -9,17 +14,20 @@ import {
   ownerFloorTemplateSources,
 } from "./floor-template-library.ts";
 import {
+  changedLinesLimitSchema,
   floorSettingsSchema,
   defaultMostAgents,
   mostAgentsSchema,
   floorTemplateRefSchema,
   floorThemeSchema,
+  ownerOnlyPathsSchema,
   templateIdSchema,
 } from "./floors.ts";
 import { gatewayRetrySettingsSchema } from "./gateway-retries.ts";
 import { requestBodiesSettingsSchema } from "./gateway-requests.ts";
 import { gitIdentitySchema } from "./git-identity.ts";
 import { hookInputSchema } from "./hooks.ts";
+import { recurringGoalInputSchema } from "./recurring-goals.ts";
 import { intakeSettingsSchema } from "./intake.ts";
 import {
   loadBalancingSettingsSchema,
@@ -93,6 +101,11 @@ export const configurationAgentSchema = z.strictObject({
   tokenCaps: tokenCapsSchema,
   /** Its own Fresh Start threshold (FR-86); null for its Floor's. */
   freshStartThreshold: freshStartThresholdSchema.nullable(),
+  /**
+   * The Sizes it takes (Scorecards PRD, FR-133); every one in a document
+   * exported before Sizes.
+   */
+  sizes: agentSizesSchema.default([...allSizes]),
 });
 export type ConfigurationAgent = z.infer<typeof configurationAgentSchema>;
 
@@ -103,6 +116,8 @@ export const configurationFloorSchema = floorSettingsSchema
     mostAgents: mostAgentsSchema.default(defaultMostAgents),
     spinOffFromChat: z.boolean().default(true),
     hourlyStatusUpdates: z.boolean().default(true),
+    ownerOnlyPaths: ownerOnlyPathsSchema.default([]),
+    changedLinesLimit: changedLinesLimitSchema.default(null),
     id: z
       .string()
       .regex(/^[a-z0-9][a-z0-9-]*$/, { error: "A Floor's id is a slug." }),
@@ -136,6 +151,12 @@ export const configurationFloorSchema = floorSettingsSchema
      * Owner made them, oldest first; none in a document exported before.
      */
     hooks: z.array(hookInputSchema).default([]),
+    /**
+     * The Floor's Recurring Goals (Scorecards PRD, FR-136), as the Owner
+     * made them, oldest first; none in a document exported before. Their
+     * runs are no part of it.
+     */
+    recurringGoals: z.array(recurringGoalInputSchema).default([]),
     /** Each Role's accepted memory entries (FR-55), oldest first. */
     roleMemory: z.array(
       z.strictObject({
@@ -171,6 +192,14 @@ export const configurationFloorSchema = floorSettingsSchema
         problem(
           `${floor.id} requires ${id}, which is not one of its reviewers.`,
         );
+      }
+    }
+    const goalNames = floor.recurringGoals.map(({ name }) =>
+      name.toLowerCase(),
+    );
+    for (const name of new Set(goalNames)) {
+      if (goalNames.filter((other) => other === name).length > 1) {
+        problem(`${floor.id} has two Recurring Goals named ${name}.`);
       }
     }
     const hookNames = floor.hooks.map(({ name }) => name.toLowerCase());
@@ -354,6 +383,7 @@ export const configurationAreas = [
   "skill_toggle",
   "role_memory",
   "hook",
+  "recurring_goal",
 ] as const;
 export type ConfigurationArea = (typeof configurationAreas)[number];
 

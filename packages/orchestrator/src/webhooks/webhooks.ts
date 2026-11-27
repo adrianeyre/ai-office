@@ -5,6 +5,7 @@ import { parseWebhookPayload, verifyWebhookSignature } from "@ai-office/github";
 import {
   pipelineLabels,
   roleLabelPrefix,
+  sizeLabels,
   type Redactor,
   type WebhookSettings,
   type WebhookSettingsUpdate,
@@ -123,12 +124,18 @@ const issueActions = new Set([
 ]);
 const ciEvents = new Set(["check_run", "check_suite"]);
 
-/** A label AI Office makes: a pipeline label, or a work Role's `role:<name>`. */
+/**
+ * A label AI Office makes: a pipeline label, a work Role's `role:<name>`,
+ * or a `size:<size>` label (Scorecards PRD, FR-132).
+ */
 const officeLabel = (name: string | undefined): boolean =>
   name !== undefined &&
   (pipelineLabels.some(
     (label) => label.name.toLowerCase() === name.toLowerCase(),
   ) ||
+    sizeLabels.some(
+      (label) => label.name.toLowerCase() === name.toLowerCase(),
+    ) ||
     name.toLowerCase().startsWith(roleLabelPrefix.toLowerCase()));
 
 /** What a delivery of `event` with `action` starts. */

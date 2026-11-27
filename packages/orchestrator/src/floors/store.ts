@@ -74,6 +74,7 @@ export function memoryFloorStore(
     tokenCaps: { ...floor.tokenCaps },
     gitIdentity: floor.gitIdentity === null ? null : { ...floor.gitIdentity },
     requiredReviewerAgentIds: [...floor.requiredReviewerAgentIds],
+    ownerOnlyPaths: [...floor.ownerOnlyPaths],
   });
   return {
     floors: all,
@@ -142,6 +143,8 @@ const toRecord = (row: FloorRow): FloorRecord => ({
   testCommand: row.testCommand,
   mergePolicy: row.mergePolicy === "auto_merge" ? "auto_merge" : "send_to_me",
   roundCap: row.roundCap,
+  ownerOnlyPaths: row.ownerOnlyPaths,
+  changedLinesLimit: row.changedLinesLimit,
   tokenCaps: { daily: row.dailyTokenCap, monthly: row.monthlyTokenCap },
   concurrencyLimit: row.concurrencyLimit,
   priority: row.priority,

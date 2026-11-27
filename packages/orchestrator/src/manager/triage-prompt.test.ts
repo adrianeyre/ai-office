@@ -23,7 +23,7 @@ const input: TriagePromptInput = {
 };
 
 describe("the triage prompt", () => {
-  it("asks whether the issue is clear enough to work, and its priority, as one JSON object", () => {
+  it("asks whether the issue is clear enough to work, its priority and its Size, as one JSON object", () => {
     const { system } = triagePrompt(input);
     expect(system).toContain(
       'You are Ada, the Manager of the Floor "Web shop" in AI Office, which works the GitHub repository adrianeyre/web-shop.',
@@ -32,7 +32,10 @@ describe("the triage prompt", () => {
     expect(system).toContain("**Its scope is bounded.**");
     expect(system).toContain("Answer with one JSON object and nothing else");
     expect(system).toContain(
-      '{"clear":false,"priority":"high | normal | low","reason":',
+      '{"clear":false,"priority":"high | normal | low","size":"small | medium | large","reason":',
+    );
+    expect(system).toContain(
+      "Its size is how big the change it asks for is: `small` for a small, local change",
     );
     expect(system).toContain(
       "## The Owner's instructions for you\n\nSecurity issues are high.",
@@ -108,7 +111,7 @@ describe("choosing between work Roles (FR-23)", () => {
   it("reads the Roles named, and their reason", () => {
     expect(
       parseTriage(
-        '{"clear":true,"priority":"normal","reason":"Bounded.","questions":[],"roles":["copywriter"],"roleReason":"It is copy."}',
+        '{"clear":true,"priority":"normal","size":"medium","reason":"Bounded.","questions":[],"roles":["copywriter"],"roleReason":"It is copy."}',
       ),
     ).toMatchObject({
       ok: true,
@@ -116,7 +119,7 @@ describe("choosing between work Roles (FR-23)", () => {
     });
     expect(
       parseTriage(
-        '{"clear":true,"priority":"normal","reason":"Bounded.","questions":[],"roles":"copywriter"}',
+        '{"clear":true,"priority":"normal","size":"medium","reason":"Bounded.","questions":[],"roles":"copywriter"}',
       ),
     ).toEqual({ ok: false, problem: "roles: roles is a list of Role ids." });
   });
@@ -126,24 +129,57 @@ describe("reading the Manager's triage", () => {
   it("accepts a clear issue with no questions, and an unclear one with some, fenced or not", () => {
     expect(
       parseTriage(
-        '{"clear":true,"priority":"high","reason":"It is bounded.","questions":[]}',
+        '{"clear":true,"priority":"high","size":"medium","reason":"It is bounded.","questions":[]}',
       ),
     ).toEqual({
       ok: true,
       value: {
         clear: true,
         priority: "high",
+        size: "medium",
         reason: "It is bounded.",
         questions: [],
       },
     });
     expect(
       parseTriage(
-        'Here:\n```json\n{"clear":false,"priority":"low","reason":"Vague.","questions":["Which page?"]}\n```',
+        'Here:\n```json\n{"clear":false,"priority":"low","size":"medium","reason":"Vague.","questions":["Which page?"]}\n```',
       ),
     ).toMatchObject({
       ok: true,
       value: { clear: false, questions: ["Which page?"] },
+    });
+  });
+
+  it("needs the issue's Size, small, medium or large, and says so when it is missing (Scorecards PRD, FR-132)", () => {
+    for (const size of ["small", "medium", "large"]) {
+      expect(
+        parseTriage(
+          JSON.stringify({
+            clear: true,
+            priority: "normal",
+            size,
+            reason: "Bounded.",
+            questions: [],
+          }),
+        ),
+      ).toMatchObject({ ok: true, value: { size } });
+    }
+    expect(
+      parseTriage(
+        '{"clear":true,"priority":"normal","reason":"Bounded.","questions":[]}',
+      ),
+    ).toEqual({
+      ok: false,
+      problem: 'size: The size is "small", "medium" or "large".',
+    });
+    expect(
+      parseTriage(
+        '{"clear":true,"priority":"normal","size":"huge","reason":"Bounded.","questions":[]}',
+      ),
+    ).toEqual({
+      ok: false,
+      problem: 'size: The size is "small", "medium" or "large".',
     });
   });
 
@@ -154,7 +190,7 @@ describe("reading the Manager's triage", () => {
     });
     expect(
       parseTriage(
-        '{"clear":"yes","priority":"urgent","reason":"","questions":[]}',
+        '{"clear":"yes","priority":"urgent","size":"medium","reason":"","questions":[]}',
       ),
     ).toEqual({
       ok: false,
@@ -163,7 +199,7 @@ describe("reading the Manager's triage", () => {
     });
     expect(
       parseTriage(
-        '{"clear":true,"priority":"normal","reason":"Fine.","questions":["Why?"]}',
+        '{"clear":true,"priority":"normal","size":"medium","reason":"Fine.","questions":["Why?"]}',
       ),
     ).toEqual({
       ok: false,
@@ -172,7 +208,7 @@ describe("reading the Manager's triage", () => {
     });
     expect(
       parseTriage(
-        '{"clear":false,"priority":"normal","reason":"Vague.","questions":["1","2","3","4","5","6"]}',
+        '{"clear":false,"priority":"normal","size":"medium","reason":"Vague.","questions":["1","2","3","4","5","6"]}',
       ),
     ).toEqual({ ok: false, problem: "questions: Ask at most 5 questions." });
     expect(triageRetryMessage("It has no JSON object.")).toBe(

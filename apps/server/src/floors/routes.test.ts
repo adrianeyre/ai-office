@@ -161,6 +161,8 @@ const cases: Case[] = [
         testCommand: "",
         mergePolicy: "send_to_me",
         roundCap: 3,
+        ownerOnlyPaths: [],
+        changedLinesLimit: null,
         tokenCaps: { daily: null, monthly: null },
         concurrencyLimit: null,
         planApproval: true,
@@ -320,9 +322,13 @@ const cases: Case[] = [
         priority: 7,
         planApproval: false,
         hourlyStatusUpdates: false,
+        ownerOnlyPaths: ["src/auth/**", "migrations/**"],
+        changedLinesLimit: 500,
       });
       expect(response.statusCode).toBe(200);
       const expected = {
+        ownerOnlyPaths: ["src/auth/**", "migrations/**"],
+        changedLinesLimit: 500,
         name: "Web shop",
         defaultBranch: "develop",
         setupCommand: "pnpm install --frozen-lockfile",
@@ -363,6 +369,8 @@ const cases: Case[] = [
             "testCommand",
             "mergePolicy",
             "roundCap",
+            "ownerOnlyPaths",
+            "changedLinesLimit",
             "tokenCaps",
             "concurrencyLimit",
             "priority",
@@ -393,6 +401,12 @@ const cases: Case[] = [
         // At least one required reviewer, as a list (FR-27).
         { requiredReviewerAgentIds: [] },
         { requiredReviewerAgentIds: "grace" },
+        // Owner-only Paths and the changed-lines limit (FR-122).
+        { ownerOnlyPaths: [""] },
+        { ownerOnlyPaths: ["src/auth/**", "SRC/Auth/**"] },
+        { ownerOnlyPaths: "src/auth/**" },
+        { changedLinesLimit: 0 },
+        { changedLinesLimit: 2.5 },
       ]) {
         const response = await request(
           setup,

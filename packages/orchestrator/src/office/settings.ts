@@ -698,6 +698,7 @@ export function databaseOfficeSettingsStore(db: Database): OfficeSettingsStore {
           activityDays: officeSettings.retentionActivityDays,
           connectionDeliveriesDays:
             officeSettings.retentionConnectionDeliveriesDays,
+          scorecardDays: officeSettings.retentionScorecardDays,
         })
         .from(officeSettings)
         .where(eq(officeSettings.id, 1));
@@ -716,6 +717,7 @@ export function databaseOfficeSettingsStore(db: Database): OfficeSettingsStore {
         retentionRequestMetadataDays: settings.requestMetadataDays,
         retentionActivityDays: settings.activityDays,
         retentionConnectionDeliveriesDays: settings.connectionDeliveriesDays,
+        retentionScorecardDays: settings.scorecardDays,
         updatedAt: at,
       };
       await db

@@ -23,6 +23,7 @@ import {
   databaseStores,
   memoryStores,
   type OfficeStores,
+  type ScorecardEntry,
 } from "@ai-office/orchestrator";
 import {
   agentListSchema,
@@ -30,6 +31,9 @@ import {
   analyticsInsightsSchema,
   analyticsSeriesSchema,
   analyticsUsageWindowsSchema,
+  agentScorecardListSchema,
+  scorecardDimensions,
+  scorecardSchema,
   type Agent,
   type AnalyticsDimension,
 } from "@ai-office/shared";
@@ -61,6 +65,7 @@ interface Setup {
   readonly accountStore: AiAccountStore;
   readonly ada: Agent;
   readonly linus: Agent;
+  readonly stores: OfficeStores;
 }
 
 const record = (
@@ -190,7 +195,7 @@ async function setUp(
   ]) {
     await history.record(record(fields));
   }
-  return { server, owner, history, store, accountStore, ada, linus };
+  return { server, owner, history, store, accountStore, ada, linus, stores };
 }
 
 const get = async (setup: Setup, url: string) =>
@@ -764,6 +769,162 @@ const cases: Case[] = [
         observedAt: "2026-10-09T10:00:00.000Z",
       });
       expect(body.accounts[0]?.readings).toHaveLength(3);
+    },
+  ],
+  [
+    "answers the Scorecard for each range and by, from its own records (Scorecards PRD, FR-128 to FR-130, FR-135)",
+    async (setup) => {
+      const { ada, linus, stores } = setup;
+      const entry = (
+        issue: number,
+        agent: Agent,
+        endedAt: string,
+        fields: Partial<ScorecardEntry> = {},
+      ): ScorecardEntry => ({
+        floorId: "web-shop",
+        issue,
+        agentId: agent.id,
+        agentName: agent.name,
+        role: agent.role,
+        stage: agent.role === "reviewer" ? "review" : "work",
+        contractor: false,
+        model: "claude-opus-5-5",
+        size: "small",
+        outcome: "merged",
+        roundsToApproval: 1,
+        qaRoundsFailed: 0,
+        stalls: 0,
+        failures: 0,
+        roundsReviewed: 0,
+        blockingComments: 0,
+        inputTokens: 1_000,
+        outputTokens: 0,
+        estimatedCostUsd: 0.5,
+        endedAt: new Date(endedAt),
+        ...fields,
+      });
+      // Ada merged #1 an hour ago, #2 five days ago and #3 sixty days ago;
+      // Linus reviewed #1.
+      await stores.scorecards.record("web-shop", 1, [
+        entry(1, ada, "2026-10-09T14:00:00.000Z"),
+        entry(1, linus, "2026-10-09T14:00:00.000Z", {
+          stage: "review",
+          role: "reviewer",
+          model: "gpt-5.5",
+          roundsReviewed: 2,
+          blockingComments: 1,
+        }),
+      ]);
+      await stores.scorecards.record("web-shop", 2, [
+        entry(2, ada, "2026-10-04T15:00:00.000Z", {
+          roundsToApproval: 3,
+          size: "large",
+          estimatedCostUsd: 1.5,
+        }),
+      ]);
+      await stores.scorecards.record("web-shop", 3, [
+        entry(3, ada, "2026-08-10T15:00:00.000Z", {
+          outcome: "handed_to_owner",
+          roundsToApproval: null,
+        }),
+      ]);
+      const scorecard = async (days: number, by: string) => {
+        const response = await get(
+          setup,
+          `/api/analytics/scorecard?${query({
+            from: new Date(now.getTime() - days * 86_400_000).toISOString(),
+            to: now.toISOString(),
+            by,
+          })}`,
+        );
+        expect(response.statusCode).toBe(200);
+        return scorecardSchema.parse(response.json());
+      };
+      // Each range counts the work that ended in it.
+      const merged = async (days: number) =>
+        (await scorecard(days, "agent")).work.map(
+          ({ label, issues, issuesMerged }) => [label, issues, issuesMerged],
+        );
+      expect(await merged(1)).toEqual([[ada.name, 1, 1]]);
+      expect(await merged(7)).toEqual([[ada.name, 2, 2]]);
+      expect(await merged(30)).toEqual([[ada.name, 2, 2]]);
+      expect(await merged(90)).toEqual([[ada.name, 3, 2]]);
+      expect((await scorecard(90, "agent")).work[0]).toMatchObject({
+        meanRoundsToApproval: 2,
+        handedToOwner: 1,
+        costPerMergedIssue: 1.25,
+      });
+      expect((await scorecard(90, "agent")).review).toEqual([
+        expect.objectContaining({
+          key: linus.id,
+          roundsReviewed: 2,
+          blockingPerRound: 0.5,
+        }),
+      ]);
+      // Each "by".
+      for (const by of scorecardDimensions) {
+        const answer = await scorecard(90, by);
+        expect(answer.by).toBe(by);
+        expect(answer.work.length).toBeGreaterThan(0);
+      }
+      expect((await scorecard(90, "role")).work.map(({ key }) => key)).toEqual([
+        ada.role,
+      ]);
+      expect(
+        (await scorecard(90, "model")).review.map(({ key }) => key),
+      ).toEqual(["gpt-5.5"]);
+      expect(
+        (await scorecard(90, "floor")).work.map(({ label }) => label),
+      ).toEqual(["web-shop"]);
+      expect(
+        (await scorecard(90, "size")).work.map(({ key, issues }) => [
+          key,
+          issues,
+        ]),
+      ).toEqual([
+        ["small", 2],
+        ["large", 1],
+      ]);
+      // Only one Agent's, as its card links it.
+      const onlyLinus = scorecardSchema.parse(
+        (
+          await get(
+            setup,
+            `/api/analytics/scorecard?${query({ ...range, agentId: linus.id })}`,
+          )
+        ).json(),
+      );
+      expect(onlyLinus.work).toEqual([]);
+      expect(onlyLinus.review.map(({ key }) => key)).toEqual([linus.id]);
+
+      // Each Agent's one line, over the last 30 days (FR-131).
+      const lines = agentScorecardListSchema.parse(
+        (await get(setup, "/api/floors/web-shop/scorecards")).json(),
+      ).scorecards;
+      expect(lines.find(({ agentId }) => agentId === ada.id)).toEqual({
+        agentId: ada.id,
+        days: 30,
+        stage: "work",
+        issues: 2,
+        issuesMerged: 2,
+        meanRoundsToApproval: 2,
+        costPerMergedIssue: 1,
+        roundsReviewed: 0,
+        blockingPerRound: null,
+      });
+      expect(
+        (await get(setup, "/api/floors/no-such-floor/scorecards")).statusCode,
+      ).toBe(404);
+      for (const bad of [
+        { ...range, by: "mood" },
+        { from: range.to, to: range.from },
+        { from: "2025-01-01T00:00:00.000Z", to: range.to },
+      ]) {
+        expect(
+          (await get(setup, `/api/analytics/scorecard?${query(bad)}`))
+            .statusCode,
+        ).toBe(400);
+      }
     },
   ],
   [

@@ -89,6 +89,7 @@ const manager: AgentRecord = {
   freshStartThreshold: null,
   createdAt: new Date(0),
   leavingAt: null,
+  sizes: ["small", "medium", "large"],
   contractor: null,
 };
 
@@ -159,7 +160,7 @@ function run(
   planned: Extract<CheckedRequest, { decision: "batch" }> = decision,
 ): {
   readonly recorder: Recorder;
-  readonly batch: () => Promise<void>;
+  readonly batch: () => Promise<unknown>;
 } {
   const recorder: Recorder = {
     filed: [],

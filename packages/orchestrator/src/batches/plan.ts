@@ -1,4 +1,5 @@
 import type {
+  IssueSize,
   PlanDraft,
   PlanItem,
   PlanLeftOut,
@@ -85,6 +86,11 @@ export interface PlanTeam {
    * turn (FR-25 (1)); none when it cannot.
    */
   readonly roles?: readonly WorkRole[];
+  /**
+   * Each issue's Size from its triage (Scorecards PRD, FR-133): an issue
+   * given to no coder goes to one that takes its Size, if any does.
+   */
+  readonly sizes?: ReadonlyMap<number, IssueSize>;
 }
 
 /** The stage a Batch's issues start at: the work Stage's. */
@@ -149,6 +155,8 @@ function assign(
   wanted: readonly (string | null)[],
   team: PlanTeam,
   roles: readonly (readonly string[] | undefined)[] = [],
+  /** Each one's issue, for its Size. */
+  issues: readonly number[] = [],
 ): (string | null)[] {
   const load = loads(team.active);
   for (const agentId of wanted) {
@@ -160,12 +168,14 @@ function assign(
     if (agentId !== null) {
       return agentId;
     }
+    const issue = issues[index];
     const chosen = chooseAgentByLoad(
       workStage,
       team.agents,
       load,
       team.paused,
       roles[index]?.[0] ?? null,
+      issue === undefined ? null : (team.sizes?.get(issue) ?? null),
     );
     if (chosen !== null) {
       load.set(chosen, (load.get(chosen) ?? 0) + 1);
@@ -387,6 +397,7 @@ export function planFromDraft(
     ),
     team,
     rolesOf,
+    order,
   );
   const items = draft.issues.map((planned, index): PlanItem =>
     withRoles(
@@ -428,6 +439,8 @@ export function planFromSpec(
   const assignments = assign(
     issues.map(() => null),
     team,
+    [],
+    issues.map(({ number }) => number),
   );
   return complete(
     "rules",
@@ -464,6 +477,8 @@ export function planByRules(
   const assignments = assign(
     issues.map(() => null),
     team,
+    [],
+    issues.map(({ number }) => number),
   );
   return complete(
     "rules",
@@ -587,6 +602,7 @@ export function replanByRules(
     ),
     team,
     roles,
+    order,
   );
   const items = edited.map((issue, index): PlanItem =>
     withRoles(
@@ -712,6 +728,7 @@ export function replanMidBatch(
     toStart.map(({ agentId, roles }) => keptCoder(agentId, roles, team)),
     team,
     toStart.map(({ roles }) => roles),
+    toStart.map(({ issue }) => issue),
   );
   const items = before.map((item, index): PlanItem => {
     const dependsOn = item.dependsOn.filter((dependency) => {

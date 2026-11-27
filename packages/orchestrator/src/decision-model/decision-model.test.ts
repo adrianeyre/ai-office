@@ -119,17 +119,19 @@ describe("the Decision Model, while it is off", () => {
 });
 
 describe("the Decision Model, while it is on", () => {
-  it("judges whether an issue is clear, how soon to work it and what it lacks, with the Manager's Gateway Key", async () => {
+  it("judges whether an issue is clear, how soon to work it, its Size and what it lacks, with the Manager's Gateway Key", async () => {
     const { jev, decisionModel, manager } = await setUp(on);
     jev.answer(manager.id, {
       clear: noul(0.92),
       priority: choice("high"),
+      size: choice("small"),
       gap: choice("nothing"),
     });
     expect(await decisionModel.issue("web-shop", issue)).toEqual({
       clear: true,
       probability: 0.92,
       priority: "high",
+      size: "small",
       gap: "nothing",
     });
     const [request] = jev.requests;
@@ -146,12 +148,14 @@ describe("the Decision Model, while it is on", () => {
     jev.answer(manager.id, {
       clear: noul(0.2),
       priority: choice("normal"),
+      size: choice("large"),
       gap: choice("done"),
     });
     expect(await decisionModel.issue("web-shop", issue)).toEqual({
       clear: false,
       probability: 0.2,
       priority: "normal",
+      size: "large",
       gap: "done",
     });
   });

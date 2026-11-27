@@ -139,20 +139,29 @@ const tasks = [
     description: "The vault, the table and the Save card tick box.",
     meets: ["R1.1", "R1.2"],
     dependsOn: [],
+    size: "large",
   },
   {
     title: "Offer saved cards first",
     description: "The checkout lists saved cards before the card form.",
     meets: ["R2.1"],
     dependsOn: [1],
+    size: "medium",
   },
   {
     title: "Ask for another card when one is declined",
     description: "A declined saved card asks for another.",
     meets: ["R2.2"],
     dependsOn: [],
+    size: "small",
   },
-];
+] satisfies {
+  title: string;
+  description: string;
+  meets: string[];
+  dependsOn: number[];
+  size: "small" | "medium" | "large";
+}[];
 
 const design = {
   overview: "A card vault behind the checkout.",
@@ -471,7 +480,8 @@ const cases: Case[] = [
       );
       expect(filedText).not.toContain("ready to become a Batch");
 
-      // Triage took each started issue as clear, asking no model.
+      // Triage took each started issue as clear, asking no model, at the
+      // Size its task was given (Scorecards PRD, FR-132).
       expect(askedOfIssues(s)).toEqual([]);
       expect(
         s.published.filter(({ type }) => type === "issue.triaged"),
@@ -479,11 +489,13 @@ const cases: Case[] = [
         expect.objectContaining({
           issue: first.number,
           outcome: "clear",
+          size: "large",
           judgedBy: "rules",
         }),
         expect.objectContaining({
           issue: third.number,
           outcome: "clear",
+          size: "small",
           judgedBy: "rules",
         }),
       ]);
@@ -725,7 +737,7 @@ const cases: Case[] = [
       // tasks.md keeps the issues of the tasks left as they were.
       const tasksMd = await s.fileOn(amendedBranch, `${folder}/tasks.md`);
       expect(tasksMd).toContain(
-        `## 1. ${tasks[0]?.title ?? ""}\n\n${tasks[0]?.description ?? ""}\n\n- **Meets:** R1.1, R1.2\n- **Depends on:** none\n- **Issue:** [#${String(first.number)}](${first.url})`,
+        `## 1. ${tasks[0]?.title ?? ""}\n\n${tasks[0]?.description ?? ""}\n\n- **Meets:** R1.1, R1.2\n- **Depends on:** none\n- **Size:** large\n- **Issue:** [#${String(first.number)}](${first.url})`,
       );
       expect(tasksMd).toContain(
         `- **Issue:** [#${String(second.number)}](${second.url})`,

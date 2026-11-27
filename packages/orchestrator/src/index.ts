@@ -674,6 +674,43 @@ export {
   type HookStore,
 } from "./hooks/store.ts";
 export {
+  createRecurringGoals,
+  openRecurringGoalsAction,
+  recurringGoalPollMs,
+  RecurringGoalError,
+  type RecurringGoalChat,
+  type RecurringGoals,
+  type RecurringGoalsOptions,
+} from "./recurring-goals/recurring-goals.ts";
+export {
+  databaseRecurringGoalStore,
+  memoryRecurringGoalStore,
+  type RecurringGoalFields,
+  type RecurringGoalRecord,
+  type RecurringGoalRunRecord,
+  type RecurringGoalStore,
+} from "./recurring-goals/store.ts";
+export {
+  createScorecardRecorder,
+  type IssueUsage,
+  type IssueUsageOf,
+  type ScorecardRecorder,
+  type ScorecardRecorderOptions,
+} from "./scorecard/recorder.ts";
+export {
+  agentScorecardOf,
+  reviewItemOf,
+  scorecardOf,
+  workItemOf,
+  type ScorecardNames,
+} from "./scorecard/aggregate.ts";
+export {
+  databaseScorecardStore,
+  memoryScorecardStore,
+  type ScorecardEntry,
+  type ScorecardStore,
+} from "./scorecard/store.ts";
+export {
   awaitingCount,
   createGuidelineApprovals,
   guidelineContentHash,

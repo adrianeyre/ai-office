@@ -13,12 +13,13 @@ import { storageCategoryInfo, storagePruneRequestSchema } from "./storage.ts";
 // Retention's settings (PRD §7).
 
 describe("retention's settings", () => {
-  it("default to 7 days of bodies, 90 of metadata, a year of activity and 90 days of delivery logs", () => {
+  it("default to 7 days of bodies, 90 of metadata, a year of activity, 90 days of delivery logs and a year of Scorecard records", () => {
     expect(defaultRetentionSettings).toEqual({
       requestBodiesDays: 7,
       requestMetadataDays: 90,
       activityDays: 365,
       connectionDeliveriesDays: 90,
+      scorecardDays: 365,
     });
     expect(retentionSettingsSchema.parse(defaultRetentionSettings)).toEqual(
       defaultRetentionSettings,
@@ -56,7 +57,19 @@ describe("retention's settings", () => {
     expect(
       problems({ ...defaultRetentionSettings, connectionDeliveriesDays: 1 }),
     ).toEqual([]);
+    expect(
+      problems({ ...defaultRetentionSettings, scorecardDays: 89 }),
+    ).toEqual(["The Scorecard is kept for at least 90 days."]);
     expect(problems({ ...defaultRetentionSettings, extra: 1 })).toHaveLength(1);
+  });
+
+  it("read settings from before the Scorecard as keeping its records a year", () => {
+    const before = Object.fromEntries(
+      Object.entries(defaultRetentionSettings).filter(
+        ([key]) => key !== "scorecardDays",
+      ),
+    );
+    expect(retentionSettingsSchema.parse(before).scorecardDays).toBe(365);
   });
 
   it("keep bodies no longer than the requests they belong to", () => {
@@ -102,6 +115,7 @@ describe("each kind of history", () => {
       requestMetadataDays: 32,
       activityDays: 30,
       connectionDeliveriesDays: 1,
+      scorecardDays: 90,
     });
   });
 
@@ -120,6 +134,7 @@ describe("each kind of history", () => {
       usage_history: 90,
       sign_ins: 365,
       connection_deliveries: 90,
+      scorecards: 365,
     });
   });
 });

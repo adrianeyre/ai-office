@@ -9,6 +9,7 @@ import type {
 import {
   createRedactor,
   reviewVerdictLabels,
+  type IssueSize,
   type Redactor,
   type ReviewVerdict,
   type VerdictComment,
@@ -38,6 +39,7 @@ import {
   stageAfter,
   type Pipeline,
 } from "../pipeline/pipeline.ts";
+import { reviewersFor } from "../manager/dispatch.ts";
 import { roleOfAgent } from "../roles/roles.ts";
 import { memoryRoleStore, type RoleStore } from "../roles/store.ts";
 import { everyRoundLinks } from "../qa/caps.ts";
@@ -193,6 +195,14 @@ export interface ReviewFlowOptions {
    * of them a fix goes back to.
    */
   readonly turns?: Pick<WorkTurns, "sendBack">;
+  /**
+   * An issue's Size (Scorecards PRD, FR-133): its rounds are reviewed by
+   * the required reviewers that take it, when any does.
+   */
+  readonly issueSize?: (
+    floorId: string,
+    issue: number,
+  ) => Promise<IssueSize | null>;
   readonly now?: () => Date;
   /**
    * The Batches handed over "in one PR" (ADR 0010): their issues are
@@ -820,9 +830,14 @@ export function createReviewFlow(options: ReviewFlowOptions): ExecuteWork {
       return "finished";
     }
 
-    // Every required reviewer reviews (FR-27).
+    // Every required reviewer reviews (FR-27): those that take the
+    // issue's Size, when any does (FR-133).
     const onFloor = await options.agents.list(floor.id);
-    const reviewers = floor.requiredReviewerAgentIds
+    const reviewers = reviewersFor(
+      floor.requiredReviewerAgentIds,
+      onFloor,
+      (await options.issueSize?.(floor.id, issue.number)) ?? null,
+    )
       .map((id) => onFloor.find((agent) => agent.id === id))
       .filter((agent) => agent?.enabled === true) as AgentRecord[];
     if (reviewers.length === 0) {

@@ -67,6 +67,7 @@ import {
   createGuidelineProposals,
   createGuidelinesAdmin,
   createHookRunner,
+  createRecurringGoals,
   createHooksAdmin,
   floorChatSkills,
   createRepositoryMemoryShelf,
@@ -99,6 +100,7 @@ import {
   type GuidelineApprovals,
   type GuidelineProposals,
   type HookRunner,
+  type RecurringGoals,
   type Notices,
   type OfficeStores,
   type SharedMemory,
@@ -108,10 +110,11 @@ import {
   type WorkingAgentStore,
   type WorkQueueStore,
 } from "@ai-office/orchestrator";
-import type {
-  FloorTemplate,
-  HealthResponse,
-  Redactor,
+import {
+  defaultOfficeTokenCaps,
+  type FloorTemplate,
+  type HealthResponse,
+  type Redactor,
 } from "@ai-office/shared";
 import type { Encryptor } from "@ai-office/shared/crypto";
 import Fastify, {
@@ -175,6 +178,7 @@ import { registerDirectChatRoutes } from "./direct-chats/routes.ts";
 import { directChatUsageOf } from "./direct-chats/usage.ts";
 import { registerGuidelineRoutes } from "./guidelines/routes.ts";
 import { registerHookRoutes } from "./hooks/routes.ts";
+import { registerRecurringGoalRoutes } from "./recurring-goals/routes.ts";
 import { registerManagerChatRoutes } from "./manager-chat/routes.ts";
 import { registerMemoryRoutes } from "./memory/routes.ts";
 import {
@@ -294,6 +298,12 @@ export interface AppOptions {
    * only Run now runs a Hook.
    */
   readonly hookRunner?: HookRunner;
+  /**
+   * Each Floor's Recurring Goals (Scorecards PRD, FR-136 to FR-141; ADR
+   * 0018). The server passes the one it started; made from `stores` when
+   * not given (in tests), and not started, so its runs carry out nothing.
+   */
+  readonly recurringGoals?: RecurringGoals;
   /**
    * Each Floor's AI Office branches, for the Branches page. Made from
    * `stores`, the work queue, `github` and `events` when not given.
@@ -1025,6 +1035,42 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       now,
     }),
   });
+  // Each Floor's Recurring Goals (FR-136, ADR 0018): made and changed only
+  // by the Owner, in the Floor admin's Recurring Goals card.
+  const timeZone = async () => (await officeSettings.ownerProfile()).timeZone;
+  registerRecurringGoalRoutes(app, {
+    floors: stores.floors,
+    timeZone,
+    recurringGoals:
+      options.recurringGoals ??
+      createRecurringGoals({
+        store: stores.recurringGoals,
+        floors: stores.floors,
+        agents: stores.agents,
+        batches: stores.batches,
+        // Without the server's chat requests, a run carries out nothing.
+        requests: {
+          workRoles: () => Promise.resolve([]),
+          canResearch: false,
+          batch: () => Promise.resolve(undefined),
+          research: () => Promise.resolve([]),
+        },
+        release: () => Promise.resolve(),
+        models: options.models ?? noModels,
+        defaultModels,
+        chat: {
+          keep: () => Promise.reject(new Error("No Manager chat here.")),
+          say: () => Promise.resolve(),
+        },
+        notices,
+        events,
+        timeZone,
+        officeTokenCap: async () =>
+          (await stores.tokenCaps.officeCaps()).daily ??
+          defaultOfficeTokenCaps.daily,
+        now,
+      }),
+  });
   registerAgentRoutes(app, {
     agents,
     defaultModels,
@@ -1132,6 +1178,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     batches: stores.batches,
     floors: stores.floors,
     plans: options.plans,
+    triage: stores.triage,
   });
   const gatewayKeys =
     options.gatewayKeys ??
@@ -1194,6 +1241,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     accounts: aiAccounts,
     floors: stores.floors,
     agents: stores.agents,
+    scorecards: stores.scorecards,
+    roles: stores.roles,
     now,
   });
   // Token accounting and caps (FR-31, FR-32), from the request history.

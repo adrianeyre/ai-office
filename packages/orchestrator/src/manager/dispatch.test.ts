@@ -13,6 +13,7 @@ import {
   chooseAgent,
   freeAgent,
   rebalance,
+  reviewersFor,
   roleOfWork,
   sandboxStageAt,
 } from "./dispatch.ts";
@@ -42,6 +43,7 @@ const agent = (
   tokenCaps: { daily: null, monthly: null },
   createdAt: new Date("2026-10-09T09:00:00.000Z"),
   leavingAt: null,
+  sizes: ["small", "medium", "large"],
   contractor: null,
   ...overrides,
 });
@@ -510,5 +512,107 @@ describe("a stage worked by more than one Role in turn (QA, then a designer)", (
       "dan",
     );
     expect(freeAgent("needs-qa", designers, [], [], "quinn")).toBeNull();
+  });
+});
+
+describe("by the issue's Size (Scorecards PRD, FR-133)", () => {
+  // Haiku takes only small issues; Opus only medium and large.
+  const haiku = agent("haiku", "coder", { sizes: ["small"] });
+  const opus = agent("opus", "coder", { sizes: ["medium", "large"] });
+  const sized = [
+    agent("manager", "manager"),
+    opus,
+    haiku,
+    agent("rex", "reviewer"),
+    agent("quinn", "qa"),
+  ];
+
+  it("gives a small issue to the Agent that takes small issues, though another has less work", () => {
+    const busy = [item(1, "haiku", "running")];
+    expect(chooseAgent("needs-work", sized, busy, [], null, "small")).toBe(
+      "haiku",
+    );
+    expect(chooseAgent("needs-work", sized, [], [], null, "large")).toBe(
+      "opus",
+    );
+  });
+
+  it("gives work to any Agent of the Role when none takes its Size", () => {
+    const smallOnly = [
+      agent("manager", "manager"),
+      agent("haiku", "coder", { sizes: ["small"] }),
+      agent("sonnet", "coder", { sizes: ["small"] }),
+    ];
+    const busy = [item(1, "haiku", "running")];
+    expect(chooseAgent("needs-work", smallOnly, busy, [], null, "large")).toBe(
+      "sonnet",
+    );
+    // So does work with no Size, triaged before Sizes.
+    expect(chooseAgent("needs-work", sized, [], [], null, null)).toBe("opus");
+  });
+
+  it("keeps waiting work for the busy Agents that take its Size, never moving it to one that does not", () => {
+    const active = [item(1, "haiku", "running"), item(2, "haiku", "queued")];
+    // Opus is free, but takes no small issues: #2 waits for Haiku.
+    expect(
+      rebalance(
+        sized,
+        active,
+        [],
+        () => null,
+        () => "small",
+      ),
+    ).toEqual([]);
+    // A medium issue waiting for Haiku moves to Opus.
+    expect(
+      rebalance(
+        sized,
+        active,
+        [],
+        () => null,
+        () => "medium",
+      ),
+    ).toEqual([
+      {
+        id: active[1]?.id,
+        floorId: "web-shop",
+        issue: 2,
+        from: "haiku",
+        to: "opus",
+      },
+    ]);
+  });
+
+  it("has the watchdog reassign only to a free Agent that takes the Size", () => {
+    expect(
+      freeAgent("needs-work", sized, [], [], "haiku", null, "small"),
+    ).toBeNull();
+    expect(freeAgent("needs-work", sized, [], [], "haiku", null, "large")).toBe(
+      "opus",
+    );
+  });
+
+  it("applies at every Stage: QA and docs too, and the reviewers of a round", () => {
+    const qa = [
+      agent("quick", "qa", { sizes: ["small"] }),
+      agent("thorough", "qa", { sizes: ["medium", "large"] }),
+    ];
+    expect(chooseAgent("needs-qa", qa, [], [], null, "small")).toBe("quick");
+    expect(chooseAgent("needs-qa", qa, [], [], null, "large")).toBe("thorough");
+    const reviewers = [
+      agent("rex", "reviewer", { sizes: ["small", "medium", "large"] }),
+      agent("rita", "reviewer", { sizes: ["large"] }),
+    ];
+    expect(reviewersFor(["rex", "rita"], reviewers, "small")).toEqual(["rex"]);
+    expect(reviewersFor(["rex", "rita"], reviewers, "large")).toEqual([
+      "rex",
+      "rita",
+    ]);
+    // None of the required reviewers takes it: every one reviews.
+    expect(reviewersFor(["rita"], reviewers, "small")).toEqual(["rita"]);
+    expect(reviewersFor(["rex", "rita"], reviewers, null)).toEqual([
+      "rex",
+      "rita",
+    ]);
   });
 });

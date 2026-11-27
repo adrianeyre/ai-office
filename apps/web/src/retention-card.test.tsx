@@ -15,6 +15,7 @@ const defaults = {
   requestMetadataDays: 90,
   activityDays: 365,
   connectionDeliveriesDays: 90,
+  scorecardDays: 365,
 };
 
 function stubServer() {
@@ -116,6 +117,7 @@ describe("retention in Admin", () => {
     await set(metadataLabel, "40");
     await set(activityLabel, "730");
     await set(deliveriesLabel, "30");
+    await set("Scorecard records (days)", "180");
     await user.click(view.getByRole("button", { name: "Save retention" }));
 
     expect((await view.findByRole("status")).textContent).toBe(
@@ -128,6 +130,7 @@ describe("retention in Admin", () => {
           requestMetadataDays: 40,
           activityDays: 730,
           connectionDeliveriesDays: 30,
+          scorecardDays: 180,
         },
         csrf: "csrf-token-1",
       },

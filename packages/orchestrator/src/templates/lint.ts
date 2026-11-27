@@ -65,7 +65,10 @@ export const readGlossary = async (
  * setup and a check command; QA ends with its report, as its Stage's
  * prompt names it; a title's length is counted in characters; and a
  * linter, a style guide or a data test has rules. "Check" and "rule" are
- * avoided only as names for an Acceptance Criterion and a Guideline.
+ * avoided only as names for an Acceptance Criterion and a Guideline. A
+ * site's performance is what Lighthouse scores, and a touch target is
+ * measured in points: "performance" and "points" are avoided only as names
+ * for the Scorecard and a Size.
  */
 const everydayWords = new Set([
   "run",
@@ -74,12 +77,15 @@ const everydayWords = new Set([
   "character",
   "check",
   "rule",
+  "performance",
+  "points",
 ]);
 
 /**
  * Glossary terms whose lowercase form is an everyday word too (to notice
- * something, to plan, a batch of products, a product's model, an office),
- * so they are not held to their capitals.
+ * something, to plan, a batch of products, a product's model, an office,
+ * a garment's or an image's size), so they are not held to their
+ * capitals.
  */
 const everydaySenses = new Set([
   "Notice",
@@ -89,6 +95,7 @@ const everydaySenses = new Set([
   "Office",
   "Connection",
   "Digest",
+  "Size",
 ]);
 
 /**

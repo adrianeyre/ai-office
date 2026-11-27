@@ -301,6 +301,12 @@ panel (`Whiteboard` in `apps/web/src/whiteboard.tsx`).
   version, each saying how it came to be ("drafted", or "replanned after
   your edits to version 1", and whether by AI Office's rules). It
   changes live, on `batch.*` events.
+- **An issue given to an Agent that does not take its Size** (Scorecards
+  PRD, FR-134) is flagged on it, "Ada takes only small issues", with the
+  issue's Size from its triage (`sizes` in the Batch's detail). The Plan
+  stands as the Owner approves it: the flag is there to be seen before
+  approval, and dispatch follows the Plan (see
+  [dispatch by Size](issue-pipeline.md#the-work-queue)).
 - **A Grilling Session.** While one runs, the whiteboard shows it above
   the Plans: its live outline, the decisions settled so far and where its
   documents are kept (PRD FR-80; see
@@ -443,6 +449,76 @@ whiteboard shows a finished Batch's **Wrap-up** above its Plan: "Wrap-up:
 of each issue (outcome, pull request, rounds, tokens, estimated cost) and
 what is blocked. The API's Batches carry `acknowledgements`, `finishedAt`
 and `wrapUp`.
+
+### Recurring Goals
+
+A **Recurring Goal** is a Goal the Owner saves on a Floor with a
+schedule, such as "every Monday at 09:00, find modules without tests and
+file an issue for each", which the Floor's Manager works each time it
+comes round (Scorecards PRD, FR-136 to FR-141;
+[ADR 0018](../architectural-decision-record/0018-a-recurring-goals-plan-waits-for-the-owner.md);
+`createRecurringGoals` in `@ai-office/orchestrator`). Unlike a Goal typed
+in the chat, it does not stand as its Plan's approval: its Plan waits for
+the Owner.
+
+- **Made by the Owner alone.** The Floor admin's **Recurring Goals** card
+  (`#recurring-goals`) adds, changes, turns off and on, deletes and runs
+  one now (**Run now**), and shows each one's schedule, next run and last
+  run (what it filed, linking its Plan, or why it was skipped or failed).
+  Only the Owner may, as for [Hooks](guidelines-specs-and-hooks.md)
+  (ADR 0016): the Manager and its chat cannot. Each is a name, its words
+  (what the Owner would type after `/goal`), a schedule and a per-run
+  Token Cap. They are in [configuration export](running.md#configuration-export-and-import),
+  without their runs.
+- **The schedule** is daily, or weekly on chosen days, at a time, in the
+  Office's time zone (the Owner's profile's), never a cron expression.
+  Its next run is counted from each run; one turned off has none. On the
+  mornings the clocks change it still comes round once, at its time.
+- **A run** keeps the Goal's words in the Manager chat as the Owner's
+  `/goal`, and asks the Manager's Model what to do with them, as a
+  [chat request](#batches-from-the-manager-chat) is asked: it files issues
+  by the chat request's own path (ADR 0004), bound to the Goal's words
+  (P2-3), and proposes a Plan for them. The Plan is never approved by the
+  Goal: the Batch waits at `awaiting_approval` on the whiteboard, with the
+  "Plan awaiting approval" action Notice, whatever the Floor's plan
+  approval setting, and no Agent starts its work until the Owner approves
+  it. A run adds no work Contractors before then. The Manager's Plan and
+  progress answer the Goal's words in the chat.
+- **Research** (FR-138). A run may add at most one research Contractor,
+  which reads a read-only clone, changes nothing, and is let go once the
+  run has filed its issues; the Manager is then asked again, knowing what
+  it found. Asking for a second fails the run.
+- **A per-run Token Cap** (FR-138) bounds the tokens the run's Manager
+  calls and its research Contractor use from the run's start, as the AI
+  Gateway counts them. By default it is the office's daily Token Cap, the
+  cap an issue's work is held to when it has none of its own; the card
+  sets another. It is checked before each model call and every few
+  seconds while research runs: a run that reaches it stops, and fails.
+- **No duplicates** (FR-139). The Manager is told of the issues earlier
+  runs of the same Recurring Goal filed that are still open, and told
+  never to file them again; plain code refuses a new issue whose title is
+  one of theirs, whatever its case, and says so in the chat. A run that
+  would file nothing new is skipped.
+- **Skips** (FR-140). A run is skipped, as an event, while the previous
+  run's Plan awaits approval or its Batch is running (so unanswered runs
+  never pile up), or while the Manager is paused or has no Model. Skips
+  are not failures.
+- **Failures** (FR-140). A failed run (the Model could not be asked, or
+  found the Goal too unclear, or the run reached its Token Cap) raises an
+  info Notice saying why. Three in a row turn the Recurring Goal off, with
+  an action Notice linking the card, until the Owner turns it on again,
+  which forgets its failures.
+- **Events** (FR-141). Every change is an Activity Feed event
+  (`recurring_goal.added`, `.changed`, `.removed`), and so is every run
+  (`recurring_goal.run_started`, `.run_skipped`, `.run_finished`,
+  `.run_failed`).
+- **API** (the Owner's session only): `GET` and `POST
+  /api/floors/:floorId/recurring-goals` (`{name, words, schedule:
+  {frequency, days, time}, tokenCap, enabled}`, with the Office's
+  `timeZone` in the answer), `PATCH` and `DELETE
+  /api/floors/:floorId/recurring-goals/:id`, and `POST
+  /api/floors/:floorId/recurring-goals/:id/run`. They are kept in
+  `recurring_goals`, and their runs in `recurring_goal_runs`.
 
 ## Repository memory
 

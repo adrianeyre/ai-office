@@ -3,6 +3,8 @@ import { randomBytes, randomUUID } from "node:crypto";
 import type { EventBus } from "@ai-office/events";
 import {
   agentErrorCodes,
+  allSizes,
+  issueSizes,
   anyAiProvider,
   builtInRoles,
   defaultTeamRoles,
@@ -15,6 +17,7 @@ import {
   sameAvatar,
   type AgentErrorCode,
   type Avatar,
+  type IssueSize,
   type ContractorKind,
   type OneOffRole,
   type FloorTemplate,
@@ -133,6 +136,8 @@ export interface NewAgent {
   /** Its own Token Caps; none (its Floor's or the office's) if absent. */
   readonly tokenCaps?: TokenCaps;
   readonly freshStartThreshold?: number | null;
+  /** The Sizes it takes (FR-133); all three if absent. */
+  readonly sizes?: readonly IssueSize[];
   /**
    * Copied from its Role's first Agent (`copyOfFirst`): its Avatar is
    * random even when it has its Role's own name.
@@ -197,6 +202,7 @@ export function newAgentRecord(options: {
       ]),
     tokenCaps: { ...(agent.tokenCaps ?? { daily: null, monthly: null }) },
     freshStartThreshold: agent.freshStartThreshold ?? null,
+    sizes: [...(agent.sizes ?? allSizes)],
     createdAt: options.createdAt,
     leavingAt: null,
     contractor: null,
@@ -229,6 +235,7 @@ export function copyOfFirst(
           extraInstructions: first.extraInstructions,
           tokenCaps: first.tokenCaps,
           freshStartThreshold: first.freshStartThreshold,
+          sizes: first.sizes,
         }),
   };
 }
@@ -373,6 +380,8 @@ export interface AgentChanges {
   readonly tokenCaps?: TokenCaps | undefined;
   /** Its own Fresh Start threshold in percent; null uses its Floor's. */
   readonly freshStartThreshold?: number | null | undefined;
+  /** The Sizes of issues it takes, at least one (FR-133). */
+  readonly sizes?: readonly IssueSize[] | undefined;
   /** Its Avatar (FR-13): how it looks, never how it works. */
   readonly avatar?: Avatar | undefined;
 }
@@ -1105,9 +1114,13 @@ export function createAgents(options: AgentsOptions): Agents {
             ? changes.freshStartThreshold
             : current.freshStartThreshold,
         avatar: changes.avatar ?? current.avatar,
+        sizes: issueSizes.filter((size) =>
+          (changes.sizes ?? current.sizes).includes(size),
+        ),
       };
       const changed = [
         ...changeKeys.filter((key) => next[key] !== current[key]),
+        ...(next.sizes.join(",") === current.sizes.join(",") ? [] : ["sizes"]),
         ...(sameAvatar(next.avatar, current.avatar) ? [] : ["avatar"]),
         ...(["daily", "monthly"] as const)
           .filter(

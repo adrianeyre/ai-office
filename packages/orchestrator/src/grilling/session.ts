@@ -319,6 +319,7 @@ function withDraft(
           dependsOn: [...new Set(task.dependsOn)]
             .filter((other) => other <= index)
             .sort((a, b) => a - b),
+          size: task.size,
         })),
       },
     };

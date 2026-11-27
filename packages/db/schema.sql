@@ -36,11 +36,13 @@ CREATE TABLE "agents" (
 	"daily_token_cap" bigint,
 	"monthly_token_cap" bigint,
 	"fresh_start_threshold" integer,
+	"sizes" text[] DEFAULT '{small,medium,large}' NOT NULL,
 	"created_at" timestamp with time zone NOT NULL,
 	"leaving_at" timestamp with time zone,
 	"removed_at" timestamp with time zone,
 	"contractor_kind" text,
 	"contractor_batch_id" bigint,
+	CONSTRAINT "agents_sizes" CHECK (cardinality("agents"."sizes") >= 1 AND "agents"."sizes" <@ ARRAY['small', 'medium', 'large']::text[]),
 	CONSTRAINT "agents_contractor_kind" CHECK ("agents"."contractor_kind" IS NULL OR "agents"."contractor_kind" IN ('work', 'research')),
 	CONSTRAINT "agents_contractor_batch" CHECK ("agents"."contractor_batch_id" IS NULL OR "agents"."contractor_kind" = 'work'),
 	CONSTRAINT "agents_token_caps" CHECK (("agents"."daily_token_cap" IS NULL OR "agents"."daily_token_cap" > 0) AND ("agents"."monthly_token_cap" IS NULL OR "agents"."monthly_token_cap" > 0)),
@@ -307,6 +309,8 @@ CREATE TABLE "floors" (
 	"test_command" text DEFAULT '' NOT NULL,
 	"merge_policy" text DEFAULT 'send_to_me' NOT NULL,
 	"round_cap" integer DEFAULT 3 NOT NULL,
+	"owner_only_paths" text[] DEFAULT '{}' NOT NULL,
+	"changed_lines_limit" integer,
 	"daily_token_cap" bigint,
 	"monthly_token_cap" bigint,
 	"concurrency_limit" integer,
@@ -328,6 +332,7 @@ CREATE TABLE "floors" (
 	CONSTRAINT "floors_id_slug" CHECK ("floors"."id" ~ '^[a-z0-9][a-z0-9-]*$'),
 	CONSTRAINT "floors_merge_policy" CHECK ("floors"."merge_policy" IN ('send_to_me', 'auto_merge')),
 	CONSTRAINT "floors_round_cap" CHECK ("floors"."round_cap" >= 1),
+	CONSTRAINT "floors_changed_lines_limit" CHECK ("floors"."changed_lines_limit" IS NULL OR "floors"."changed_lines_limit" >= 1),
 	CONSTRAINT "floors_token_caps" CHECK (("floors"."daily_token_cap" IS NULL OR "floors"."daily_token_cap" > 0) AND ("floors"."monthly_token_cap" IS NULL OR "floors"."monthly_token_cap" > 0)),
 	CONSTRAINT "floors_concurrency_limit" CHECK ("floors"."concurrency_limit" IS NULL OR "floors"."concurrency_limit" >= 1),
 	CONSTRAINT "floors_most_agents" CHECK ("floors"."most_agents" IS NULL OR "floors"."most_agents" >= 1),
@@ -643,9 +648,11 @@ CREATE TABLE "issue_triage" (
 	"notice_id" text,
 	"role" text,
 	"candidates" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"size" text,
 	"triaged_at" timestamp with time zone NOT NULL,
 	CONSTRAINT "issue_triage_floor_id_issue_pk" PRIMARY KEY("floor_id","issue"),
 	CONSTRAINT "issue_triage_issue" CHECK ("issue_triage"."issue" > 0),
+	CONSTRAINT "issue_triage_size" CHECK ("issue_triage"."size" IS NULL OR "issue_triage"."size" IN ('small', 'medium', 'large')),
 	CONSTRAINT "issue_triage_status" CHECK ("issue_triage"."status" IN ('clear', 'waiting', 'routing')),
 	CONSTRAINT "issue_triage_priority" CHECK ("issue_triage"."priority" IN ('high', 'normal', 'low')),
 	CONSTRAINT "issue_triage_judged_by" CHECK ("issue_triage"."judged_by" IN ('model', 'decision_model', 'rules', 'owner'))
@@ -857,6 +864,7 @@ CREATE TABLE "office_settings" (
 	"retention_request_metadata_days" integer,
 	"retention_activity_days" integer,
 	"retention_connection_deliveries_days" integer,
+	"retention_scorecard_days" integer,
 	"github_webhooks_enabled" boolean,
 	"github_webhook_secret" text,
 	"owner_profile" jsonb,
@@ -881,7 +889,7 @@ CREATE TABLE "office_settings" (
 	CONSTRAINT "office_settings_gateway_prompt_cache_ttl" CHECK ("office_settings"."gateway_prompt_cache_ttl" IS NULL OR "office_settings"."gateway_prompt_cache_ttl" IN ('5m', '1h')),
 	CONSTRAINT "office_settings_gateway_keep_alive" CHECK (("office_settings"."gateway_keep_alive_idle_minutes" IS NULL OR "office_settings"."gateway_keep_alive_idle_minutes" BETWEEN 5 AND 480) AND ("office_settings"."gateway_keep_alive_max_per_account_per_hour" IS NULL OR "office_settings"."gateway_keep_alive_max_per_account_per_hour" BETWEEN 1 AND 600)),
 	CONSTRAINT "office_settings_token_caps" CHECK (("office_settings"."daily_token_cap" IS NULL OR "office_settings"."daily_token_cap" > 0) AND ("office_settings"."monthly_token_cap" IS NULL OR "office_settings"."monthly_token_cap" > 0)),
-	CONSTRAINT "office_settings_retention" CHECK (("office_settings"."retention_request_bodies_days" IS NULL OR "office_settings"."retention_request_bodies_days" BETWEEN 0 AND 3650) AND ("office_settings"."retention_request_metadata_days" IS NULL OR "office_settings"."retention_request_metadata_days" BETWEEN 32 AND 3650) AND ("office_settings"."retention_activity_days" IS NULL OR "office_settings"."retention_activity_days" BETWEEN 30 AND 3650) AND ("office_settings"."retention_connection_deliveries_days" IS NULL OR "office_settings"."retention_connection_deliveries_days" BETWEEN 1 AND 3650)),
+	CONSTRAINT "office_settings_retention" CHECK (("office_settings"."retention_request_bodies_days" IS NULL OR "office_settings"."retention_request_bodies_days" BETWEEN 0 AND 3650) AND ("office_settings"."retention_request_metadata_days" IS NULL OR "office_settings"."retention_request_metadata_days" BETWEEN 32 AND 3650) AND ("office_settings"."retention_activity_days" IS NULL OR "office_settings"."retention_activity_days" BETWEEN 30 AND 3650) AND ("office_settings"."retention_connection_deliveries_days" IS NULL OR "office_settings"."retention_connection_deliveries_days" BETWEEN 1 AND 3650) AND ("office_settings"."retention_scorecard_days" IS NULL OR "office_settings"."retention_scorecard_days" BETWEEN 90 AND 3650)),
 	CONSTRAINT "office_settings_github_webhook_secret_sealed" CHECK ("office_settings"."github_webhook_secret" IS NULL OR "office_settings"."github_webhook_secret" LIKE 'aio1:%'),
 	CONSTRAINT "office_settings_github_webhooks_secret" CHECK ("office_settings"."github_webhooks_enabled" IS NOT TRUE OR "office_settings"."github_webhook_secret" IS NOT NULL),
 	CONSTRAINT "office_settings_gateway_circuit_breaker" CHECK (("office_settings"."gateway_circuit_breaker_threshold" IS NULL OR "office_settings"."gateway_circuit_breaker_threshold" BETWEEN 1 AND 100) AND ("office_settings"."gateway_circuit_breaker_cooldown_seconds" IS NULL OR "office_settings"."gateway_circuit_breaker_cooldown_seconds" BETWEEN 1 AND 3600))
@@ -956,6 +964,42 @@ CREATE TABLE "recovery_codes" (
 	CONSTRAINT "recovery_codes_code_hash_unique" UNIQUE("code_hash")
 );
 
+CREATE TABLE "recurring_goal_runs" (
+	"id" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "recurring_goal_runs_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1),
+	"goal_id" bigint NOT NULL,
+	"floor_id" text NOT NULL,
+	"started_at" timestamp with time zone NOT NULL,
+	"finished_at" timestamp with time zone,
+	"outcome" text NOT NULL,
+	"reason" text DEFAULT '' NOT NULL,
+	"batch_id" bigint,
+	"issues" integer[] DEFAULT '{}' NOT NULL,
+	"tokens" bigint DEFAULT 0 NOT NULL,
+	CONSTRAINT "recurring_goal_runs_outcome" CHECK ("recurring_goal_runs"."outcome" IN ('running', 'planned', 'skipped', 'failed') AND ("recurring_goal_runs"."outcome" = 'running') = ("recurring_goal_runs"."finished_at" IS NULL)),
+	CONSTRAINT "recurring_goal_runs_tokens" CHECK ("recurring_goal_runs"."tokens" >= 0)
+);
+
+CREATE TABLE "recurring_goals" (
+	"id" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "recurring_goals_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1),
+	"floor_id" text NOT NULL,
+	"name" text NOT NULL,
+	"words" text NOT NULL,
+	"frequency" text NOT NULL,
+	"days" integer[] NOT NULL,
+	"time" text NOT NULL,
+	"token_cap" bigint,
+	"enabled" boolean NOT NULL,
+	"failures" integer DEFAULT 0 NOT NULL,
+	"next_run_at" timestamp with time zone,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	CONSTRAINT "recurring_goals_name" CHECK (length("recurring_goals"."name") BETWEEN 1 AND 100 AND "recurring_goals"."name" = btrim("recurring_goals"."name")),
+	CONSTRAINT "recurring_goals_words" CHECK (length("recurring_goals"."words") BETWEEN 1 AND 2000),
+	CONSTRAINT "recurring_goals_schedule" CHECK ((("recurring_goals"."frequency" = 'daily' AND cardinality("recurring_goals"."days") = 0) OR ("recurring_goals"."frequency" = 'weekly' AND cardinality("recurring_goals"."days") BETWEEN 1 AND 7 AND "recurring_goals"."days" <@ ARRAY[0, 1, 2, 3, 4, 5, 6])) AND "recurring_goals"."time" ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
+	CONSTRAINT "recurring_goals_token_cap" CHECK ("recurring_goals"."token_cap" IS NULL OR "recurring_goals"."token_cap" > 0),
+	CONSTRAINT "recurring_goals_failures" CHECK ("recurring_goals"."failures" >= 0)
+);
+
 CREATE TABLE "repository_skill_reviews" (
 	"floor_id" text NOT NULL,
 	"folder" text NOT NULL,
@@ -1026,6 +1070,34 @@ CREATE TABLE "schema_meta" (
 	"key" text PRIMARY KEY NOT NULL,
 	"value" text NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE "scorecard_records" (
+	"floor_id" text NOT NULL,
+	"issue" integer NOT NULL,
+	"agent_id" text NOT NULL,
+	"agent_name" text NOT NULL,
+	"role" text NOT NULL,
+	"stage" text NOT NULL,
+	"contractor" boolean DEFAULT false NOT NULL,
+	"model" text NOT NULL,
+	"size" text,
+	"outcome" text NOT NULL,
+	"rounds_to_approval" integer,
+	"qa_rounds_failed" integer DEFAULT 0 NOT NULL,
+	"stalls" integer DEFAULT 0 NOT NULL,
+	"failures" integer DEFAULT 0 NOT NULL,
+	"rounds_reviewed" integer DEFAULT 0 NOT NULL,
+	"blocking_comments" integer DEFAULT 0 NOT NULL,
+	"input_tokens" bigint DEFAULT 0 NOT NULL,
+	"output_tokens" bigint DEFAULT 0 NOT NULL,
+	"estimated_cost_usd" double precision DEFAULT 0 NOT NULL,
+	"ended_at" timestamp with time zone NOT NULL,
+	CONSTRAINT "scorecard_records_floor_id_issue_agent_id_model_pk" PRIMARY KEY("floor_id","issue","agent_id","model"),
+	CONSTRAINT "scorecard_records_outcome" CHECK ("scorecard_records"."outcome" IN ('merged', 'closed', 'handed_to_owner')),
+	CONSTRAINT "scorecard_records_stage" CHECK ("scorecard_records"."stage" IN ('work', 'review', 'qa', 'docs')),
+	CONSTRAINT "scorecard_records_size" CHECK ("scorecard_records"."size" IS NULL OR "scorecard_records"."size" IN ('small', 'medium', 'large')),
+	CONSTRAINT "scorecard_records_counts" CHECK ("scorecard_records"."issue" > 0 AND ("scorecard_records"."rounds_to_approval" IS NULL OR "scorecard_records"."rounds_to_approval" > 0) AND "scorecard_records"."qa_rounds_failed" >= 0 AND "scorecard_records"."stalls" >= 0 AND "scorecard_records"."failures" >= 0 AND "scorecard_records"."rounds_reviewed" >= 0 AND "scorecard_records"."blocking_comments" >= 0 AND "scorecard_records"."input_tokens" >= 0 AND "scorecard_records"."output_tokens" >= 0 AND "scorecard_records"."estimated_cost_usd" >= 0)
 );
 
 CREATE TABLE "sessions" (
@@ -1148,6 +1220,9 @@ ALTER TABLE "memory_proposals" ADD CONSTRAINT "memory_proposals_curation_id_memo
 ALTER TABLE "notices" ADD CONSTRAINT "notices_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "plans" ADD CONSTRAINT "plans_batch_id_batches_id_fk" FOREIGN KEY ("batch_id") REFERENCES "public"."batches"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "qa_reports" ADD CONSTRAINT "qa_reports_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "recurring_goal_runs" ADD CONSTRAINT "recurring_goal_runs_goal_id_recurring_goals_id_fk" FOREIGN KEY ("goal_id") REFERENCES "public"."recurring_goals"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "recurring_goal_runs" ADD CONSTRAINT "recurring_goal_runs_batch_id_batches_id_fk" FOREIGN KEY ("batch_id") REFERENCES "public"."batches"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "recurring_goals" ADD CONSTRAINT "recurring_goals_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "repository_skill_reviews" ADD CONSTRAINT "repository_skill_reviews_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "review_verdicts" ADD CONSTRAINT "review_verdicts_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "role_memory" ADD CONSTRAINT "role_memory_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
@@ -1205,9 +1280,12 @@ CREATE INDEX "memory_proposals_pending_idx" ON "memory_proposals" USING btree ("
 CREATE INDEX "notices_open_idx" ON "notices" USING btree ("created_at") WHERE "notices"."dismissed_at" IS NULL AND "notices"."acted_at" IS NULL;
 CREATE INDEX "notices_floor_id_idx" ON "notices" USING btree ("floor_id","created_at");
 CREATE UNIQUE INDEX "qa_reports_one_per_round" ON "qa_reports" USING btree ("floor_id","issue","round");
+CREATE INDEX "recurring_goal_runs_goal_idx" ON "recurring_goal_runs" USING btree ("goal_id","id");
+CREATE UNIQUE INDEX "recurring_goals_name_unique" ON "recurring_goals" USING btree ("floor_id",lower("name"));
 CREATE UNIQUE INDEX "review_verdicts_one_per_round" ON "review_verdicts" USING btree ("floor_id","issue","round","agent_id");
 CREATE INDEX "role_memory_floor_idx" ON "role_memory" USING btree ("floor_id","role","id");
 CREATE UNIQUE INDEX "roles_name_unique" ON "roles" USING btree ("name") WHERE "roles"."floor_id" IS NULL;
+CREATE INDEX "scorecard_records_ended_at" ON "scorecard_records" USING btree ("ended_at");
 CREATE INDEX "sessions_expires_at_idx" ON "sessions" USING btree ("expires_at");
 CREATE INDEX "sign_in_events_occurred_at_idx" ON "sign_in_events" USING btree ("occurred_at");
 CREATE INDEX "work_queue_status_idx" ON "work_queue" USING btree ("status","created_at");

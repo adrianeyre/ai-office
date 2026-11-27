@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { issueSizes } from "./triage.ts";
+
 // A Grilling Session's issues (PRD FR-81). Once the session's documents
 // are proposed, the Manager drafts GitHub issues from them: vertical
 // slices, each with "What to build", acceptance criteria, the drafts it is
@@ -47,6 +49,11 @@ const draftShape = {
   prdSections: z.array(text("A PRD section", 200)).max(30),
   /** The titles of the session's ADRs it cites. */
   adrs: z.array(text("An ADR", 200)).max(10),
+  /**
+   * Its Size, for a Spec's task (Scorecards PRD, FR-132): the issue filed
+   * for it takes it at triage. None for other drafts.
+   */
+  size: z.enum(issueSizes).optional(),
 };
 
 /** An issue filed on GitHub for a draft. */

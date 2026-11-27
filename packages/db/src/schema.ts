@@ -817,6 +817,19 @@ export const floors = pgTable(
     /** `send_to_me` (the default) or `auto_merge` (FR-29). */
     mergePolicy: text("merge_policy").notNull().default("send_to_me"),
     roundCap: integer("round_cap").notNull().default(3),
+    /**
+     * Globs whose changes are never merged automatically (Scorecards PRD,
+     * FR-122): the pull request goes to the Owner.
+     */
+    ownerOnlyPaths: text("owner_only_paths")
+      .array()
+      .notNull()
+      .default(sql`'{}'`),
+    /**
+     * The most lines a pull request may change and be merged
+     * automatically (FR-122); null for no limit.
+     */
+    changedLinesLimit: integer("changed_lines_limit"),
     /** Token Cap overrides (FR-32); null uses the office's. */
     dailyTokenCap: bigint("daily_token_cap", { mode: "number" }),
     monthlyTokenCap: bigint("monthly_token_cap", { mode: "number" }),
@@ -877,6 +890,10 @@ export const floors = pgTable(
       sql`${table.mergePolicy} IN ('send_to_me', 'auto_merge')`,
     ),
     check("floors_round_cap", sql`${table.roundCap} >= 1`),
+    check(
+      "floors_changed_lines_limit",
+      sql`${table.changedLinesLimit} IS NULL OR ${table.changedLinesLimit} >= 1`,
+    ),
     check(
       "floors_token_caps",
       sql`(${table.dailyTokenCap} IS NULL OR ${table.dailyTokenCap} > 0) AND (${table.monthlyTokenCap} IS NULL OR ${table.monthlyTokenCap} > 0)`,
@@ -1013,6 +1030,14 @@ export const agents = pgTable(
      * (FR-86); null uses its Floor's.
      */
     freshStartThreshold: integer("fresh_start_threshold"),
+    /**
+     * The Sizes of issues it takes, at every Stage (Scorecards PRD,
+     * FR-133): all three by default.
+     */
+    sizes: text("sizes")
+      .array()
+      .notNull()
+      .default(sql`'{small,medium,large}'`),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     /**
      * When the Owner removed it while it was in the middle of a task
@@ -1035,6 +1060,10 @@ export const agents = pgTable(
     }).references((): AnyPgColumn => batches.id),
   },
   (table) => [
+    check(
+      "agents_sizes",
+      sql`cardinality(${table.sizes}) >= 1 AND ${table.sizes} <@ ARRAY['small', 'medium', 'large']::text[]`,
+    ),
     check(
       "agents_contractor_kind",
       sql`${table.contractorKind} IS NULL OR ${table.contractorKind} IN ('work', 'research')`,
@@ -1154,8 +1183,8 @@ export const officeSettings = pgTable(
     /**
      * Retention (PRD §7), in days; each null for its default: request and
      * response bodies 7, requests' records and usage readings 90, the
-     * Activity Feed, closed Notices and sign-ins 365, and Connections'
-     * delivery logs 90.
+     * Activity Feed, closed Notices and sign-ins 365, Connections'
+     * delivery logs 90, and the Scorecard's records 365.
      */
     retentionRequestBodiesDays: integer("retention_request_bodies_days"),
     retentionRequestMetadataDays: integer("retention_request_metadata_days"),
@@ -1163,6 +1192,8 @@ export const officeSettings = pgTable(
     retentionConnectionDeliveriesDays: integer(
       "retention_connection_deliveries_days",
     ),
+    /** The Scorecard's records (Scorecards PRD, FR-127): 365. */
+    retentionScorecardDays: integer("retention_scorecard_days"),
     /**
      * Whether the GitHub App's webhooks are taken (FR-8); null for the
      * default, off. Intake's polling carries on either way.
@@ -1257,7 +1288,7 @@ export const officeSettings = pgTable(
     ),
     check(
       "office_settings_retention",
-      sql`(${table.retentionRequestBodiesDays} IS NULL OR ${table.retentionRequestBodiesDays} BETWEEN 0 AND 3650) AND (${table.retentionRequestMetadataDays} IS NULL OR ${table.retentionRequestMetadataDays} BETWEEN 32 AND 3650) AND (${table.retentionActivityDays} IS NULL OR ${table.retentionActivityDays} BETWEEN 30 AND 3650) AND (${table.retentionConnectionDeliveriesDays} IS NULL OR ${table.retentionConnectionDeliveriesDays} BETWEEN 1 AND 3650)`,
+      sql`(${table.retentionRequestBodiesDays} IS NULL OR ${table.retentionRequestBodiesDays} BETWEEN 0 AND 3650) AND (${table.retentionRequestMetadataDays} IS NULL OR ${table.retentionRequestMetadataDays} BETWEEN 32 AND 3650) AND (${table.retentionActivityDays} IS NULL OR ${table.retentionActivityDays} BETWEEN 30 AND 3650) AND (${table.retentionConnectionDeliveriesDays} IS NULL OR ${table.retentionConnectionDeliveriesDays} BETWEEN 1 AND 3650) AND (${table.retentionScorecardDays} IS NULL OR ${table.retentionScorecardDays} BETWEEN 90 AND 3650)`,
     ),
     check(
       "office_settings_github_webhook_secret_sealed",
@@ -2091,11 +2122,20 @@ export const issueTriage = pgTable(
     role: text("role"),
     /** The work Roles the Owner is asked to choose from, while `routing`. */
     candidates: jsonb("candidates").notNull().default([]),
+    /**
+     * Its Size (Scorecards PRD, FR-132): `small`, `medium` or `large`; null
+     * for a triage from before Sizes.
+     */
+    size: text("size"),
     triagedAt: timestamp("triaged_at", { withTimezone: true }).notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.floorId, table.issue] }),
     check("issue_triage_issue", sql`${table.issue} > 0`),
+    check(
+      "issue_triage_size",
+      sql`${table.size} IS NULL OR ${table.size} IN ('small', 'medium', 'large')`,
+    ),
     check(
       "issue_triage_status",
       sql`${table.status} IN ('clear', 'waiting', 'routing')`,
@@ -3109,5 +3149,167 @@ export const connectionDeliveries = pgTable(
       sql`NOT ${table.test} OR ${table.eventId} IS NULL`,
     ),
     check("connection_deliveries_attempts", sql`${table.attempts} >= 0`),
+  ],
+);
+
+// The Scorecard (Scorecards PRD, FR-126, FR-127, FR-135): how each piece of
+// work turned out, recorded when it ended (its issue merged or closed, or
+// handed to the Owner), so the Scorecard outlives the events and Gateway
+// requests it was built from. A row for each Agent that worked a Stage of
+// it and each Model that served that Agent's requests; a piece of work
+// that ends again (handed to the Owner, then merged) is recorded afresh.
+// Kept for its own retention period (`retention_scorecard_days`).
+export const scorecardRecords = pgTable(
+  "scorecard_records",
+  {
+    floorId: text("floor_id").notNull(),
+    issue: integer("issue").notNull(),
+    agentId: text("agent_id").notNull(),
+    /** Its name, Role (a library Role's id) and Stage when the work ended. */
+    agentName: text("agent_name").notNull(),
+    role: text("role").notNull(),
+    stage: text("stage").notNull(),
+    contractor: boolean("contractor").notNull().default(false),
+    /** The Model that served its requests; its own, or empty, with none. */
+    model: text("model").notNull(),
+    /** The issue's Size from its triage; null when it had none. */
+    size: text("size"),
+    /** `merged`, `closed` or `handed_to_owner`. */
+    outcome: text("outcome").notNull(),
+    /** Review Loop rounds until every reviewer approved; null if none did. */
+    roundsToApproval: integer("rounds_to_approval"),
+    qaRoundsFailed: integer("qa_rounds_failed").notNull().default(0),
+    /** The watchdog's stalls and failures charged to this Agent. */
+    stalls: integer("stalls").notNull().default(0),
+    failures: integer("failures").notNull().default(0),
+    /** As a reviewer: rounds reviewed, and its blocking comments. */
+    roundsReviewed: integer("rounds_reviewed").notNull().default(0),
+    blockingComments: integer("blocking_comments").notNull().default(0),
+    inputTokens: bigint("input_tokens", { mode: "number" })
+      .notNull()
+      .default(0),
+    outputTokens: bigint("output_tokens", { mode: "number" })
+      .notNull()
+      .default(0),
+    estimatedCostUsd: doublePrecision("estimated_cost_usd")
+      .notNull()
+      .default(0),
+    endedAt: timestamp("ended_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.floorId, table.issue, table.agentId, table.model],
+    }),
+    index("scorecard_records_ended_at").on(table.endedAt),
+    check(
+      "scorecard_records_outcome",
+      sql`${table.outcome} IN ('merged', 'closed', 'handed_to_owner')`,
+    ),
+    check(
+      "scorecard_records_stage",
+      sql`${table.stage} IN ('work', 'review', 'qa', 'docs')`,
+    ),
+    check(
+      "scorecard_records_size",
+      sql`${table.size} IS NULL OR ${table.size} IN ('small', 'medium', 'large')`,
+    ),
+    check(
+      "scorecard_records_counts",
+      sql`${table.issue} > 0 AND (${table.roundsToApproval} IS NULL OR ${table.roundsToApproval} > 0) AND ${table.qaRoundsFailed} >= 0 AND ${table.stalls} >= 0 AND ${table.failures} >= 0 AND ${table.roundsReviewed} >= 0 AND ${table.blockingComments} >= 0 AND ${table.inputTokens} >= 0 AND ${table.outputTokens} >= 0 AND ${table.estimatedCostUsd} >= 0`,
+    ),
+  ],
+);
+
+// Each Floor's Recurring Goals (Scorecards PRD, FR-136 to FR-141; ADR
+// 0018): a Goal the Owner saved with a schedule, daily or weekly on chosen
+// days (`days`, 0 for Sunday) at a time (`time`, HH:MM) in the Office's
+// time zone, which the Floor's Manager works each time it comes round
+// (`next_run_at`, null while it is off), proposing a Plan that waits for
+// the Owner. Each run may use at most `token_cap` tokens, the Manager's and
+// its research Contractor's together; null for the office's daily Token
+// Cap. Three failed runs in a row (`failures`) turn it off. Only the Owner
+// makes, changes, runs and deletes them.
+export const recurringGoals = pgTable(
+  "recurring_goals",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
+    floorId: text("floor_id")
+      .notNull()
+      .references(() => floors.id),
+    name: text("name").notNull(),
+    words: text("words").notNull(),
+    frequency: text("frequency").notNull(),
+    days: integer("days").array().notNull(),
+    time: text("time").notNull(),
+    tokenCap: bigint("token_cap", { mode: "number" }),
+    enabled: boolean("enabled").notNull(),
+    failures: integer("failures").notNull().default(0),
+    nextRunAt: timestamp("next_run_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("recurring_goals_name_unique").on(
+      table.floorId,
+      sql`lower(${table.name})`,
+    ),
+    check(
+      "recurring_goals_name",
+      sql`length(${table.name}) BETWEEN 1 AND 100 AND ${table.name} = btrim(${table.name})`,
+    ),
+    check(
+      "recurring_goals_words",
+      sql`length(${table.words}) BETWEEN 1 AND 2000`,
+    ),
+    check(
+      "recurring_goals_schedule",
+      sql`((${table.frequency} = 'daily' AND cardinality(${table.days}) = 0) OR (${table.frequency} = 'weekly' AND cardinality(${table.days}) BETWEEN 1 AND 7 AND ${table.days} <@ ARRAY[0, 1, 2, 3, 4, 5, 6])) AND ${table.time} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'`,
+    ),
+    check(
+      "recurring_goals_token_cap",
+      sql`${table.tokenCap} IS NULL OR ${table.tokenCap} > 0`,
+    ),
+    check("recurring_goals_failures", sql`${table.failures} >= 0`),
+  ],
+);
+
+// Each run of a Recurring Goal (FR-140, FR-141): `running` until it ends,
+// then `planned` (it filed issues and proposed its Batch's Plan, which
+// waits for the Owner), `skipped` or `failed`, with why (`reason`); the
+// issues it filed, which later runs never file again while they are
+// open (FR-139); its Manager chat message; and the tokens it used.
+// Deleting a Recurring Goal deletes its runs.
+export const recurringGoalRuns = pgTable(
+  "recurring_goal_runs",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
+    goalId: bigint("goal_id", { mode: "number" })
+      .notNull()
+      .references(() => recurringGoals.id, { onDelete: "cascade" }),
+    floorId: text("floor_id").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    outcome: text("outcome").notNull(),
+    reason: text("reason").notNull().default(""),
+    batchId: bigint("batch_id", { mode: "number" }).references(
+      (): AnyPgColumn => batches.id,
+    ),
+    issues: integer("issues")
+      .array()
+      .notNull()
+      .default(sql`'{}'`),
+    tokens: bigint("tokens", { mode: "number" }).notNull().default(0),
+  },
+  (table) => [
+    index("recurring_goal_runs_goal_idx").on(table.goalId, table.id),
+    check(
+      "recurring_goal_runs_outcome",
+      sql`${table.outcome} IN ('running', 'planned', 'skipped', 'failed') AND (${table.outcome} = 'running') = (${table.finishedAt} IS NULL)`,
+    ),
+    check("recurring_goal_runs_tokens", sql`${table.tokens} >= 0`),
   ],
 );

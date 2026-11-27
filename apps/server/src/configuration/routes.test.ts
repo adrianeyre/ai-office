@@ -191,6 +191,8 @@ const cases: Case[] = [
         requestMetadataDays: 40,
         activityDays: 365,
         connectionDeliveriesDays: 30,
+        // Not given, so the default.
+        scorecardDays: 365,
       });
 
       const preview = await request(

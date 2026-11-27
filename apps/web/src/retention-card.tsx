@@ -40,6 +40,7 @@ const formValues = (settings: RetentionSettings): FormValues => ({
   requestMetadataDays: String(settings.requestMetadataDays),
   activityDays: String(settings.activityDays),
   connectionDeliveriesDays: String(settings.connectionDeliveriesDays),
+  scorecardDays: String(settings.scorecardDays),
 });
 
 /** Each field: its label, what it deletes, and its bounds. */
@@ -73,6 +74,12 @@ const fields: readonly {
     hint: "Each Connection's log of what it sent; 90 by default, and at least 1. A delivery still waiting to go stays.",
     min: retentionMinDays.connectionDeliveriesDays,
   },
+  {
+    key: "scorecardDays",
+    label: "Scorecard records (days)",
+    hint: "How each piece of work turned out, for the Scorecard on Analytics; 365 by default, and at least 90. They outlive the events and requests they were built from.",
+    min: retentionMinDays.scorecardDays,
+  },
 ];
 
 const numberOrUndefined = (value: string): number | undefined =>
@@ -99,6 +106,7 @@ function RetentionForm({ settings }: { settings: RetentionSettings }) {
       connectionDeliveriesDays: numberOrUndefined(
         values.connectionDeliveriesDays,
       ),
+      scorecardDays: numberOrUndefined(values.scorecardDays),
     });
     if (!parsed.success) {
       setProblems(parsed.error.issues.map(({ message }) => message));

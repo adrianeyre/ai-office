@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { maxGrillingIssues } from "./grilling-issues.ts";
+import { issueSizes } from "./triage.ts";
 
 // Specs (Guidelines, Specs and Hooks PRD, FR-113; ADR 0015): a feature's
 // requirements, design and tasks, agreed with the Owner one step at a time
@@ -110,6 +111,11 @@ export const specTaskSchema = z.object({
   meets: z.array(z.string()),
   /** The earlier tasks it depends on, by number. */
   dependsOn: z.array(z.number().int().positive()),
+  /**
+   * How big it is (Scorecards PRD, FR-132): its issue takes it at triage.
+   * None on a task written before Sizes.
+   */
+  size: z.enum(issueSizes).optional(),
 });
 export type SpecTask = z.infer<typeof specTaskSchema>;
 
@@ -242,6 +248,11 @@ export const specTurnSchema = z.object({
           .array(z.number().int().positive())
           .max(maxSpecTasks)
           .default([]),
+        size: z
+          .enum(issueSizes, {
+            error: 'A task\'s size is "small", "medium" or "large".',
+          })
+          .default("medium"),
       }),
     )
     .min(1, { error: "The tasks hold at least one task." })
@@ -348,16 +359,19 @@ export function specTasksDocument(
     "",
     "In the order they are built. Each task becomes one issue; its progress is read from the issue.",
     "",
-    ...tasks.flatMap(({ title, description, meets, dependsOn }, index) => [
-      `## ${String(index + 1)}. ${title}`,
-      "",
-      description.trim(),
-      "",
-      `- **Meets:** ${meets.join(", ")}`,
-      `- **Depends on:** ${dependsOn.length === 0 ? "none" : dependsOn.map((number) => `task ${String(number)}`).join(", ")}`,
-      ...linkOf(issues[index]),
-      "",
-    ]),
+    ...tasks.flatMap(
+      ({ title, description, meets, dependsOn, size }, index) => [
+        `## ${String(index + 1)}. ${title}`,
+        "",
+        description.trim(),
+        "",
+        `- **Meets:** ${meets.join(", ")}`,
+        `- **Depends on:** ${dependsOn.length === 0 ? "none" : dependsOn.map((number) => `task ${String(number)}`).join(", ")}`,
+        ...(size === undefined ? [] : [`- **Size:** ${size}`]),
+        ...linkOf(issues[index]),
+        "",
+      ],
+    ),
   ].join("\n");
 }
 

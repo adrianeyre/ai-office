@@ -10,6 +10,7 @@ import {
   type Batch,
   type BatchDetail,
   type Floor,
+  type IssueSize,
   type Plan,
   type PlanItem,
   type WrapUp,
@@ -38,7 +39,7 @@ import { AgentLink } from "./agent-link.tsx";
 import { getJson, postJson, readApiError } from "./api.ts";
 import { formatMoney, useMoney } from "./money.ts";
 import { useEventStream } from "./event-stream.ts";
-import { floorQuery } from "./floors.ts";
+import { agentsQuery, floorQuery } from "./floors.ts";
 import { GrillingWhiteboard } from "./grilling.tsx";
 import { rolesQuery } from "./role-library.tsx";
 import { sessionQuery } from "./session.ts";
@@ -139,14 +140,64 @@ function useRoleName(): (id: string) => string {
   return (id) => roles?.find((role) => role.id === id)?.name ?? id;
 }
 
+/** "small", "small and medium": the Sizes an Agent takes, in words. */
+const sizesInWords = (sizes: readonly IssueSize[]): string =>
+  sizes.length <= 1
+    ? (sizes[0] ?? "")
+    : `${sizes.slice(0, -1).join(", ")} and ${sizes.at(-1) ?? ""}`;
+
+/** Each issue's Size, from a Batch's detail (FR-134). */
+const sizesOf = (detail: BatchDetail): ReadonlyMap<number, IssueSize> =>
+  new Map(detail.sizes.map(({ issue, size }) => [issue, size]));
+
+/**
+ * The flag on an issue the Plan gives to a coder that does not take its
+ * Size (Scorecards PRD, FR-134): the Plan stands as the Owner approves it,
+ * but they see it first.
+ */
+function SizeFlag({
+  floorId,
+  agentId,
+  issue,
+  size,
+}: {
+  floorId: string;
+  agentId: string | null;
+  issue: number;
+  size: IssueSize | undefined;
+}) {
+  const { data: agents } = useQuery(agentsQuery(floorId));
+  const agent = agents?.find(({ id }) => id === agentId);
+  if (size === undefined || agent === undefined || agent.sizes.includes(size)) {
+    return null;
+  }
+  return (
+    <p role="note">
+      <Badge tone="warning">
+        {agent.name} takes only {sizesInWords(agent.sizes)} issues
+      </Badge>{" "}
+      <span className="text-xs text-muted-foreground">
+        #{issue} is {size}: the Plan gives it to {agent.name} all the same, as
+        you approve it.
+      </span>
+    </p>
+  );
+}
+
 /** What a Plan says about one issue, after its number and title. */
 function ItemDetails({
   floorId,
   item,
+  size,
   showRoles = true,
 }: {
   floorId: string;
-  item: Pick<PlanItem, "agentId" | "dependsOn" | "files" | "note" | "roles">;
+  item: Pick<
+    PlanItem,
+    "issue" | "agentId" | "dependsOn" | "files" | "note" | "roles"
+  >;
+  /** The issue's Size from its triage, if it has one. */
+  size?: IssueSize | undefined;
   /** Whether to list its work Roles, unless the editor does. */
   showRoles?: boolean;
 }) {
@@ -176,6 +227,12 @@ function ItemDetails({
         </p>
       )}
       {item.note !== "" && <p>{item.note}</p>}
+      <SizeFlag
+        floorId={floorId}
+        agentId={item.agentId}
+        issue={item.issue}
+        size={size}
+      />
     </div>
   );
 }
@@ -186,11 +243,14 @@ function PlanView({
   floorId,
   plan,
   started,
+  sizes,
 }: {
   floor: Floor | undefined;
   floorId: string;
   plan: Plan;
   started: readonly number[];
+  /** Each issue's Size, for the flag on one its coder does not take. */
+  sizes: ReadonlyMap<number, IssueSize>;
 }) {
   return (
     <div className="space-y-3">
@@ -210,7 +270,11 @@ function PlanView({
                 </>
               )}
             </p>
-            <ItemDetails floorId={floorId} item={item} />
+            <ItemDetails
+              floorId={floorId}
+              item={item}
+              size={sizes.get(item.issue)}
+            />
             {item.annotation !== undefined && item.annotation !== "" && (
               <p className="text-xs">Your note: {item.annotation}</p>
             )}
@@ -792,6 +856,7 @@ function PlanEditor({
                   <ItemDetails
                     floorId={floorId}
                     item={item}
+                    size={sizesOf(detail).get(item.issue)}
                     showRoles={row.roles.length < 2}
                   />
                   {row.roles.length > 1 && (
@@ -1029,6 +1094,7 @@ function BatchPlans({
             floorId={floorId}
             plan={plan}
             started={plan.version === latest.version ? batch.started : []}
+            sizes={sizesOf(detail)}
           />
         </>
       )}

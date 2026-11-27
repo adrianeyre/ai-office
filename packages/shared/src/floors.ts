@@ -59,6 +59,48 @@ export const mostAgentsSchema = z
   })
   .nullable();
 
+/** The most Owner-only Paths a Floor may have (Scorecards PRD, FR-122). */
+export const maxOwnerOnlyPaths = 100;
+
+/**
+ * An Owner-only Path (Scorecards PRD, FR-122): a glob, from the top of the
+ * repository, matched as a Guideline's `fileMatchPattern` is (`*`, `**`,
+ * `?`, `[…]` and `{a,b}`), but whatever its case.
+ */
+export const ownerOnlyPathSchema = z
+  .string({ error: "An Owner-only Path is a glob, such as src/auth/**." })
+  .trim()
+  .min(1, { error: "An Owner-only Path is a glob, such as src/auth/**." })
+  .max(255, { error: "Use at most 255 characters for an Owner-only Path." })
+  .regex(/^[^\n\r]+$/, { error: "An Owner-only Path is one line." });
+
+/**
+ * A Floor's Owner-only Paths (FR-122): each once, whatever its case; empty
+ * for none, the default.
+ */
+export const ownerOnlyPathsSchema = z
+  .array(ownerOnlyPathSchema)
+  .max(maxOwnerOnlyPaths, {
+    error: `Give at most ${String(maxOwnerOnlyPaths)} Owner-only Paths.`,
+  })
+  .refine(
+    (paths) =>
+      new Set(paths.map((path) => path.toLowerCase())).size === paths.length,
+    { error: "Give each Owner-only Path once." },
+  );
+
+/**
+ * The most lines a pull request may change and still be merged
+ * automatically (FR-122): lines added plus lines removed, lockfiles and
+ * generated files left out; null for no limit, the default.
+ */
+export const changedLinesLimitSchema = z
+  .number({ error: "The changed-lines limit is a whole number of lines." })
+  .int({ error: "The changed-lines limit is a whole number of lines." })
+  .min(1, { error: "The changed-lines limit is at least 1 line." })
+  .max(1_000_000, { error: "The changed-lines limit is at most 1,000,000." })
+  .nullable();
+
 /** A Floor's settings (FR-7), with their limits. */
 export const floorSettingsSchema = z.object({
   name: z
@@ -90,6 +132,16 @@ export const floorSettingsSchema = z.object({
     .int({ error: "The Round Cap is a whole number of rounds." })
     .min(1, { error: "The Round Cap is at least 1." })
     .max(10, { error: "The Round Cap is at most 10." }),
+  /**
+   * Paths whose changes the Merge Policy never merges automatically
+   * (Scorecards PRD, FR-122): the pull request goes to the Owner.
+   */
+  ownerOnlyPaths: ownerOnlyPathsSchema,
+  /**
+   * The most lines a pull request may change and be merged automatically
+   * (FR-122); null for no limit.
+   */
+  changedLinesLimit: changedLinesLimitSchema,
   /** Overrides of the office's Token Caps; null uses the office's. */
   tokenCaps: z.object({ daily: tokenCap, monthly: tokenCap }),
   /** A lower limit on this Floor's running sandboxes; null for none. */
@@ -141,6 +193,8 @@ export const defaultFloorSettings = {
   testCommand: "",
   mergePolicy: "send_to_me",
   roundCap: 3,
+  ownerOnlyPaths: [],
+  changedLinesLimit: null,
   tokenCaps: { daily: null, monthly: null },
   concurrencyLimit: null,
   priority: 0,

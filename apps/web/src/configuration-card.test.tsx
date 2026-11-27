@@ -37,6 +37,7 @@ const configuration: Configuration = {
       requestMetadataDays: 90,
       activityDays: 365,
       connectionDeliveriesDays: 90,
+      scorecardDays: 365,
     },
   },
   aiProviders: [],

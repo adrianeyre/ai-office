@@ -305,9 +305,10 @@ const designDone = {
 const tasksDone = { message: "The tasks.", spec: { tasks } };
 
 /** The tasks as AI Office keeps them: each depending only on earlier ones. */
+/** As kept: each task's Size, medium when its Model gave none (FR-132). */
 const keptTasks = [
-  { ...tasks[0], dependsOn: [] },
-  { ...tasks[1], dependsOn: [1] },
+  { ...tasks[0], dependsOn: [], size: "medium" },
+  { ...tasks[1], dependsOn: [1], size: "medium" },
 ] as const;
 
 type Case = [
@@ -456,12 +457,14 @@ const cases: Case[] = [
           description: "The vault, the table and the Save card tick box.",
           meets: ["R1.1", "R1.2"],
           dependsOn: [],
+          size: "medium",
         },
         {
           title: "Offer saved cards first",
           description: "The checkout lists saved cards before the card form.",
           meets: ["R2.1", "R2.2", "R9.9"],
           dependsOn: [1],
+          size: "medium",
         },
       ]);
       expect(await s.fileOn(branch, `${folder}/tasks.md`)).toBe(tasksMd);
@@ -496,6 +499,7 @@ const cases: Case[] = [
           blockedBy: [],
           prdSections: [],
           adrs: [],
+          size: "medium",
           filed: null,
         },
         expect.objectContaining({

@@ -49,6 +49,7 @@ import { agentsQuery, floorsQuery } from "./floors.ts";
 import { lobbyCastQuery } from "./people.ts";
 import { rolesQuery } from "./role-library.tsx";
 import { RoleMemoryCard } from "./role-memory-card.tsx";
+import { AgentScorecardLine } from "./scorecard.tsx";
 import { sessionQuery } from "./session.ts";
 import { TeamCard } from "./team-card.tsx";
 import { FloorTokenUsageCard } from "./token-caps.tsx";
@@ -391,6 +392,14 @@ function AgentSettingsCard({ agent }: { agent: Agent }) {
           Token Caps: {capText(agent.tokenCaps.daily)} a day,{" "}
           {capText(agent.tokenCaps.monthly)} a month.
         </p>
+        {/* How its work turned out, where its Model is chosen (FR-131). */}
+        {agent.role !== "manager" && (
+          <AgentScorecardLine
+            floorId={agent.floorId}
+            agentId={agent.id}
+            agentName={agent.name}
+          />
+        )}
         <div className="flex flex-wrap gap-2">
           <KeepOnTeam agent={agent} onKept={setSaid} />
           <RemoveAgent agent={agent} onRemoved={setSaid} />

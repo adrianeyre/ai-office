@@ -174,6 +174,7 @@ const cases: Case[] = [
           freshStartThreshold: null,
           createdAt: expect.any(Date) as unknown,
           leavingAt: null,
+          sizes: ["small", "medium", "large"],
           contractor: null,
         });
         expect(agent.role === "coder" ? ["Adrian"] : agentNames).toContain(

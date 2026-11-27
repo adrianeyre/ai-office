@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { PipelineLabel } from "./pipeline.ts";
+
 // The Manager's triage (PRD FR-23): before work starts on a picked-up
 // issue, the Manager checks it is clear enough to work (acceptance criteria
 // present, scope bounded) and sets its priority, which the work queue
@@ -18,6 +20,50 @@ export const issuePriorityLabels: Record<IssuePriority, string> = {
   low: "Low",
   normal: "Normal",
   high: "High",
+};
+
+/**
+ * An issue's Size (Scorecards PRD, FR-132): how much work it is, judged at
+ * triage with its priority. Each Agent takes the Sizes the Owner chose
+ * (FR-133), so small work can go to cheaper Agents.
+ */
+export const issueSizes = ["small", "medium", "large"] as const;
+export type IssueSize = (typeof issueSizes)[number];
+
+/** What an issue gets when nothing judged its Size: AI Office's rules. */
+export const defaultIssueSize: IssueSize = "medium";
+
+export const issueSizeLabels: Record<IssueSize, string> = {
+  small: "Small",
+  medium: "Medium",
+  large: "Large",
+};
+
+/** What a label that forces an issue's Size starts with (FR-132). */
+export const sizeLabelPrefix = "size:";
+
+/** The `size:<size>` label that forces `size`, such as `size:small`. */
+export const sizeLabelName = (size: IssueSize): string =>
+  `${sizeLabelPrefix}${size}`;
+
+/** The three `size:` labels intake makes on each Floor's repository. */
+export const sizeLabels: readonly PipelineLabel[] = issueSizes.map((size) => ({
+  name: sizeLabelName(size),
+  color: "c5def5",
+  description: `AI Office: a ${size} issue, whatever triage judges`,
+}));
+
+/**
+ * The Size `labels` force, in any case: the largest, when an issue has
+ * more than one `size:` label; undefined with none.
+ */
+export const sizeOfLabels = (
+  labels: readonly string[],
+): IssueSize | undefined => {
+  const named = new Set(
+    labels.map((label) => label.trim().toLowerCase().replace(/\s+/g, "")),
+  );
+  return issueSizes.findLast((size) => named.has(sizeLabelName(size)));
 };
 
 /** Whether the issue may be worked, or waits for the Owner. */
@@ -55,6 +101,10 @@ export const triageVerdictSchema = z
     }),
     priority: z.enum(issuePriorities, {
       error: 'The priority is "high", "normal" or "low".',
+    }),
+    /** How big its change is (Scorecards PRD, FR-132). */
+    size: z.enum(issueSizes, {
+      error: 'The size is "small", "medium" or "large".',
     }),
     /** Why, in a sentence or two. */
     reason: z

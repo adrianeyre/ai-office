@@ -55,6 +55,8 @@ import {
   createNoAccountLeftNotices,
   createGuidelineApprovals,
   createHookRunner,
+  createScorecardRecorder,
+  createRecurringGoals,
   createGuidelineProposals,
   createTaskGuidelines,
   plannedFiles,
@@ -589,6 +591,7 @@ export async function startOffice(
       auth: authStore,
       communications: communicationsStore,
       chatAttachments: stores.chatAttachments,
+      scorecards: stores.scorecards,
     }),
     onReport: ({ deleted, failed }) => {
       for (const { rule, error } of failed) {
@@ -1038,6 +1041,27 @@ export async function startOffice(
     },
   });
 
+  // The Scorecard (Scorecards PRD, FR-126, FR-127): how each piece of work
+  // turned out, recorded as it ends, with what its Gateway requests used.
+  const scorecard = createScorecardRecorder({
+    store: stores.scorecards,
+    floors: stores.floors,
+    agents: stores.agents,
+    roles: stores.roles,
+    events,
+    reviews: stores.reviews,
+    usage: (floorId, issue) => requestStore.issueUsage(floorId, issue),
+    sizeOf: async (floorId, issue) =>
+      (await stores.triage.get(floorId, issue))?.size ?? null,
+    github,
+    onError: (error) => {
+      logger.warn(
+        { err: error },
+        "A piece of work was not recorded for the Scorecard.",
+      );
+    },
+  });
+
   // A Grilling Session's facts (FR-79), found in read-only sandboxes that
   // reach models through the AI Gateway with the Agent's own Gateway Key
   // (ADR 0001), when the GitHub App and the sandboxes' Gateway are set.
@@ -1344,6 +1368,50 @@ export async function startOffice(
     () => false,
   );
   const setupToken = passwordSet ? undefined : await writeSetupToken();
+  // Each Floor's Recurring Goals (Scorecards PRD, FR-136 to FR-141; ADR
+  // 0018): on their schedules, the Manager works each one's words by the
+  // chat request's path, and its Plan waits for the Owner.
+  const recurringGoals = createRecurringGoals({
+    store: stores.recurringGoals,
+    floors: stores.floors,
+    agents: stores.agents,
+    batches: stores.batches,
+    requests: chatRequests,
+    release: (floorId, agentId) => agents.release(floorId, agentId),
+    models,
+    defaultModels: () => aiProviders.defaultModels(),
+    github,
+    chat: {
+      // The Goal's words, kept as the Owner's `/goal`, which they are.
+      keep: (floorId, text) =>
+        stores.managerChat.append({
+          floorId,
+          kind: "owner",
+          text,
+          command: null,
+          replyTo: null,
+          agentId: null,
+          model: null,
+          createdAt: new Date(),
+        }),
+      say: async (floorId, _kind, text, replyTo) => {
+        await managerChat.postProgress(floorId, text, replyTo);
+      },
+    },
+    notices,
+    events,
+    timeZone: async () => (await officeSettings.ownerProfile()).timeZone,
+    officeTokenCap: async () => (await tokenCaps.officeCaps()).daily,
+    // What the run's Manager and research Contractor used, as the AI
+    // Gateway counted it, from the run's start.
+    tokensUsed: async (agentIds, since) =>
+      (await requestHistory.tokenUsage(since, new Date()))
+        .filter(({ agentId }) => agentId !== null && agentIds.includes(agentId))
+        .reduce((sum, { totals }) => sum + totals.tokens, 0),
+    onError: (error) => {
+      logger.warn({ err: error }, "A Recurring Goal's run went wrong.");
+    },
+  });
   const app = await buildApp({
     floorStops,
     logger,
@@ -1361,6 +1429,7 @@ export async function startOffice(
     guidelineApprovals,
     guidelineProposals,
     hookRunner,
+    recurringGoals,
     aiAccounts,
     combos,
     modelMappings,
@@ -1525,6 +1594,9 @@ export async function startOffice(
     // A diff too large for a reviewer's context window goes to the Owner.
     defaultModels: () => aiProviders.defaultModels(),
     contextWindow,
+    // The reviewers that take the issue's Size (Scorecards PRD, FR-133).
+    issueSize: async (floorId, issue) =>
+      (await stores.triage.get(floorId, issue))?.size ?? null,
   });
   // The turns of the work Roles a Plan gives an issue (PRD FR-25 (1)): the
   // coder flow hands it from one to the next, the Review Loop sends a fix
@@ -1582,6 +1654,8 @@ export async function startOffice(
               "needs-review": createReviewFlow({
                 floors: stores.floors,
                 agents: workingAgents,
+                issueSize: async (floorId, issue) =>
+                  (await stores.triage.get(floorId, issue))?.size ?? null,
                 github: stageGitHub,
                 pipeline,
                 notices,
@@ -1777,6 +1851,8 @@ export async function startOffice(
     // the one its triage chose.
     issueRole: async (floorId: string, issue: number) =>
       (await turns.role(floorId, issue)) ?? triage.role(floorId, issue),
+    // Its Size from its triage (Scorecards PRD, FR-133).
+    issueSize: (floorId: string, issue: number) => triage.size(floorId, issue),
     onError: (error) => {
       logger.error({ err: error }, "The work queue failed.");
     },
@@ -1818,6 +1894,7 @@ export async function startOffice(
           events,
           decisions: stores.decisions,
           pausedAgents: () => capEnforcement.pausedAgents(),
+          issueSize: (floorId, issue) => triage.size(floorId, issue),
           // The Owner's stall timeouts, read at each check.
           timeLimits: () => officeSettings.watchdogSettings(),
           redactor,
@@ -2189,6 +2266,8 @@ export async function startOffice(
     guidelineApprovals.stop();
     taskGuidelines.stop();
     stopHooks();
+    await scorecard.stop();
+    await recurringGoals.stop();
     capEnforcement.stop();
     workingAgents.stop();
     await intake.stop();
@@ -2273,6 +2352,8 @@ export async function startOffice(
   memoryCuration.start();
   roleMemoryReview.start();
   retention.start();
+  scorecard.start();
+  recurringGoals.start();
   await communications
     .start()
     .then(async () =>

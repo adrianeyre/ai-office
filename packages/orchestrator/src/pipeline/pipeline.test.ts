@@ -350,6 +350,7 @@ describe("stageAfter", () => {
         freshStartThreshold: null,
         createdAt: new Date(created.getTime() + index),
         leavingAt: null,
+        sizes: ["small", "medium", "large"],
         contractor: null,
       })),
     );

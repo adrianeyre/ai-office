@@ -588,6 +588,7 @@ async function scenario(
           JSON.stringify({
             clear: true,
             priority: "normal",
+            size: "medium",
             reason: "It lists acceptance criteria.",
             questions: [],
           }),

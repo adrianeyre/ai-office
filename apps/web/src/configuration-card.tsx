@@ -42,6 +42,7 @@ const areaNames: Record<ConfigurationArea, string> = {
   skill_toggle: "Floors' Skill settings",
   role_memory: "Role memory",
   hook: "Hooks",
+  recurring_goal: "Recurring Goals",
 };
 
 /** The file chosen, read and checked, or why it cannot be imported. */

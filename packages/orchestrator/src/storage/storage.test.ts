@@ -7,6 +7,7 @@ import {
   gatewayRequestBodies,
   gatewayRequests,
   gatewayUsageDays,
+  scorecardRecords,
   signInEvents,
 } from "@ai-office/db";
 import { postgresTest } from "@ai-office/db/testing";
@@ -106,6 +107,21 @@ describe("storage, in Postgres 18", () => {
       await db
         .insert(connectionDeliveries)
         .values([deliveryOf(1, old), deliveryOf(2, recent)]);
+      // The Scorecard's records (Scorecards PRD, FR-127), by when their
+      // work ended.
+      await db.insert(scorecardRecords).values(
+        [old, recent].map((endedAt, index) => ({
+          floorId: "web-shop",
+          issue: index + 1,
+          agentId: "ada",
+          agentName: "Ada",
+          role: "coder",
+          stage: "work",
+          model: "claude-opus-5-5",
+          outcome: "merged",
+          endedAt,
+        })),
+      );
       const storage = databaseStorageStore(db);
 
       const usage = await storage.usage();
@@ -123,6 +139,7 @@ describe("storage, in Postgres 18", () => {
       expect(await storage.prune("usage_history", cutoff)).toBe(1);
       expect(await storage.prune("sign_ins", cutoff)).toBe(1);
       expect(await storage.prune("connection_deliveries", cutoff)).toBe(1);
+      expect(await storage.prune("scorecards", cutoff)).toBe(1);
       // The request whose body went stays, until its own turn.
       expect(
         (await storage.usage()).categories.find(

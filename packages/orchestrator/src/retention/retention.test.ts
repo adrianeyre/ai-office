@@ -23,6 +23,7 @@ function recordingTargets() {
     requestMetadata: target("requestMetadata"),
     activity: target("activity"),
     connectionDeliveries: target("connectionDeliveries"),
+    scorecards: target("scorecards"),
   };
   return { calls, targets };
 }
@@ -32,7 +33,7 @@ afterEach(() => {
 });
 
 describe("retention's job", () => {
-  it("deletes bodies older than 7 days, records older than 90, activity older than a year and delivery logs older than 90 days, by default", async () => {
+  it("deletes bodies older than 7 days, records older than 90, activity older than a year, delivery logs older than 90 days and Scorecard records older than a year, by default", async () => {
     const { calls, targets } = recordingTargets();
     const retention = createRetention({
       settings: () => Promise.resolve(defaultRetentionSettings),
@@ -45,12 +46,14 @@ describe("retention's job", () => {
       ["requestMetadata", "2026-07-12T12:00:00.000Z"],
       ["activity", "2025-10-10T12:00:00.000Z"],
       ["connectionDeliveries", "2026-07-12T12:00:00.000Z"],
+      ["scorecards", "2025-10-10T12:00:00.000Z"],
     ]);
     expect(report.deleted.map(({ rule, count }) => [rule, count])).toEqual([
       ["requestBodiesDays", 1],
       ["requestMetadataDays", 2],
       ["activityDays", 3],
       ["connectionDeliveriesDays", 4],
+      ["scorecardDays", 5],
     ]);
     expect(report.failed).toEqual([]);
   });
@@ -92,6 +95,7 @@ describe("retention's job", () => {
       requestMetadataDays: 30,
       activityDays: 60,
       connectionDeliveriesDays: 14,
+      scorecardDays: 120,
     };
     await retention.run();
     expect(calls.map(([, before]) => before)).toEqual([
@@ -99,6 +103,7 @@ describe("retention's job", () => {
       new Date(now.getTime() - 30 * day).toISOString(),
       new Date(now.getTime() - 60 * day).toISOString(),
       new Date(now.getTime() - 14 * day).toISOString(),
+      new Date(now.getTime() - 120 * day).toISOString(),
     ]);
   });
 
@@ -118,6 +123,7 @@ describe("retention's job", () => {
       "requestBodies",
       "activity",
       "connectionDeliveries",
+      "scorecards",
     ]);
     expect(report.failed).toEqual([
       { rule: "requestMetadataDays", error: failure },
@@ -126,6 +132,7 @@ describe("retention's job", () => {
       "requestBodiesDays",
       "activityDays",
       "connectionDeliveriesDays",
+      "scorecardDays",
     ]);
   });
 
@@ -144,7 +151,7 @@ describe("retention's job", () => {
     expect(reports).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
     expect(reports).toHaveLength(2);
-    expect(calls[4]).toEqual([
+    expect(calls[5]).toEqual([
       "requestBodies",
       new Date(now.getTime() + 60 * 60 * 1000 - 7 * day).toISOString(),
     ]);

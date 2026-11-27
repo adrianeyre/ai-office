@@ -12,6 +12,7 @@ import {
   defaultIntakeSettings,
   triageActions,
   type DecisionModelSettings,
+  type IssueSize,
 } from "@ai-office/shared";
 import { describe, expect, it } from "vitest";
 
@@ -73,9 +74,10 @@ const vagueIssue = {
 const triageAnswer = (answer: {
   clear: boolean;
   priority: "high" | "normal" | "low";
+  size?: "small" | "medium" | "large";
   reason: string;
   questions?: string[];
-}): string => JSON.stringify({ questions: [], ...answer });
+}): string => JSON.stringify({ questions: [], size: "medium", ...answer });
 
 interface Setup {
   readonly github: FakeGitHub;
@@ -93,7 +95,8 @@ interface Setup {
   readonly workStore: WorkQueueStore;
   readonly manager: AgentRecord;
   /** The issues filed from the Floor's Specs (FR-115). */
-  readonly specIssues: Set<number>;
+  /** Issues filed from a Spec, each with its task's Size. */
+  readonly specIssues: Map<number, IssueSize | null>;
   /** The issue's labels on GitHub. */
   labels(issue: number): Promise<readonly string[]>;
   /** The issue's comments' bodies, oldest first. */
@@ -124,13 +127,13 @@ async function setUp(
   const jev = createFakeDecisionModel();
   let decisionSettings = defaultDecisionModelSettings;
   const notices = createNotices({ store: stores.notices, events: bus });
-  const specIssues = new Set<number>();
+  const specIssues = new Map<number, IssueSize | null>();
   const triage = createTriage({
     floors: stores.floors,
     agents: stores.agents,
     github,
     models: model,
-    specIssues: () => Promise.resolve(new Set(specIssues)),
+    specIssues: () => Promise.resolve(new Map(specIssues)),
     decisionModel: createDecisionModel({
       settings: () => Promise.resolve(decisionSettings),
       client: jev,
@@ -147,6 +150,7 @@ async function setUp(
     events: bus,
     limit: () => Promise.resolve(3),
     issuePriority: (floorId, issue) => triage.priority(floorId, issue),
+    issueSize: (floorId, issue) => triage.size(floorId, issue),
   });
   const intake = createIntake({
     floors: stores.floors,
@@ -227,7 +231,7 @@ const cases: Case[] = [
         ].join("\n"),
         labels: ["ai-office"],
       });
-      setup.specIssues.add(fromSpec.number);
+      setup.specIssues.set(fromSpec.number, null);
 
       expect((await intake.poll()).pickedUp).toEqual([
         { floorId: "web-shop", issue: fromSpec.number },
@@ -257,6 +261,7 @@ const cases: Case[] = [
       jev.answer(manager.id, {
         clear: noul(0.93),
         priority: choice("high"),
+        size: choice("medium"),
         gap: choice("nothing"),
       });
       await intake.poll();
@@ -291,6 +296,7 @@ const cases: Case[] = [
       jev.answer(manager.id, {
         clear: noul(0.93),
         priority: choice("high"),
+        size: choice("small"),
         gap: choice("nothing"),
       });
 
@@ -328,9 +334,15 @@ const cases: Case[] = [
           agentId: manager.id,
           outcome: "clear",
           priority: "high",
+          size: "small",
           judgedBy: "decision_model",
         },
       ]);
+      // Its Size, from the Decision Model in the same judgement (FR-132).
+      expect(comment).toContain("Its Size is **small**.");
+      expect(
+        (await setup.stores.triage.get("web-shop", issue.number))?.size,
+      ).toBe("small");
       expect(await setup.notices.open()).toEqual([]);
     },
   ],
@@ -343,6 +355,7 @@ const cases: Case[] = [
       jev.answer(manager.id, {
         clear: noul(0.08),
         priority: choice("normal"),
+        size: choice("medium"),
         gap: choice("done"),
       });
 
@@ -460,9 +473,11 @@ const cases: Case[] = [
           agentId: manager.id,
           outcome: "clear",
           priority: "high",
+          size: "medium",
           judgedBy: "model",
         },
       ]);
+      expect(comment).toContain("Its Size is **medium**.");
       // No Notice: nothing needs the Owner.
       expect(await setup.notices.open()).toEqual([]);
 
@@ -741,6 +756,211 @@ const cases: Case[] = [
       expect(model.requests).toEqual([]);
       expect((await setup.comments(issue.number))[0]).toContain(
         `as ${manager.name} is paused`,
+      );
+    },
+  ],
+  [
+    "the Manager's Model gives the issue its Size, kept with the triage (Scorecards PRD, FR-132)",
+    async (setup) => {
+      const { github, model, manager, intake, triage } = setup;
+      const issue = github.createIssue(webShop, clearIssue);
+      model.answer(
+        manager.id,
+        triageAnswer({
+          clear: true,
+          priority: "normal",
+          size: "large",
+          reason: "Clear.",
+        }),
+      );
+      await intake.poll();
+      expect(await triage.size("web-shop", issue.number)).toBe("large");
+      expect(await setup.triaged()).toMatchObject([
+        { size: "large", judgedBy: "model" },
+      ]);
+      expect((await setup.comments(issue.number))[0]).toContain(
+        "Its Size is **large**.",
+      );
+    },
+  ],
+  [
+    "an answer without a Size is sent back to the Manager's Model, as any invalid triage is",
+    async (setup) => {
+      const { github, model, manager, intake, triage } = setup;
+      const issue = github.createIssue(webShop, clearIssue);
+      model.answer(
+        manager.id,
+        JSON.stringify({
+          clear: true,
+          priority: "normal",
+          reason: "Clear.",
+          questions: [],
+        }),
+        triageAnswer({
+          clear: true,
+          priority: "normal",
+          size: "small",
+          reason: "Clear.",
+        }),
+      );
+      await intake.poll();
+      const [, retry] = model.requestsOf(manager.id);
+      expect(retry?.messages.at(-1)?.content).toContain(
+        'That answer is not a valid triage: size: The size is "small", "medium" or "large".',
+      );
+      expect(await triage.size("web-shop", issue.number)).toBe("small");
+      expect(await setup.triaged()).toMatchObject([
+        { size: "small", judgedBy: "model" },
+      ]);
+    },
+  ],
+  [
+    "a size: label forces the Size, whatever the Model judged; one added later changes it without triaging again",
+    async (setup) => {
+      const { github, model, manager, intake, triage } = setup;
+      const issue = github.createIssue(webShop, {
+        ...clearIssue,
+        labels: ["ai-office", "size:small"],
+      });
+      model.answer(
+        manager.id,
+        triageAnswer({
+          clear: true,
+          priority: "normal",
+          size: "large",
+          reason: "Clear.",
+        }),
+      );
+      await intake.poll();
+      expect(await triage.size("web-shop", issue.number)).toBe("small");
+      expect(await setup.triaged()).toMatchObject([{ size: "small" }]);
+      expect((await setup.comments(issue.number))[0]).toContain(
+        "Its Size is **small**, as the `size:small` label on this issue says.",
+      );
+
+      // The Owner labels it large: its Size changes, and no model is asked.
+      github.setLabel(webShop, issue.number, "size:large");
+      await setup.triage.check(
+        (await setup.stores.floors.get("web-shop")) ?? expect.fail(),
+        await github.repository(webShop).getIssue(issue.number),
+      );
+      expect(await triage.size("web-shop", issue.number)).toBe("large");
+      expect(model.requestsOf(manager.id)).toHaveLength(1);
+      expect((await setup.comments(issue.number)).at(-1)).toContain(
+        "### Size: large",
+      );
+    },
+  ],
+  [
+    "intake makes the three size: labels on the Floor's repository",
+    async (setup) => {
+      const { github, intake } = setup;
+      await intake.poll();
+      const labels = github.labels(webShop).map(({ name }) => name);
+      expect(labels).toEqual(
+        expect.arrayContaining(["size:small", "size:medium", "size:large"]),
+      );
+    },
+  ],
+  [
+    "an issue filed from a Spec takes the Size its task was given",
+    async (setup) => {
+      const { github, model, intake, triage } = setup;
+      const issue = github.createIssue(webShop, clearIssue);
+      setup.specIssues.set(issue.number, "small");
+      await intake.poll();
+      expect(model.requests).toEqual([]);
+      expect(await triage.size("web-shop", issue.number)).toBe("small");
+      expect((await setup.comments(issue.number))[0]).toContain(
+        "Its Size is **small**, as its task in the Spec says.",
+      );
+    },
+  ],
+  [
+    "AI Office's rules say medium when no model judges",
+    async (setup) => {
+      const { github, manager, intake, stores, triage } = setup;
+      await stores.agents.update({ ...manager, enabled: false });
+      const issue = github.createIssue(webShop, clearIssue);
+      await intake.poll();
+      expect(await triage.size("web-shop", issue.number)).toBe("medium");
+      expect(await setup.triaged()).toMatchObject([
+        { size: "medium", judgedBy: "rules" },
+      ]);
+    },
+  ],
+  [
+    "dispatches by Size: a small issue goes to the coder that takes small issues, another waits for it while it is busy, and with no coder taking its Size any coder works it, as the triage comment says (Scorecards PRD, FR-133)",
+    async (setup) => {
+      const { github, model, manager, intake, stores, workStore } = setup;
+      const [ada] = (await stores.agents.list("web-shop")).filter(
+        ({ role }) => role === "coder",
+      );
+      if (ada === undefined) {
+        throw new Error("A new Floor has a coder.");
+      }
+      // Ada on Opus takes medium and large issues; Hal on Haiku, small.
+      await stores.agents.update({ ...ada, sizes: ["medium", "large"] });
+      const hal = {
+        ...ada,
+        id: "web-shop-hal",
+        name: "Hal Haiku",
+        modelOverride: "claude-haiku-5-5",
+        sizes: ["small" as const],
+        createdAt: new Date("2026-10-09T13:00:00.000Z"),
+      };
+      expect(await stores.agents.create(hal)).toBe("created");
+      const answer = (size: "small" | "medium" | "large") =>
+        triageAnswer({
+          clear: true,
+          priority: "normal",
+          size,
+          reason: "Clear.",
+        });
+      const typo = github.createIssue(webShop, {
+        ...clearIssue,
+        title: "Fix a typo in the footer",
+      });
+      const another = github.createIssue(webShop, {
+        ...clearIssue,
+        title: "Fix another typo",
+      });
+      model.answer(manager.id, answer("small"), answer("small"));
+      await intake.poll();
+      const queuedFor = async () =>
+        Object.fromEntries(
+          (await workStore.active()).map(({ issue, agentId }) => [
+            issue,
+            agentId,
+          ]),
+        );
+      // Both small: Hal's, the second waiting behind the first, though
+      // Ada is free.
+      expect(await queuedFor()).toEqual({
+        [typo.number]: hal.id,
+        [another.number]: hal.id,
+      });
+
+      // No coder takes large issues once Ada takes only medium ones: any
+      // coder may, and the triage comment says so.
+      await stores.agents.update({
+        ...((await stores.agents.list("web-shop")).find(
+          ({ id }) => id === ada.id,
+        ) ?? ada),
+        sizes: ["medium"],
+      });
+      const big = github.createIssue(webShop, {
+        ...clearIssue,
+        title: "Rework the checkout",
+      });
+      model.answer(manager.id, answer("large"));
+      await intake.poll();
+      expect((await queuedFor())[big.number]).toBe(ada.id);
+      expect((await setup.comments(big.number))[0]).toContain(
+        "None of the Floor's coder Agents takes **large** issues, so any of them may work it.",
+      );
+      expect((await setup.comments(typo.number))[0]).not.toContain(
+        "None of the Floor's",
       );
     },
   ],

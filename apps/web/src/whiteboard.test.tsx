@@ -43,6 +43,8 @@ const floor = {
   testCommand: "",
   mergePolicy: "send_to_me",
   roundCap: 3,
+  ownerOnlyPaths: [],
+  changedLinesLimit: null,
   tokenCaps: { daily: null, monthly: null },
   concurrencyLimit: null,
   priority: 0,
@@ -75,6 +77,7 @@ const agent = (id: string, name: string, role: string) => ({
   tokenCaps: { daily: null, monthly: null },
   createdAt: "2026-10-08T12:00:00.000Z",
   leavingAt: null,
+  sizes: ["small", "medium", "large"],
   contractor: null,
 });
 
@@ -205,6 +208,7 @@ function initialBatches(): BatchDetail[] {
         },
       },
       plans: [finishedPlan],
+      sizes: [],
     },
     {
       batch: {
@@ -241,6 +245,7 @@ function initialBatches(): BatchDetail[] {
         wrapUp: null,
       },
       plans: [firstPlan],
+      sizes: [],
     },
     {
       batch: {
@@ -260,6 +265,7 @@ function initialBatches(): BatchDetail[] {
         wrapUp: null,
       },
       plans: [pastPlan],
+      sizes: [],
     },
   ];
 }
@@ -313,11 +319,15 @@ function storeBatches(): BatchDetail[] {
         wrapUp: null,
       },
       plans: [autumn],
+      sizes: [],
     },
   ];
 }
 
 let posted: { url: string; body: unknown; csrf: string | null }[];
+
+/** The Sizes each Agent takes, where not all three (FR-133). */
+let agentSizes: Readonly<Record<string, ("small" | "medium" | "large")[]>> = {};
 
 function stubServer(initial: BatchDetail[] = initialBatches()) {
   let batches = initial;
@@ -372,6 +382,7 @@ function stubServer(initial: BatchDetail[] = initialBatches()) {
           replace({
             batch: { ...detail.batch, plan: next },
             plans: [...detail.plans, next],
+            sizes: detail.sizes,
           }),
           { status: 201 },
         );
@@ -415,7 +426,10 @@ function stubServer(initial: BatchDetail[] = initialBatches()) {
           agent("alan", "Alan", "coder"),
           agent("mia", "Mia", "merchandiser"),
           agent("cole", "Cole", "copywriter"),
-        ],
+        ].map((each) => ({
+          ...each,
+          sizes: agentSizes[each.id] ?? each.sizes,
+        })),
       });
     }
     if (url === "/api/floors/web-shop") {
@@ -800,6 +814,41 @@ describe("the whiteboard", () => {
         "Version 2, replanned after your edits to version 1, 9 Oct 2026, 10:02.",
       ),
     ).toBeTruthy();
+  });
+
+  it("flags an issue the Plan gives to an Agent that does not take its Size, which stands as the Owner approves it (Scorecards PRD, FR-134)", async () => {
+    agentSizes = { mia: ["small"] };
+    const [detail] = storeBatches();
+    stubServer(
+      detail === undefined
+        ? []
+        : [
+            {
+              ...detail,
+              sizes: [
+                { issue: 4, size: "large" },
+                { issue: 5, size: "small" },
+              ],
+            },
+          ],
+    );
+    renderPage("/floors/web-shop/whiteboard?batch=2");
+    await screen.findByRole("heading", { name: "Batch 2: Awaiting approval" });
+    const flag = await screen.findByText("Mia takes only small issues");
+    expect(flag.closest("[role=note]")?.textContent).toContain(
+      "#4 is large: the Plan gives it to Mia all the same, as you approve it.",
+    );
+    // Cole takes every Size: #5 has no flag, and the Plan can be approved.
+    expect(
+      screen
+        .getAllByRole("note")
+        .filter(({ textContent }) => textContent.includes("takes only")),
+    ).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Approve Plan" })).toHaveProperty(
+      "disabled",
+      false,
+    );
+    agentSizes = {};
   });
 
   it("reorders an issue's work Roles, saved for the Manager to replan in that order before approving; the last Role cannot be removed", async () => {

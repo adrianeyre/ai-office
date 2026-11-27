@@ -12,6 +12,7 @@ import {
   renamedPipelineLabels,
   guidelineLabel,
   roleLabel,
+  sizeLabels,
   type IntakeSettings,
   type PipelineStage,
   type Role,
@@ -269,6 +270,10 @@ export function createIntake(options: IntakeOptions): Intake {
     if (!labelled.has(floor.id)) {
       await renameRetiredLabels(repository);
       for (const label of pipelineLabels) {
+        await repository.ensureLabel(label);
+      }
+      // The labels that force an issue's Size (Scorecards PRD, FR-132).
+      for (const label of sizeLabels) {
         await repository.ensureLabel(label);
       }
       labelled.add(floor.id);

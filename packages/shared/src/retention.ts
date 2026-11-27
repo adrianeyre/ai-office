@@ -2,8 +2,9 @@ import { z } from "zod";
 
 // Retention (PRD §7, FR-65): how long AI Office keeps what it records.
 // Request and response bodies go after 7 days, usage and request metadata
-// after 90, the Activity Feed and Notices after a year and Connections'
-// delivery logs after 90 days, unless the Owner sets other periods in the
+// after 90, the Activity Feed and Notices after a year, Connections'
+// delivery logs after 90 days and the Scorecard's records (Scorecards PRD,
+// FR-127) after a year, unless the Owner sets other periods in the
 // office admin. Storing bodies at all is a switch
 // of its own (`requestBodiesSettingsSchema`). Admin's Storage card deletes
 // the same kinds of history by hand, to free space; both read their
@@ -18,6 +19,7 @@ export const retentionRules = [
   "requestMetadataDays",
   "activityDays",
   "connectionDeliveriesDays",
+  "scorecardDays",
 ] as const;
 export type RetentionRule = (typeof retentionRules)[number];
 
@@ -29,6 +31,7 @@ export const historyKinds = [
   "usage_history",
   "sign_ins",
   "connection_deliveries",
+  "scorecards",
 ] as const;
 export type HistoryKind = (typeof historyKinds)[number];
 
@@ -56,6 +59,8 @@ export const historyKindRetention: Readonly<
   // A delivery still waiting to go (retried for up to 24 hours, or held
   // for quiet hours) is the outbound queue, not its log, and always stays.
   connection_deliveries: { rule: "connectionDeliveriesDays", minDays: 1 },
+  // The Scorecard reads up to 90 days at a time, as Analytics do.
+  scorecards: { rule: "scorecardDays", minDays: 90 },
 };
 
 /** The fewest days a rule keeps: the most any kind it deletes keeps. */
@@ -109,6 +114,15 @@ export const retentionSettingsSchema = z
       "A Connection's delivery log",
       retentionMinDays.connectionDeliveriesDays,
     ),
+    /**
+     * The Scorecard's records of how each piece of work turned out
+     * (Scorecards PRD, FR-127): a year. A document or request from before
+     * them takes the default.
+     */
+    scorecardDays: days(
+      "The Scorecard",
+      retentionMinDays.scorecardDays,
+    ).default(365),
   })
   .refine(
     (settings) => settings.requestBodiesDays <= settings.requestMetadataDays,
@@ -126,6 +140,7 @@ export const defaultRetentionSettings: RetentionSettings = {
   requestMetadataDays: 90,
   activityDays: 365,
   connectionDeliveriesDays: 90,
+  scorecardDays: 365,
 };
 
 /** Records older than this, at `now`, are past `days` of retention. */

@@ -134,6 +134,7 @@ async function configure(source: Office): Promise<void> {
     requestMetadataDays: 60,
     activityDays: 730,
     connectionDeliveriesDays: 45,
+    scorecardDays: 400,
   });
   const at = new Date("2026-10-09T12:00:00.000Z");
   await stores.tokenCaps.setOfficeCaps(
@@ -186,6 +187,8 @@ async function configure(source: Office): Promise<void> {
       extraInstructions: "Keep functions small.",
       tokenCaps: { daily: 300_000, monthly: null },
       freshStartThreshold: 70,
+      // The Sizes it takes (Scorecards PRD, FR-133).
+      sizes: ["medium", "large"],
     }),
   ).toBe("updated");
   expect(
@@ -207,6 +210,9 @@ async function configure(source: Office): Promise<void> {
     testCommand: "pnpm test",
     mergePolicy: "auto_merge",
     roundCap: 4,
+    // Owner-only Paths and the changed-lines limit (Scorecards PRD, FR-122).
+    ownerOnlyPaths: ["src/auth/**", "migrations/**"],
+    changedLinesLimit: 500,
     tokenCaps: { daily: 1_000_000, monthly: null },
     concurrencyLimit: 2,
     priority: 3,
@@ -268,6 +274,30 @@ async function configure(source: Office): Promise<void> {
       createdAt: at,
     },
   ]);
+  // The Owner's Recurring Goals (Scorecards PRD, FR-136): one weekly, one
+  // daily and off. Their runs are no part of the configuration.
+  for (const goal of [
+    {
+      name: "Weekly test gaps",
+      words: "Find modules without tests and file an issue for each.",
+      schedule: { frequency: "weekly" as const, days: [1, 4], time: "09:00" },
+      tokenCap: 200_000,
+      enabled: true,
+      nextRunAt: new Date("2026-10-12T08:00:00.000Z"),
+    },
+    {
+      name: "Daily dependency check",
+      words: "Look for outdated dependencies and file an issue for each.",
+      schedule: { frequency: "daily" as const, days: [], time: "07:30" },
+      tokenCap: null,
+      enabled: false,
+      nextRunAt: null,
+    },
+  ]) {
+    expect(
+      await stores.recurringGoals.create("web-shop", goal, at),
+    ).toMatchObject({ name: goal.name });
+  }
   // The Owner's Hooks (FR-121): one any reviewer runs, one the coder
   // runs, turned off. Their runs are no part of the configuration.
   const migrationCheck = await stores.hooks.create(
@@ -584,14 +614,49 @@ const cases: Case[] = [
         requestMetadataDays: 60,
         activityDays: 730,
         connectionDeliveriesDays: 45,
+        scorecardDays: 400,
       });
       expect(floor("web-shop")?.agents).toHaveLength(5);
       // Fresh Start thresholds (FR-86): the Floor's, and an Agent's own.
       expect(floor("web-shop")?.freshStartThreshold).toBe(90);
+      // Owner-only Paths and the changed-lines limit (FR-122).
+      expect(floor("web-shop")?.ownerOnlyPaths).toEqual([
+        "src/auth/**",
+        "migrations/**",
+      ]);
+      expect(floor("web-shop")?.changedLinesLimit).toBe(500);
+      // Recurring Goals (FR-136), without their runs or next run.
+      expect(floor("web-shop")?.recurringGoals).toEqual([
+        {
+          name: "Weekly test gaps",
+          words: "Find modules without tests and file an issue for each.",
+          schedule: { frequency: "weekly", days: [1, 4], time: "09:00" },
+          tokenCap: 200_000,
+          enabled: true,
+        },
+        {
+          name: "Daily dependency check",
+          words: "Look for outdated dependencies and file an issue for each.",
+          schedule: { frequency: "daily", days: [], time: "07:30" },
+          tokenCap: null,
+          enabled: false,
+        },
+      ]);
+      expect(floor("blog")?.recurringGoals).toEqual([]);
+      expect(floor("blog")?.ownerOnlyPaths).toEqual([]);
+      expect(floor("blog")?.changedLinesLimit).toBeNull();
       expect(
         floor("web-shop")?.agents.find(({ name }) => name === "Ada Lovelace")
           ?.freshStartThreshold,
       ).toBe(70);
+      expect(
+        floor("web-shop")?.agents.find(({ name }) => name === "Ada Lovelace")
+          ?.sizes,
+      ).toEqual(["medium", "large"]);
+      expect(
+        floor("web-shop")?.agents.find(({ name }) => name === "Linus Torvalds")
+          ?.sizes,
+      ).toEqual(["small", "medium", "large"]);
       expect(floor("web-shop")?.roleMemory).toHaveLength(2);
       expect(floor("web-shop")?.skillToggles).toHaveLength(2);
       expect(

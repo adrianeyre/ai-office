@@ -7,6 +7,7 @@ import {
   roleName,
   whiteboardPath,
   type IntakeSettings,
+  type IssueSize,
   type PlanDraft,
   type PlanEdit,
   type PlanLeftOut,
@@ -203,6 +204,12 @@ export interface ChatBatchRequest {
    * likely files, Agents and work Roles, checked as any draft is.
    */
   readonly plan: PlanDraft;
+  /**
+   * A Recurring Goal's run (Scorecards PRD, FR-137; ADR 0018): its words
+   * do not stand as the Plan's approval, which waits for the Owner on the
+   * whiteboard, with an action Notice, whatever the Floor's plan approval.
+   */
+  readonly awaitsOwner?: boolean;
 }
 
 /**
@@ -561,16 +568,33 @@ export function createBatches(options: BatchesOptions): Batches {
     return { manager, agents, roles };
   };
 
-  /** The Floor's team, as a Plan shares work out across it. */
-  const planTeam = async (team: {
-    agents: AgentRecord[];
-    roles: WorkRole[];
-  }): Promise<PlanTeam> => ({
-    agents: team.agents,
-    active: await options.work.active(),
-    paused: options.pausedAgents?.() ?? [],
-    roles: team.roles,
-  });
+  /**
+   * The Floor's team, as a Plan shares work out across it, with the Size
+   * of each of `issues` from its triage (Scorecards PRD, FR-133).
+   */
+  const planTeam = async (
+    team: {
+      agents: AgentRecord[];
+      roles: WorkRole[];
+    },
+    floorId: string,
+    issues: readonly number[],
+  ): Promise<PlanTeam> => {
+    const sizes = new Map<number, IssueSize>();
+    for (const issue of issues) {
+      const size = await options.triage?.size(floorId, issue);
+      if (size != null) {
+        sizes.set(issue, size);
+      }
+    }
+    return {
+      agents: team.agents,
+      active: await options.work.active(),
+      paused: options.pausedAgents?.() ?? [],
+      roles: team.roles,
+      sizes,
+    };
+  };
 
   /** The issues the Floor's open Batches hold back, by Batch. */
   const holding = async (floorId: string): Promise<Map<number, number>> => {
@@ -1594,7 +1618,11 @@ export function createBatches(options: BatchesOptions): Batches {
       floor,
       batch.chatMessageId !== null,
     );
-    const team = await planTeam(members);
+    const team = await planTeam(
+      members,
+      floor.id,
+      kept.map(({ number }) => number),
+    );
     const replanning: Replanning = { previous: plan, kept, dropped };
     let drafted: { plan: PlanContent; fallback?: string };
     try {
@@ -1778,7 +1806,7 @@ export function createBatches(options: BatchesOptions): Batches {
           floor,
           batch.chatMessageId !== null,
         );
-        const team = await planTeam(members);
+        const team = await planTeam(members, floor.id, order);
         const carryingOn = order.filter((issue) => started.has(issue));
         const content = replanMidBatch(
           plan,
@@ -1868,7 +1896,7 @@ export function createBatches(options: BatchesOptions): Batches {
             plan,
             carryingOn,
             started,
-            await planTeam(members),
+            await planTeam(members, floor.id, carryingOn),
             [
               ...plan.leftOut,
               ...dropped.map((issue) => ({
@@ -2038,7 +2066,11 @@ export function createBatches(options: BatchesOptions): Batches {
     if (issues.length === 0) {
       return { batch: undefined, leftOut };
     }
-    const team = await planTeam(members);
+    const team = await planTeam(
+      members,
+      floor.id,
+      issues.map(({ number }) => number),
+    );
     // A chat request's Plan was settled in the chat; plain code checks it,
     // and the Manager drafts one only if it does not hold. The issues left
     // out leave its Plan, and the issues it waits on.
@@ -2088,13 +2120,16 @@ export function createBatches(options: BatchesOptions): Batches {
     // The chat request stands as the Plan's approval (ADR 0004), as do a
     // Spec's confirmed tasks, unless the Owner edited its drafts since
     // (FR-115).
-    const approvedAlready = request !== undefined || spec?.approved === true;
+    // A Recurring Goal's never does (ADR 0018).
+    const awaitsOwner = request?.awaitsOwner === true;
+    const approvedAlready =
+      (request !== undefined && !awaitsOwner) || spec?.approved === true;
     const { batch, plan } = await store.create(
       {
         floorId: floor.id,
         issues: issues.map(({ number }) => number),
         status:
-          floor.planApproval && !approvedAlready
+          awaitsOwner || (floor.planApproval && !approvedAlready)
             ? "awaiting_approval"
             : "in_progress",
         agentId: manager.id,
@@ -2118,8 +2153,8 @@ export function createBatches(options: BatchesOptions): Batches {
       ...(spec === undefined ? {} : { specSessionId: spec.sessionId }),
     });
     // The chat request is the Plan's approval, recorded as the Owner's
-    // (ADR 0012), as the whiteboard's is.
-    if (request !== undefined) {
+    // (ADR 0012), as the whiteboard's is; a Recurring Goal's is not.
+    if (request !== undefined && !awaitsOwner) {
       await events.publish({
         type: "batch.approved",
         version: 1,

@@ -700,6 +700,89 @@ const cases: Case[] = [
     },
   ],
   [
+    "adds up an issue's requests per Agent and Model for the Scorecard, kept or deleted (Scorecards PRD, FR-126)",
+    async ({ store }) => {
+      const history = createRequestHistory({ store, encryptor });
+      const at = (time: string) => new Date(`2026-10-${time}Z`);
+      const on = (agentId: string, issue: number) => ({
+        agentId,
+        floorId: "web-shop",
+        ownerTool: null,
+        issue,
+      });
+      for (const fields of [
+        {
+          ...on("ada", 4),
+          startedAt: at("01T09:00:00.000"),
+          inputTokens: 100,
+          outputTokens: 20,
+          estimatedCostUsd: 0.25,
+        },
+        {
+          ...on("ada", 4),
+          startedAt: at("05T09:00:00.000"),
+          inputTokens: 50,
+          outputTokens: 5,
+          estimatedCostUsd: 0.125,
+        },
+        {
+          ...on("ada", 4),
+          startedAt: at("05T10:00:00.000"),
+          model: "claude-sonnet-5-5",
+          inputTokens: 10,
+          outputTokens: 1,
+          estimatedCostUsd: 0.01,
+        },
+        {
+          ...on("grace", 4),
+          startedAt: at("05T11:00:00.000"),
+          model: "gpt-5.5",
+          inputTokens: 30,
+          outputTokens: 3,
+          estimatedCostUsd: 0.5,
+        },
+        // Another issue's, and an Owner tool's, are not the issue's.
+        { ...on("ada", 5), startedAt: at("05T12:00:00.000") },
+        { startedAt: at("05T12:00:00.000"), issue: 4 },
+      ]) {
+        await history.record(record(fields));
+      }
+      const usage = async () =>
+        (await store.issueUsage("web-shop", 4)).toSorted((a, b) =>
+          `${a.agentId}${String(a.model)}`.localeCompare(
+            `${b.agentId}${String(b.model)}`,
+          ),
+        );
+      const expected = [
+        {
+          agentId: "ada",
+          model: "claude-opus-5-5",
+          inputTokens: 150,
+          outputTokens: 25,
+          estimatedCostUsd: 0.375,
+        },
+        {
+          agentId: "ada",
+          model: "claude-sonnet-5-5",
+          inputTokens: 10,
+          outputTokens: 1,
+          estimatedCostUsd: 0.01,
+        },
+        {
+          agentId: "grace",
+          model: "gpt-5.5",
+          inputTokens: 30,
+          outputTokens: 3,
+          estimatedCostUsd: 0.5,
+        },
+      ];
+      expect(await usage()).toEqual(expected);
+      // The 1st's request is deleted: what it used is still counted.
+      expect(await store.deleteBefore(at("02T00:00:00.000"))).toBe(1);
+      expect(await usage()).toEqual(expected);
+    },
+  ],
+  [
     "adds up requests per hour or day, AI Account, Model and caller for analytics, with their errors, latency and keep-alives",
     async ({ store }) => {
       const history = createRequestHistory({ store, encryptor });

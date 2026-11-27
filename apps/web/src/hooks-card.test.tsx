@@ -30,6 +30,8 @@ const floor = {
   testCommand: "",
   mergePolicy: "send_to_me" as const,
   roundCap: 3,
+  ownerOnlyPaths: [],
+  changedLinesLimit: null,
   tokenCaps: { daily: null, monthly: null },
   concurrencyLimit: null,
   priority: 0,
@@ -61,6 +63,7 @@ const agent = (id: string, name: string, role: string) => ({
   freshStartThreshold: null,
   createdAt: "2026-10-01T00:00:00.000Z",
   leavingAt: null,
+  sizes: ["small", "medium", "large"],
   contractor: null,
 });
 

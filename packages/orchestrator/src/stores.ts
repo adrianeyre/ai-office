@@ -133,6 +133,16 @@ import {
   type HookStore,
 } from "./hooks/store.ts";
 import {
+  databaseRecurringGoalStore,
+  memoryRecurringGoalStore,
+  type RecurringGoalStore,
+} from "./recurring-goals/store.ts";
+import {
+  databaseScorecardStore,
+  memoryScorecardStore,
+  type ScorecardStore,
+} from "./scorecard/store.ts";
+import {
   databaseRoleStore,
   memoryRoleStore,
   type MemoryRoleStore,
@@ -209,6 +219,10 @@ export interface OfficeStores {
   readonly guidelineProposals: GuidelineProposalStore;
   /** Each Floor's Hooks and their runs (Guidelines PRD, FR-118 to FR-121). */
   readonly hooks: HookStore;
+  /** How each piece of work turned out, for the Scorecard (FR-126). */
+  readonly scorecards: ScorecardStore;
+  /** Each Floor's Recurring Goals and their runs (FR-136). */
+  readonly recurringGoals: RecurringGoalStore;
   readonly batches: BatchStore;
   /** The turns of the work Roles a Plan gives an issue (FR-25 (1)). */
   readonly workTurns: WorkTurnsStore;
@@ -227,6 +241,7 @@ export interface OfficeStores {
  * `qa_reports`, `design_reviews`, `handoffs`, `skills`, `floor_skill_toggles`,
  * `repository_skill_reviews`, `approved_guidelines`, `guideline_changes`,
  * `guideline_proposals`, `hooks`, `hook_runs`, `hook_push_heads`,
+ * `scorecard_records`, `recurring_goals`, `recurring_goal_runs`,
  * `manager_chat_messages`, `grilling_sessions`, `status_updates`, `issue_triage`, `manager_decisions`, `batches`,
  * `plans`, `batch_issues`, `issue_work_turns`, `memory_proposals`,
  * `memory_curations`,
@@ -259,6 +274,8 @@ export const databaseStores = (db: Database): OfficeStores => ({
   guidelines: databaseGuidelineStore(db),
   guidelineProposals: databaseGuidelineProposalStore(db),
   hooks: databaseHookStore(db),
+  scorecards: databaseScorecardStore(db),
+  recurringGoals: databaseRecurringGoalStore(db),
   batches: databaseBatchStore(db),
   workTurns: databaseWorkTurnsStore(db),
   memory: databaseMemoryStore(db),
@@ -288,6 +305,8 @@ export function memoryStores(): OfficeStores & {
   readonly triage: ReturnType<typeof memoryTriageStore>;
   readonly decisions: ReturnType<typeof memoryDecisionStore>;
   readonly hooks: ReturnType<typeof memoryHookStore>;
+  readonly scorecards: ReturnType<typeof memoryScorecardStore>;
+  readonly recurringGoals: ReturnType<typeof memoryRecurringGoalStore>;
   readonly batches: ReturnType<typeof memoryBatchStore>;
   readonly workTurns: ReturnType<typeof memoryWorkTurnsStore>;
   readonly memory: ReturnType<typeof memoryMemoryStore>;
@@ -333,6 +352,8 @@ export function memoryStores(): OfficeStores & {
     guidelines: memoryGuidelineStore(),
     guidelineProposals: memoryGuidelineProposalStore(),
     hooks: memoryHookStore(),
+    scorecards: memoryScorecardStore(),
+    recurringGoals: memoryRecurringGoalStore(),
     batches: memoryBatchStore(),
     workTurns: memoryWorkTurnsStore(),
     memory: memoryMemoryStore(),

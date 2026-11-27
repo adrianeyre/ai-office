@@ -178,6 +178,7 @@ export {
   type AnalyticsFilter,
   type AnalyticsRow,
   type HistoryQuery,
+  type IssueUsageRow,
   type RequestHistoryStore,
   type SealedBodies,
   type StoredRequest,

@@ -21,6 +21,7 @@ import {
   type GrillingIssueDraft,
   type GrillingIssues,
   type GrillingSpec,
+  type IssueSize,
   type SpecPhase,
   type SpecRequirements,
   type SpecTask,
@@ -425,6 +426,7 @@ export function specIssueDrafts(
           ),
           prdSections: [],
           adrs: [],
+          ...(task.size === undefined ? {} : { size: task.size }),
           filed: null,
         },
       ];
@@ -502,17 +504,21 @@ export function specBatchIssues(
   );
 }
 
-/** The issues filed from the Floor's Specs (FR-115): clear by construction. */
+/**
+ * The issues filed from the Floor's Specs (FR-115): clear by construction,
+ * each with the Size its task was given (Scorecards PRD, FR-132), or null
+ * for a task from before Sizes.
+ */
 export async function specIssues(
   store: Pick<GrillingStore, "list">,
   floorId: string,
-): Promise<ReadonlySet<number>> {
-  return new Set(
+): Promise<ReadonlyMap<number, IssueSize | null>> {
+  return new Map(
     (await store.list(floorId)).flatMap(({ spec, issues }) =>
       spec === null
         ? []
-        : (issues?.drafts.flatMap(({ filed }) =>
-            filed === null ? [] : [filed.number],
+        : (issues?.drafts.flatMap(({ filed, size }) =>
+            filed === null ? [] : [[filed.number, size ?? null] as const],
           ) ?? []),
     ),
   );
@@ -604,7 +610,7 @@ export function specInstructions(session: GrillingSessionRecord): string[] {
     requirements: `- \`spec.requirements\`: the whole requirements, \`{introduction, requirements}\`, each requirement \`{title, story, criteria}\`: \`story\` is one user story ("As a …, I want …, so that …"), and \`criteria\` its Acceptance Criteria, each one testable statement starting with its id, \`R<requirement>.<criterion>\` (R2.3 is requirement 2's third), in the form "R2.3 WHEN <trigger> THE SYSTEM SHALL <response>", or its "IF <condition> THEN THE SYSTEM SHALL <response>", "WHILE <state> THE SYSTEM SHALL <response>" or "WHERE <option> THE SYSTEM SHALL <response>" forms. At most ${String(maxSpecRequirements)} requirements of at most ${String(maxSpecCriteria)} criteria each.
 - AI Office checks every criterion in plain code, and the Owner cannot confirm the requirements while any fails: its id starts with a capital R and its own requirement's number, and no other criterion has it; its keywords (WHEN, IF, THEN, WHILE, WHERE, THE SYSTEM SHALL) are in capitals; and it says SHALL once, one behaviour per criterion. Anything that is not such a statement (context, notes, examples) goes in the story or the introduction, never in \`criteria\`.`,
     design: `- \`spec.design\`: the whole design, \`{overview, architecture, data, errorHandling, testing}\`, each in Markdown: how it fits the system as it is, the data it keeps and changes, what can go wrong and what then happens, and how each Acceptance Criterion will be tested. Build on the approved requirements; design nothing they do not ask for.`,
-    tasks: `- \`spec.tasks\`: the whole list, in the order they should be built, at most ${String(maxSpecTasks)}, each \`{title, description, meets, dependsOn}\`: a vertical slice that can be built, reviewed and merged on its own; \`meets\` the ids of the approved Acceptance Criteria it meets (every criterion met by some task); \`dependsOn\` the numbers of earlier tasks it needs first (1 for the first). Each task becomes one issue.`,
+    tasks: `- \`spec.tasks\`: the whole list, in the order they should be built, at most ${String(maxSpecTasks)}, each \`{title, description, meets, dependsOn, size}\`: a vertical slice that can be built, reviewed and merged on its own; \`meets\` the ids of the approved Acceptance Criteria it meets (every criterion met by some task); \`dependsOn\` the numbers of earlier tasks it needs first (1 for the first); \`size\` how big its change is, \`small\` (a few lines in one or two files), \`medium\` or \`large\` (many files or modules, a migration, a new subsystem). Each task becomes one issue, of its size.`,
   };
   return [
     write[spec.phase],

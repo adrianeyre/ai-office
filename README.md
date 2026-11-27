@@ -93,6 +93,21 @@ database was migrated, the script puts the previous image back. See
   chose happens, such as a pull request touching `**/*.sql`, bounded by
   runs an hour. See
   [Guidelines, Specs and Hooks](docs/guide/guidelines-specs-and-hooks.md).
+- **Scorecards, Sizes, Owner-only Paths and Recurring Goals.** The
+  **Scorecard** on Analytics shows how each Agent's, Role's and Model's
+  work turned out (issues merged, Review Loop rounds, QA failures, stalls,
+  hand-offs to you) and what each merged issue cost; each Agent's card
+  gives its line for the last 30 days. Triage gives each issue a
+  **Size**, and each Agent takes only the Sizes you choose, so small
+  issues can go to cheaper Models. **Owner-only Paths** and a
+  changed-lines limit keep chosen pull requests from being merged
+  automatically. A **Recurring Goal** is a Goal saved with a schedule,
+  such as "every Monday, find modules without tests and file issues",
+  whose Plan waits for your approval. See
+  [The Scorecard](docs/guide/ai-gateway.md#the-scorecard),
+  [Size](docs/guide/issue-pipeline.md#size), [the Merge
+  Policy](docs/guide/issue-pipeline.md#the-merge-policy) and
+  [Recurring Goals](docs/guide/batches-and-memory.md#recurring-goals).
 
 ## Screenshots
 

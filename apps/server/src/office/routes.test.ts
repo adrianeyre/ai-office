@@ -402,7 +402,7 @@ const cases: Case[] = [
     },
   ],
   [
-    "keeps bodies 7 days, records 90, the Activity Feed a year and delivery logs 90 days by default, and sets other periods",
+    "keeps bodies 7 days, records 90, the Activity Feed a year, delivery logs 90 days and Scorecard records a year by default, and sets other periods",
     async (setup) => {
       const before = await request(setup, "GET", "/api/office/retention");
       expect(before.statusCode).toBe(200);
@@ -411,12 +411,14 @@ const cases: Case[] = [
         requestMetadataDays: 90,
         activityDays: 365,
         connectionDeliveriesDays: 90,
+        scorecardDays: 365,
       });
       const chosen = {
         requestBodiesDays: 3,
         requestMetadataDays: 40,
         activityDays: 365,
         connectionDeliveriesDays: 30,
+        scorecardDays: 180,
       };
       const set = await request(setup, "PUT", "/api/office/retention", chosen);
       expect(set.statusCode).toBe(200);
@@ -434,6 +436,7 @@ const cases: Case[] = [
           "retention.requestBodiesDays",
           "retention.requestMetadataDays",
           "retention.connectionDeliveriesDays",
+          "retention.scorecardDays",
         ],
       });
 
@@ -445,6 +448,7 @@ const cases: Case[] = [
         { ...chosen, activityDays: 29 },
         { ...chosen, activityDays: 100.5 },
         { ...chosen, connectionDeliveriesDays: 0 },
+        { ...chosen, scorecardDays: 89 },
         { ...chosen, requestBodiesDays: 41 },
         { ...chosen, extra: true },
       ]) {
@@ -1037,6 +1041,7 @@ const cases: Case[] = [
         "usage_history",
         "sign_ins",
         "connection_deliveries",
+        "scorecards",
       ]);
 
       const pruned = await request(setup, "POST", "/api/office/storage/prune", {
@@ -1063,7 +1068,7 @@ const cases: Case[] = [
         ],
         [
           { category: "everything", olderThanDays: 90 },
-          "Choose what to delete: activity, request_bodies, requests, usage_history, sign_ins, connection_deliveries.",
+          "Choose what to delete: activity, request_bodies, requests, usage_history, sign_ins, connection_deliveries, scorecards.",
         ],
         [
           { category: "activity", olderThanDays: 1.5 },

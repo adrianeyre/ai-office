@@ -5,6 +5,7 @@ import type {
   ChatAttachmentStore,
   NoticeStore,
   RetentionTargets,
+  ScorecardStore,
 } from "@ai-office/orchestrator";
 
 import type { AuthStore } from "./auth/store.ts";
@@ -21,10 +22,13 @@ export interface RetentionStores {
   readonly communications: CommunicationsStore;
   /** Manager chat attachments, whose unsent ones go after a day (FR-24). */
   readonly chatAttachments?: Pick<ChatAttachmentStore, "deleteUnsentBefore">;
+  /** The Scorecard's records (Scorecards PRD, FR-127). */
+  readonly scorecards?: Pick<ScorecardStore, "deleteBefore">;
 }
 
 export function retentionTargets(stores: RetentionStores): RetentionTargets {
   const attachments = stores.chatAttachments;
+  const scorecards = stores.scorecards;
   return {
     // Bodies first, by their own (shorter) period; the requests stay.
     requestBodies: (before) => stores.requests.deleteBodiesBefore(before),
@@ -46,6 +50,10 @@ export function retentionTargets(stores: RetentionStores): RetentionTargets {
     // Connections' delivery logs; deliveries still waiting to go stay.
     connectionDeliveries: (before) =>
       stores.communications.deleteDeliveriesBefore(before),
+    // The Scorecard's records, by when their work ended.
+    ...(scorecards === undefined
+      ? {}
+      : { scorecards: (before: Date) => scorecards.deleteBefore(before) }),
     // Manager chat attachments never sent, after a day.
     ...(attachments === undefined
       ? {}

@@ -223,6 +223,65 @@ function usageWindowsFor(url: URL): AnalyticsUsageWindows {
   };
 }
 
+/** The Scorecard the stubbed server answers (Scorecards PRD, FR-128 to FR-130). */
+function scorecardFor(url: URL) {
+  const by = url.searchParams.get("by") ?? "agent";
+  const agentId = url.searchParams.get("agentId");
+  const group = (key: string, label: string) => ({
+    key,
+    label,
+    floorId: by === "agent" ? "web-shop" : null,
+  });
+  const work = [
+    {
+      ...group(
+        by === "model" ? "claude-opus-5-5" : "ada",
+        by === "model" ? "claude-opus-5-5" : "Ada",
+      ),
+      issues: 15,
+      issuesMerged: 14,
+      meanRoundsToApproval: 1.2,
+      qaRoundsFailed: 1,
+      stalls: 0,
+      failures: 1,
+      handedToOwner: 1,
+      tokens: 1_400_000,
+      estimatedCostUsd: 12.74,
+      tokensPerMergedIssue: 100_000,
+      costPerMergedIssue: 0.91,
+    },
+    {
+      ...group(
+        by === "model" ? "claude-sonnet-5-5" : "linus",
+        by === "model" ? "claude-sonnet-5-5" : "Linus",
+      ),
+      issues: 24,
+      issuesMerged: 21,
+      meanRoundsToApproval: 1.6,
+      qaRoundsFailed: 2,
+      stalls: 3,
+      failures: 0,
+      handedToOwner: 3,
+      tokens: 2_000_000,
+      estimatedCostUsd: 7.14,
+      tokensPerMergedIssue: 95_238,
+      costPerMergedIssue: 0.34,
+    },
+  ].filter(({ key }) => agentId === null || key === agentId);
+  const review = [
+    {
+      ...group("grace", "Grace"),
+      issues: 30,
+      roundsReviewed: 40,
+      blockingComments: 24,
+      blockingPerRound: 0.6,
+      tokens: 500_000,
+      estimatedCostUsd: 2,
+    },
+  ].filter(({ key }) => agentId === null || key === agentId);
+  return { by, work, review };
+}
+
 function stubServer() {
   const asked: URL[] = [];
   vi.stubGlobal(
@@ -243,6 +302,8 @@ function stubServer() {
           return Promise.resolve(Response.json(insights));
         case "/api/analytics/usage-windows":
           return Promise.resolve(Response.json(usageWindowsFor(url)));
+        case "/api/analytics/scorecard":
+          return Promise.resolve(Response.json(scorecardFor(url)));
         case "/api/session":
           return Promise.resolve(
             Response.json({
@@ -530,6 +591,153 @@ describe("the analytics dashboards", () => {
       expect(tokens.getAllByTestId("chart-bucket")).toHaveLength(24);
     });
     expect(router.state.location.search).toMatchObject({ range: "24h" });
+  });
+});
+
+describe("the Scorecard on Analytics (Scorecards PRD, FR-128 to FR-130)", () => {
+  it("shows work, QA and docs: issues merged, rounds, QA failures, stalls, failures, hand-offs and cost per merged issue, with a table view", async () => {
+    const { asked } = stubServer();
+    renderAt("/analytics?range=30d");
+    const card = await cardOf("Scorecard: work, QA and docs");
+    const bars = await card.findByRole("list", {
+      name: "Issues merged by Agent",
+    });
+    expect(
+      within(bars)
+        .getAllByRole("listitem")
+        .map(({ textContent }) => textContent),
+    ).toEqual(["Ada14", "Linus21"]);
+    const [first] = within(bars).getAllByRole("listitem");
+    fireEvent.focus(first ?? bars);
+    expect(card.getByRole("status").textContent).toContain("1.2rounds");
+    const table = card.getByRole("table", {
+      name: "The Scorecard by Agent: work, QA and docs",
+    });
+    expect(
+      within(table)
+        .getAllByRole("row")
+        .map((row) =>
+          within(row)
+            .queryAllByRole("cell")
+            .map(({ textContent }) => textContent),
+        ),
+    ).toEqual([
+      [],
+      ["Ada", "15", "14", "1.2", "1", "0", "1", "1", "100K", "$0.91"],
+      ["Linus", "24", "21", "1.6", "2", "3", "0", "3", "95.2K", "$0.34"],
+    ]);
+    // The Analytics range, as every widget uses it.
+    const scorecard = asked.find(
+      (url) => url.pathname === "/api/analytics/scorecard",
+    );
+    expect(scorecard?.searchParams.get("by")).toBe("agent");
+    expect(
+      Date.parse(scorecard?.searchParams.get("to") ?? "") -
+        Date.parse(scorecard?.searchParams.get("from") ?? ""),
+    ).toBe(30 * 86_400_000);
+  });
+
+  it("shows reviewers: rounds reviewed and blocking comments per round, with a table view", async () => {
+    stubServer();
+    renderAt("/analytics");
+    const card = await cardOf("Scorecard: reviewers");
+    const bars = await card.findByRole("list", {
+      name: "Rounds reviewed by Agent",
+    });
+    expect(
+      within(bars)
+        .getAllByRole("listitem")
+        .map(({ textContent }) => textContent),
+    ).toEqual(["Grace40"]);
+    const table = card.getByRole("table", {
+      name: "The Scorecard by Agent: reviewers",
+    });
+    expect(
+      within(table)
+        .getAllByRole("cell")
+        .map(({ textContent }) => textContent),
+    ).toEqual(["Grace", "30", "40", "24", "0.6", "500K", "$2.00"]);
+  });
+
+  it("breaks the Scorecard down by Agent, Role, Model, Floor or Size, keeping it in the address", async () => {
+    const { asked } = stubServer();
+    const router = renderAt("/analytics");
+    await cardOf("Scorecard: work, QA and docs");
+    const select = screen.getByRole("combobox", { name: "Scorecard by" });
+    expect(
+      within(select)
+        .getAllByRole("option")
+        .map(({ textContent }) => textContent),
+    ).toEqual(["By Agent", "By Role", "By Model", "By Floor", "By Size"]);
+    const user = userEvent.setup();
+    await user.selectOptions(select, "model");
+    const card = await cardOf("Scorecard: work, QA and docs");
+    expect(
+      await card.findByRole("list", { name: "Issues merged by Model" }),
+    ).toBeDefined();
+    expect(router.state.location.search).toMatchObject({ scorecard: "model" });
+    expect(
+      asked.some(
+        (url) =>
+          url.pathname === "/api/analytics/scorecard" &&
+          url.searchParams.get("by") === "model",
+      ),
+    ).toBe(true);
+  });
+
+  it("follows the page's own by, Model or Floor, unless it has its own", async () => {
+    const { asked } = stubServer();
+    renderAt("/analytics?by=model");
+    const card = await cardOf("Scorecard: work, QA and docs");
+    expect(
+      await card.findByRole("list", { name: "Issues merged by Model" }),
+    ).toBeDefined();
+    expect(
+      asked
+        .find((url) => url.pathname === "/api/analytics/scorecard")
+        ?.searchParams.get("by"),
+    ).toBe("model");
+  });
+
+  it("shows one Agent's Scorecard from its card's link, and everyone's again", async () => {
+    const { asked } = stubServer();
+    const router = renderAt("/analytics?range=30d&scorecard=agent&agent=ada");
+    const card = await cardOf("Scorecard: work, QA and docs");
+    expect(await card.findByText(/Only Ada's work\./)).toBeDefined();
+    expect(
+      asked
+        .find((url) => url.pathname === "/api/analytics/scorecard")
+        ?.searchParams.get("agentId"),
+    ).toBe("ada");
+    await userEvent.click(card.getByRole("button", { name: "Show everyone" }));
+    expect(router.state.location.search).not.toHaveProperty("agent");
+    expect(
+      await (
+        await cardOf("Scorecard: work, QA and docs")
+      ).findByRole("list", { name: "Issues merged by Agent" }),
+    ).toBeDefined();
+  });
+
+  it("draws its charts from the theme's colours, in light and dark", async () => {
+    for (const dark of [false, true]) {
+      document.documentElement.classList.toggle("dark", dark);
+      stubServer();
+      renderAt("/analytics");
+      const card = await cardOf("Scorecard: work, QA and docs");
+      const bars = await card.findByRole("list", {
+        name: "Issues merged by Agent",
+      });
+      // The bars take the theme's series colour, never a fixed one.
+      const fills = [
+        ...bars.querySelectorAll<HTMLElement>("[aria-hidden]"),
+      ].map(({ style }) => style.background);
+      expect(fills.length).toBeGreaterThan(0);
+      expect(new Set(fills)).toEqual(new Set(["var(--viz-series-1)"]));
+      cleanup();
+      vi.unstubAllGlobals();
+      vi.stubGlobal("scrollTo", vi.fn());
+    }
+    document.documentElement.classList.remove("dark");
   });
 });
 

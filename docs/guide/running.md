@@ -613,6 +613,7 @@ back to a number of days, once the Owner confirms (`POST
 | Usage history | AI Accounts' usage readings | none | 90 days | Requests and usage |
 | Sign-in history | Each sign-in, and each failed one | 1 day | 365 days | Activity Feed and Notices |
 | Connection deliveries | Each Connection's log of what it sent (`connection_deliveries`); one still waiting to go stays | 1 day | 90 days | Connection deliveries |
+| Scorecard records | How each piece of work turned out, for the [Scorecard](ai-gateway.md#the-scorecard) (`scorecard_records`), by when it ended | 90 days | 365 days | Scorecard records |
 
 The kinds, what each always keeps and what is suggested are
 [retention](#retention)'s (`historyKindRetention` and
@@ -621,8 +622,9 @@ the retention jobs agree: the suggestion is PRD §7's default for the rule
 that deletes that kind, and a rule never keeps fewer days than any kind it
 deletes. What is always kept is what AI Office still reads: work under way
 reads its own events back (an issue's address, its pull request, the Token
-Caps it reached) however long ago it started, and hourly Analytics read up
-to 31 days of requests themselves.
+Caps it reached) however long ago it started, hourly Analytics read up
+to 31 days of requests themselves, and the Scorecard reads up to 90 days
+of its records, as Analytics' longest range does.
 
 Both delete events, requests and Connection deliveries through the same
 functions in `@ai-office/db`, so a clean-up by hand behaves as retention
@@ -666,6 +668,7 @@ the Owner changes a period:
 | Requests and usage | `gateway_requests` (with their bodies) and AI Accounts' usage-window readings (`ai_account_usage`) | 90 days | 32 days |
 | Activity Feed and Notices | `events`, Notices dismissed or acted on before then, and `sign_in_events` | 365 days | 30 days |
 | Connection deliveries | Connections' finished deliveries (`connection_deliveries`); those still waiting to go stay | 90 days | 1 day |
+| Scorecard records | The Scorecard's records (`scorecard_records`), by when their work ended (Scorecards PRD, FR-127): they outlive the events and requests they were built from | 365 days | 90 days |
 
 - **Manager chat attachments never sent** (`manager_chat_attachments`
   with no message) are deleted a day after they were uploaded, on the same
@@ -685,7 +688,8 @@ the Owner changes a period:
   switch in AI Settings' **Request history** card (see
   [Request history](ai-gateway.md#request-history-and-live-streams)).
 - **API.** `GET` and `PUT /api/office/retention` with
-  `{"requestBodiesDays","requestMetadataDays","activityDays","connectionDeliveriesDays"}`. Each change
+  `{"requestBodiesDays","requestMetadataDays","activityDays","connectionDeliveriesDays","scorecardDays"}`
+  (a request without `scorecardDays` keeps its default). Each change
   is a `config.changed` event (`retention.requestBodiesDays`, …). The
   periods live in `office_settings`. What each run deleted is logged.
 
@@ -705,10 +709,14 @@ moved, copied or rebuilt.
   Model), the Owner's own [Floor Templates](floors-and-agents.md#your-own-floor-templates)
   with each one's files (the built-in ones ship with AI Office), and every Floor, archived ones too: its repository, the Floor
   Template it started from and its 3D theme, its settings, Merge Policy
-  and Fresh Start threshold, its Agents (Avatars, Models, effort, instructions, Token Caps and Fresh
-  Start thresholds), its issues' Token Caps, its Skill settings per Role,
-  its [Hooks](guidelines-specs-and-hooks.md#hooks) as the Owner made them
-  (never their runs), and each Role's accepted memory. The settings shown
+  (with its [Owner-only Paths and changed-lines limit](issue-pipeline.md#the-merge-policy))
+  and Fresh Start threshold, its Agents (Avatars, Models, effort, instructions, Token Caps, Fresh
+  Start thresholds and the [Sizes](floors-and-agents.md#the-agent-editor) each takes), its issues' Token Caps, its Skill settings per Role,
+  its [Hooks](guidelines-specs-and-hooks.md#hooks) and its
+  [Recurring Goals](batches-and-memory.md#recurring-goals) as the Owner
+  made them (never their runs), and each Role's accepted memory. A file
+  exported before these took their defaults: no Owner-only Paths, every
+  Size, no Recurring Goals. The settings shown
   in AI Settings are in it as well as General Settings'.
 - **Never a credential.** AI Accounts, Gateway Keys, the password, TOTP and
   anything sealed with `ENCRYPTION_KEY` are not in it, and the whole file
