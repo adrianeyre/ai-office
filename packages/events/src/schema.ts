@@ -4,6 +4,8 @@ import {
   issuePriorities,
   issueSizes,
   maxCommandIssues,
+  recurringGoalFrequencies,
+  recurringGoalSkipReasons,
   maxMemoryEntries,
   maxMemoryEntryLength,
   maxMemoryProposals,
@@ -580,6 +582,65 @@ const hookRunFinished = event("hook.run_finished", {
 const hookRunSkipped = event("hook.run_skipped", {
   ...hookRunShape,
   reason: z.enum(hookSkipReasons),
+});
+// Recurring Goals (Scorecards PRD, FR-136 to FR-141; ADR 0018): each one
+// the Owner adds, changes or deletes, each turned off by its own failed
+// runs, and each run: started, skipped (and why), planned (it filed issues
+// and proposed a Plan, which waits for the Owner) or failed.
+const recurringGoalId = z.number().int().positive();
+const recurringGoalName = z.string().min(1).max(100);
+const recurringGoalAdded = event("recurring_goal.added", {
+  floorId,
+  recurringGoalId,
+  name: recurringGoalName,
+  frequency: z.enum(recurringGoalFrequencies),
+});
+const recurringGoalChanged = event("recurring_goal.changed", {
+  floorId,
+  recurringGoalId,
+  name: recurringGoalName,
+  /** Which of its fields changed, such as `enabled` or `schedule`. */
+  fields: z.array(z.string().min(1).max(40)).min(1).max(10),
+  by: z.enum(["owner", "failures"]),
+  enabled: z.boolean(),
+});
+const recurringGoalRemoved = event("recurring_goal.removed", {
+  floorId,
+  recurringGoalId,
+  name: recurringGoalName,
+});
+const recurringGoalRunShape = {
+  floorId,
+  recurringGoalId,
+  name: recurringGoalName,
+  runId: z.number().int().positive(),
+};
+/** A run started, on its schedule or by the Owner's Run now. */
+const recurringGoalRunStarted = event("recurring_goal.run_started", {
+  ...recurringGoalRunShape,
+  by: z.enum(["schedule", "owner"]),
+});
+const recurringGoalRunSkipped = event("recurring_goal.run_skipped", {
+  ...recurringGoalRunShape,
+  reason: z.enum(recurringGoalSkipReasons),
+});
+/** A run filed its issues and proposed a Plan, which waits for the Owner. */
+const recurringGoalRunFinished = event("recurring_goal.run_finished", {
+  ...recurringGoalRunShape,
+  batchId: z.number().int().positive(),
+  issues: z.array(issue).max(maxCommandIssues),
+  tokens: count,
+});
+/**
+ * A run failed: an info Notice says why, and the
+ * `recurringGoalFailuresToTurnOff`th in a row turns it off (`turnedOff`).
+ */
+const recurringGoalRunFailed = event("recurring_goal.run_failed", {
+  ...recurringGoalRunShape,
+  reason: z.string().min(1).max(500),
+  failures: count,
+  turnedOff: z.boolean(),
+  tokens: count,
 });
 // Office-wide and Role memory (PRD FR-54, FR-55, FR-56): the Owner edits
 // the office-wide memory; Agents propose Role memory in their Handoffs, the
@@ -1258,6 +1319,13 @@ export const officeEventSchema = z.discriminatedUnion("type", [
   hookRunStarted,
   hookRunFinished,
   hookRunSkipped,
+  recurringGoalAdded,
+  recurringGoalChanged,
+  recurringGoalRemoved,
+  recurringGoalRunStarted,
+  recurringGoalRunSkipped,
+  recurringGoalRunFinished,
+  recurringGoalRunFailed,
   sandboxStarted,
   sandboxStopped,
   sandboxText,

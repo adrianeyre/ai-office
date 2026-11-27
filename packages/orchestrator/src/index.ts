@@ -674,6 +674,23 @@ export {
   type HookStore,
 } from "./hooks/store.ts";
 export {
+  createRecurringGoals,
+  openRecurringGoalsAction,
+  recurringGoalPollMs,
+  RecurringGoalError,
+  type RecurringGoalChat,
+  type RecurringGoals,
+  type RecurringGoalsOptions,
+} from "./recurring-goals/recurring-goals.ts";
+export {
+  databaseRecurringGoalStore,
+  memoryRecurringGoalStore,
+  type RecurringGoalFields,
+  type RecurringGoalRecord,
+  type RecurringGoalRunRecord,
+  type RecurringGoalStore,
+} from "./recurring-goals/store.ts";
+export {
   createScorecardRecorder,
   type IssueUsage,
   type IssueUsageOf,

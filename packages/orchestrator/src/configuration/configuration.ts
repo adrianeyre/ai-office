@@ -10,6 +10,8 @@ import {
   createRedactor,
   defaultGitIdentity,
   defaultOfficeTokenCaps,
+  defaultTimeZone,
+  nextRecurringRun,
   describeSkill,
   effortsOf,
   looksLikeSecret,
@@ -256,6 +258,16 @@ export function createConfiguration(
           a.skillName.localeCompare(b.skillName) ||
           a.role.localeCompare(b.role),
       ),
+    // Its Recurring Goals as the Owner made them (FR-136): never their runs.
+    recurringGoals: (await stores.recurringGoals.list(floor.id)).map(
+      (goal) => ({
+        name: goal.name,
+        words: goal.words,
+        schedule: { ...goal.schedule, days: [...goal.schedule.days] },
+        tokenCap: goal.tokenCap,
+        enabled: goal.enabled,
+      }),
+    ),
     // Its Hooks as the Owner made them (FR-121): never their runs.
     hooks: (await stores.hooks.list(floor.id)).map((hook) => ({
       name: hook.name,
@@ -1153,6 +1165,77 @@ export function createConfiguration(
               version: 1,
               floorId: floor.id,
               hookId: updated.id,
+              name: updated.name,
+              fields: differs,
+              by: "owner",
+              enabled: updated.enabled,
+            });
+          });
+        }
+      }
+
+      // Its Recurring Goals (Scorecards PRD, FR-136), each by its name:
+      // added, or changed to the document's, coming round next from now.
+      const goalsHere =
+        here === undefined ? [] : await stores.recurringGoals.list(floor.id);
+      for (const goal of floor.recurringGoals) {
+        const subject = `${floor.id}: ${goal.name}`;
+        const current = goalsHere.find(
+          ({ name }) => name.toLowerCase() === goal.name.toLowerCase(),
+        );
+        const nextRunAt = async (enabled: boolean) =>
+          enabled
+            ? nextRecurringRun(
+                goal.schedule,
+                now(),
+                (await stores.office.ownerProfile())?.timeZone ??
+                  defaultTimeZone,
+              )
+            : null;
+        if (current === undefined) {
+          step("recurring_goal", subject, "add", [], async () => {
+            const added = await stores.recurringGoals.create(
+              floor.id,
+              { ...goal, nextRunAt: await nextRunAt(goal.enabled) },
+              now(),
+            );
+            if (added === "name_taken") {
+              throw new Error(`${subject} was not added: its name is taken.`);
+            }
+            await events.publish({
+              type: "recurring_goal.added",
+              version: 1,
+              floorId: floor.id,
+              recurringGoalId: added.id,
+              name: added.name,
+              frequency: added.schedule.frequency,
+            });
+          });
+          continue;
+        }
+        const differs = (
+          ["name", "words", "schedule", "tokenCap", "enabled"] as const
+        ).filter((field) => stable(current[field]) !== stable(goal[field]));
+        if (differs.length > 0) {
+          step("recurring_goal", subject, "change", differs, async () => {
+            const updated = await stores.recurringGoals.update(
+              floor.id,
+              current.id,
+              {
+                ...goal,
+                nextRunAt: await nextRunAt(goal.enabled),
+                ...(goal.enabled ? { failures: 0 } : {}),
+              },
+              now(),
+            );
+            if (updated === undefined || updated === "name_taken") {
+              throw new Error(`${subject} was not changed.`);
+            }
+            await events.publish({
+              type: "recurring_goal.changed",
+              version: 1,
+              floorId: floor.id,
+              recurringGoalId: updated.id,
               name: updated.name,
               fields: differs,
               by: "owner",

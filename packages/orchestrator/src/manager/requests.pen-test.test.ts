@@ -160,7 +160,7 @@ function run(
   planned: Extract<CheckedRequest, { decision: "batch" }> = decision,
 ): {
   readonly recorder: Recorder;
-  readonly batch: () => Promise<void>;
+  readonly batch: () => Promise<unknown>;
 } {
   const recorder: Recorder = {
     filed: [],

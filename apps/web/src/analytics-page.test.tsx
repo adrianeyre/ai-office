@@ -685,6 +685,20 @@ describe("the Scorecard on Analytics (Scorecards PRD, FR-128 to FR-130)", () => 
     ).toBe(true);
   });
 
+  it("follows the page's own by, Model or Floor, unless it has its own", async () => {
+    const { asked } = stubServer();
+    renderAt("/analytics?by=model");
+    const card = await cardOf("Scorecard: work, QA and docs");
+    expect(
+      await card.findByRole("list", { name: "Issues merged by Model" }),
+    ).toBeDefined();
+    expect(
+      asked
+        .find((url) => url.pathname === "/api/analytics/scorecard")
+        ?.searchParams.get("by"),
+    ).toBe("model");
+  });
+
   it("shows one Agent's Scorecard from its card's link, and everyone's again", async () => {
     const { asked } = stubServer();
     const router = renderAt("/analytics?range=30d&scorecard=agent&agent=ada");

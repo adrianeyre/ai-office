@@ -964,6 +964,42 @@ CREATE TABLE "recovery_codes" (
 	CONSTRAINT "recovery_codes_code_hash_unique" UNIQUE("code_hash")
 );
 
+CREATE TABLE "recurring_goal_runs" (
+	"id" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "recurring_goal_runs_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1),
+	"goal_id" bigint NOT NULL,
+	"floor_id" text NOT NULL,
+	"started_at" timestamp with time zone NOT NULL,
+	"finished_at" timestamp with time zone,
+	"outcome" text NOT NULL,
+	"reason" text DEFAULT '' NOT NULL,
+	"batch_id" bigint,
+	"issues" integer[] DEFAULT '{}' NOT NULL,
+	"tokens" bigint DEFAULT 0 NOT NULL,
+	CONSTRAINT "recurring_goal_runs_outcome" CHECK ("recurring_goal_runs"."outcome" IN ('running', 'planned', 'skipped', 'failed') AND ("recurring_goal_runs"."outcome" = 'running') = ("recurring_goal_runs"."finished_at" IS NULL)),
+	CONSTRAINT "recurring_goal_runs_tokens" CHECK ("recurring_goal_runs"."tokens" >= 0)
+);
+
+CREATE TABLE "recurring_goals" (
+	"id" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "recurring_goals_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1),
+	"floor_id" text NOT NULL,
+	"name" text NOT NULL,
+	"words" text NOT NULL,
+	"frequency" text NOT NULL,
+	"days" integer[] NOT NULL,
+	"time" text NOT NULL,
+	"token_cap" bigint,
+	"enabled" boolean NOT NULL,
+	"failures" integer DEFAULT 0 NOT NULL,
+	"next_run_at" timestamp with time zone,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	CONSTRAINT "recurring_goals_name" CHECK (length("recurring_goals"."name") BETWEEN 1 AND 100 AND "recurring_goals"."name" = btrim("recurring_goals"."name")),
+	CONSTRAINT "recurring_goals_words" CHECK (length("recurring_goals"."words") BETWEEN 1 AND 2000),
+	CONSTRAINT "recurring_goals_schedule" CHECK ((("recurring_goals"."frequency" = 'daily' AND cardinality("recurring_goals"."days") = 0) OR ("recurring_goals"."frequency" = 'weekly' AND cardinality("recurring_goals"."days") BETWEEN 1 AND 7 AND "recurring_goals"."days" <@ ARRAY[0, 1, 2, 3, 4, 5, 6])) AND "recurring_goals"."time" ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
+	CONSTRAINT "recurring_goals_token_cap" CHECK ("recurring_goals"."token_cap" IS NULL OR "recurring_goals"."token_cap" > 0),
+	CONSTRAINT "recurring_goals_failures" CHECK ("recurring_goals"."failures" >= 0)
+);
+
 CREATE TABLE "repository_skill_reviews" (
 	"floor_id" text NOT NULL,
 	"folder" text NOT NULL,
@@ -1184,6 +1220,9 @@ ALTER TABLE "memory_proposals" ADD CONSTRAINT "memory_proposals_curation_id_memo
 ALTER TABLE "notices" ADD CONSTRAINT "notices_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "plans" ADD CONSTRAINT "plans_batch_id_batches_id_fk" FOREIGN KEY ("batch_id") REFERENCES "public"."batches"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "qa_reports" ADD CONSTRAINT "qa_reports_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "recurring_goal_runs" ADD CONSTRAINT "recurring_goal_runs_goal_id_recurring_goals_id_fk" FOREIGN KEY ("goal_id") REFERENCES "public"."recurring_goals"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "recurring_goal_runs" ADD CONSTRAINT "recurring_goal_runs_batch_id_batches_id_fk" FOREIGN KEY ("batch_id") REFERENCES "public"."batches"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "recurring_goals" ADD CONSTRAINT "recurring_goals_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "repository_skill_reviews" ADD CONSTRAINT "repository_skill_reviews_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "review_verdicts" ADD CONSTRAINT "review_verdicts_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "role_memory" ADD CONSTRAINT "role_memory_floor_id_floors_id_fk" FOREIGN KEY ("floor_id") REFERENCES "public"."floors"("id") ON DELETE no action ON UPDATE no action;
@@ -1241,6 +1280,8 @@ CREATE INDEX "memory_proposals_pending_idx" ON "memory_proposals" USING btree ("
 CREATE INDEX "notices_open_idx" ON "notices" USING btree ("created_at") WHERE "notices"."dismissed_at" IS NULL AND "notices"."acted_at" IS NULL;
 CREATE INDEX "notices_floor_id_idx" ON "notices" USING btree ("floor_id","created_at");
 CREATE UNIQUE INDEX "qa_reports_one_per_round" ON "qa_reports" USING btree ("floor_id","issue","round");
+CREATE INDEX "recurring_goal_runs_goal_idx" ON "recurring_goal_runs" USING btree ("goal_id","id");
+CREATE UNIQUE INDEX "recurring_goals_name_unique" ON "recurring_goals" USING btree ("floor_id",lower("name"));
 CREATE UNIQUE INDEX "review_verdicts_one_per_round" ON "review_verdicts" USING btree ("floor_id","issue","round","agent_id");
 CREATE INDEX "role_memory_floor_idx" ON "role_memory" USING btree ("floor_id","role","id");
 CREATE UNIQUE INDEX "roles_name_unique" ON "roles" USING btree ("name") WHERE "roles"."floor_id" IS NULL;

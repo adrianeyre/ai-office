@@ -709,10 +709,14 @@ moved, copied or rebuilt.
   Model), the Owner's own [Floor Templates](floors-and-agents.md#your-own-floor-templates)
   with each one's files (the built-in ones ship with AI Office), and every Floor, archived ones too: its repository, the Floor
   Template it started from and its 3D theme, its settings, Merge Policy
-  and Fresh Start threshold, its Agents (Avatars, Models, effort, instructions, Token Caps and Fresh
-  Start thresholds), its issues' Token Caps, its Skill settings per Role,
-  its [Hooks](guidelines-specs-and-hooks.md#hooks) as the Owner made them
-  (never their runs), and each Role's accepted memory. The settings shown
+  (with its [Owner-only Paths and changed-lines limit](issue-pipeline.md#the-merge-policy))
+  and Fresh Start threshold, its Agents (Avatars, Models, effort, instructions, Token Caps, Fresh
+  Start thresholds and the [Sizes](floors-and-agents.md#the-agent-editor) each takes), its issues' Token Caps, its Skill settings per Role,
+  its [Hooks](guidelines-specs-and-hooks.md#hooks) and its
+  [Recurring Goals](batches-and-memory.md#recurring-goals) as the Owner
+  made them (never their runs), and each Role's accepted memory. A file
+  exported before these took their defaults: no Owner-only Paths, every
+  Size, no Recurring Goals. The settings shown
   in AI Settings are in it as well as General Settings'.
 - **Never a credential.** AI Accounts, Gateway Keys, the password, TOTP and
   anything sealed with `ENCRYPTION_KEY` are not in it, and the whole file

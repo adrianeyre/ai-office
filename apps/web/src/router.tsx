@@ -667,7 +667,11 @@ const analyticsRoute = createRoute({
       <AnalyticsPage
         range={range ?? "7d"}
         by={by ?? "model"}
-        scorecard={scorecard ?? "agent"}
+        // The page's own "by", when the Scorecard has it too (FR-130).
+        scorecard={
+          scorecard ??
+          (by === "agent" || by === "model" || by === "floor" ? by : "agent")
+        }
         agent={agent}
         onChange={(next) => {
           void navigate({ search: next });

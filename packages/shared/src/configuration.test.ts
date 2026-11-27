@@ -63,6 +63,15 @@ const floor = {
       enabled: true,
     },
   ],
+  recurringGoals: [
+    {
+      name: "Weekly test gaps",
+      words: "Find modules without tests and file an issue for each.",
+      schedule: { frequency: "weekly" as const, days: [1], time: "09:00" },
+      tokenCap: 200_000,
+      enabled: true,
+    },
+  ],
   roleMemory: [],
 };
 
@@ -173,6 +182,28 @@ describe("a configuration export", () => {
         floors: [{ ...floor, agents: [{ ...manager, sizes: [] }, ...rest] }],
       }),
     ).toEqual(["An Agent takes issues of at least one Size."]);
+  });
+
+  it("carries each Floor's Recurring Goals, reads an export made before them as having none, and names each once", () => {
+    const before = Object.fromEntries(
+      Object.entries(floor).filter(([key]) => key !== "recurringGoals"),
+    );
+    expect(
+      configurationSchema.parse({ ...configuration, floors: [before] })
+        .floors[0]?.recurringGoals,
+    ).toEqual([]);
+    const [goal] = floor.recurringGoals;
+    expect(
+      problems({
+        ...configuration,
+        floors: [
+          {
+            ...floor,
+            recurringGoals: [goal, { ...goal, name: "WEEKLY TEST GAPS" }],
+          },
+        ],
+      }),
+    ).toEqual(["web-shop has two Recurring Goals named weekly test gaps."]);
   });
 
   it("carries each Floor's Hooks, reads an export made before them as having none, and names each once", () => {

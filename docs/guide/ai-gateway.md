@@ -294,7 +294,9 @@ an Agent.
   - **Reviewers**: rounds reviewed, blocking comments, and blocking
     comments per round.
 - **By Agent, Role, Model, Floor or Size**, chosen beside it and kept in
-  the address (`?scorecard=model`). Work counts toward the Model that
+  the address (`?scorecard=model`); until one is chosen it follows the
+  page's own "by" when that is Agent, Model or Floor, and is by Agent
+  otherwise. Work counts toward the Model that
   served it. By Size, smallest first, with **No Size** for work triaged
   before Sizes.
 - **On each Agent's card**: see [Floors and Agents](floors-and-agents.md).

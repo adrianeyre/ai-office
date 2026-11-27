@@ -89,6 +89,14 @@ import { fencedPaths } from "./request-fence.ts";
 // the Manager itself) answers the Model's questions in read-only sandboxes,
 // as a Grilling Session's facts are found (FR-79), files nothing, and
 // leaves; the Model is then asked again, knowing what was found.
+//
+// A Recurring Goal's run (Scorecards PRD, FR-137 to FR-139; ADR 0018)
+// takes this path too, its saved words standing as the Owner's, with three
+// differences: its Plan waits for the Owner's approval rather than the
+// request standing as it; it adds no work Contractors (its one research
+// Contractor stays until the run has filed its issues); and plain code
+// refuses to file an issue whose title is that of one an earlier run of
+// the same Recurring Goal filed and is still open.
 
 /** A decision's fenced block, from the reply's start. */
 const fenceOpening = chatRequestFence;
@@ -693,6 +701,68 @@ export const filedNote = (manager: string, messageId: number): string =>
     "",
   ].join("\n");
 
+/** The note on an issue a Recurring Goal's run filed (ADR 0018). */
+export const recurringNote = (manager: string, goal: string): string =>
+  [
+    "### Filed for a Recurring Goal",
+    "",
+    `${manager}, the Floor's Manager, filed this issue for the Owner's Recurring Goal "${goal}", on its schedule. Its Batch's Plan waits for the Owner's approval on the whiteboard: no work starts on it until then.`,
+    "",
+  ].join("\n");
+
+/** A title as compared with another: its words, whatever their case. */
+const titleKey = (title: string): string =>
+  title.trim().replaceAll(/\s+/g, " ").toLowerCase();
+
+/**
+ * A Batch decision without the new issues whose titles match one of
+ * `filedBefore` (FR-139), each later issue's dependencies on them dropped
+ * and renumbered; and the issues they matched.
+ */
+export function withoutFiledBefore(
+  decision: Extract<CheckedRequest, { decision: "batch" }>,
+  filedBefore: readonly OpenIssue[],
+): {
+  readonly decision: Extract<CheckedRequest, { decision: "batch" }>;
+  readonly refused: readonly OpenIssue[];
+} {
+  const earlier = new Map(
+    filedBefore.map((issue) => [titleKey(issue.title), issue]),
+  );
+  const refused: OpenIssue[] = [];
+  const kept = decision.issues.flatMap((issue, index) => {
+    const match = earlier.get(titleKey(issue.title));
+    if (match !== undefined) {
+      refused.push(match);
+      return [];
+    }
+    return [{ issue, index }];
+  });
+  if (refused.length === 0) {
+    return { decision, refused };
+  }
+  const renumbered = new Map(
+    kept.map(({ index }, position) => [index + 1, position + 1]),
+  );
+  return {
+    decision: {
+      ...decision,
+      issues: kept.map(({ issue }) => ({
+        ...issue,
+        dependsOn: issue.dependsOn.flatMap((other) => {
+          const now = renumbered.get(other);
+          return now === undefined ? [] : [now];
+        }),
+      })),
+      resolved: kept.flatMap(({ index }) => {
+        const role = decision.resolved[index];
+        return role === undefined ? [] : [role];
+      }),
+    },
+    refused,
+  };
+}
+
 /** Says something in the chat, in answer to the Owner's request. */
 export type Say = (
   kind: "plan" | "progress" | "error",
@@ -768,6 +838,30 @@ export interface ResearchRun {
   readonly finishedAt: Date | null;
 }
 
+/** A Recurring Goal's run, carried out as a chat request (ADR 0018). */
+export interface RecurringRequest {
+  /** The Recurring Goal's name, as the Owner gave it. */
+  readonly name: string;
+  /**
+   * The open issues earlier runs of it filed (FR-139): one of the same
+   * title is not filed again.
+   */
+  readonly filedBefore: readonly OpenIssue[];
+  /**
+   * Told of the research Contractor it adds, which the run lets go once it
+   * has filed its issues (FR-138), rather than as its research ends.
+   */
+  readonly onResearcher?: (agent: AgentRecord) => void;
+}
+
+/** What carrying out a Batch decision filed and started. */
+export interface RequestBatchResult {
+  /** The Batch, unless nothing could be worked. */
+  readonly batchId?: number;
+  /** The new issues filed. */
+  readonly filed: readonly number[];
+}
+
 /** A chat request to carry out: the Owner's message and what the Model decided. */
 export interface RequestInput<Decision> {
   readonly floor: FloorRecord;
@@ -782,6 +876,8 @@ export interface RequestInput<Decision> {
   readonly decision: Decision;
   readonly say: Say;
   readonly signal: AbortSignal;
+  /** A Recurring Goal's run, rather than the Owner's chat message. */
+  readonly recurring?: RecurringRequest;
 }
 
 export interface ChatRequests {
@@ -804,7 +900,7 @@ export interface ChatRequests {
    */
   batch(
     input: RequestInput<Extract<CheckedRequest, { decision: "batch" }>>,
-  ): Promise<void>;
+  ): Promise<RequestBatchResult | undefined>;
   /**
    * Sends research: a research Contractor (or the Manager, with no room)
    * answers each question in read-only sandboxes and leaves. Answers the
@@ -1003,7 +1099,13 @@ export function createChatRequests(options: ChatRequestsOptions): ChatRequests {
     openIssues: openIssuesOf,
 
     async batch(input) {
-      const { floor, manager, message, decision, say, signal } = input;
+      const { floor, manager, message, say, signal, recurring } = input;
+      // A Recurring Goal's run files nothing an earlier run of it filed
+      // that is still open (FR-139), by title, in plain code.
+      const { decision, refused: alreadyFiled } = withoutFiledBefore(
+        input.decision,
+        recurring?.filedBefore ?? [],
+      );
       // Where no work can run, none is filed or started (ADR 0012).
       const cannot = options.cannotRun?.();
       if (cannot !== undefined) {
@@ -1011,7 +1113,7 @@ export function createChatRequests(options: ChatRequestsOptions): ChatRequests {
           "error",
           `${manager.name} filed nothing and started nothing: ${cannot}`,
         );
-        return;
+        return undefined;
       }
       const ownerWords = [...(input.earlier ?? []), message.text];
       const asked = readGoalCommand(message.text)?.words ?? message.text;
@@ -1027,7 +1129,7 @@ export function createChatRequests(options: ChatRequestsOptions): ChatRequests {
           "error",
           `${manager.name} filed nothing and started nothing: that is ${String(total)} issues, and one request works at most ${String(maxRequestIssues)} at a time. Ask for the first ${String(maxRequestIssues)}, and for the rest after.`,
         );
-        return;
+        return undefined;
       }
       // One pull request only when the Owner's own words ask for it.
       const onePullRequest =
@@ -1049,7 +1151,7 @@ export function createChatRequests(options: ChatRequestsOptions): ChatRequests {
             'Name each file in your own words if you want it changed, or file the issues yourself and name them, such as "/goal work issues 12 and 15".',
           ].join("\n"),
         );
-        return;
+        return undefined;
       }
       const titles = new Map(
         ((await openIssuesOf(floor)) ?? []).map(({ number, title }) => [
@@ -1066,12 +1168,23 @@ export function createChatRequests(options: ChatRequestsOptions): ChatRequests {
       );
       if (refused !== undefined) {
         await say("error", refused);
-        return;
+        return undefined;
+      }
+      if (existing.length === 0 && decision.issues.length === 0) {
+        await say(
+          "error",
+          `${manager.name} filed nothing and started nothing: every issue it would file, ${issueList(alreadyFiled.map(({ number }) => number))}, was filed by an earlier run and is still open.`,
+        );
+        return { filed: [] };
       }
       const team = (await agents.list(floor.id)).filter(
         ({ role }) => role !== managerRole,
       );
-      const { room, office } = await roomOf(floor, team);
+      const { room: free, office } = await roomOf(floor, team);
+      // A Recurring Goal's run adds no work Contractors before the Owner
+      // approves its Plan (ADR 0018).
+      const room: ContractorRoom =
+        recurring === undefined ? free : { agents: 0, sandboxes: 0 };
       const library = await libraryWorkRoles();
       // An issue whose one-off Role gets no Contractor goes to the Floor's
       // first work Role with an Agent in it.
@@ -1115,19 +1228,33 @@ export function createChatRequests(options: ChatRequestsOptions): ChatRequests {
       const inOnePullRequest = onePullRequest
         ? ", in one pull request, one issue after another"
         : "";
+      // A Recurring Goal's Plan is proposed, and waits (ADR 0018).
+      const starting =
+        recurring === undefined
+          ? `starting ${them} now as one Batch${inOnePullRequest}`
+          : `proposing ${them} as one Batch${inOnePullRequest}, whose Plan waits for your approval on the whiteboard`;
       await say(
         "plan",
         [
+          ...(recurring === undefined
+            ? []
+            : [`Recurring Goal "${recurring.name}":`, ""]),
           decision.message.trim(),
           "",
           ...pickedLines(existing, typed, added, decision.readings ?? []),
+          ...(alreadyFiled.length === 0
+            ? []
+            : [
+                `Not filed again: ${alreadyFiled.map(({ number, title }) => `#${String(number)} ${title}`).join("; ")}, filed by an earlier run and still open.`,
+                "",
+              ]),
           existing.length === 0
-            ? `I'm filing ${String(newIssues)} ${newIssues === 1 ? "issue" : "issues"} and starting ${them} now as one Batch${inOnePullRequest}:`
+            ? `I'm filing ${String(newIssues)} ${newIssues === 1 ? "issue" : "issues"} and ${starting}:`
             : `I'm working ${issueList(existing)}${
                 newIssues === 0
                   ? ""
                   : ` and filing ${String(newIssues)} new ${newIssues === 1 ? "issue" : "issues"}`
-              }, starting ${them} now as one Batch${inOnePullRequest}${newIssues === 0 ? "." : ":"}`,
+              }, ${starting}${newIssues === 0 ? "." : ":"}`,
           ...decision.issues.map((issue, index) => {
             const after = issue.dependsOn.map((other) => String(other));
             return `${String(index + 1)}. ${issue.title}: ${roleName(roleOfIssue(index))}${after.length === 0 ? "" : `, after ${after.join(", ")}`}`;
@@ -1185,7 +1312,10 @@ export function createChatRequests(options: ChatRequestsOptions): ChatRequests {
               // untrusted text, never into the Role (P2-4).
               ...withNotes(position),
             }),
-            note: filedNote(manager.name, message.id),
+            note:
+              recurring === undefined
+                ? filedNote(manager.name, message.id)
+                : recurringNote(manager.name, recurring.name),
           });
           filed.push({ number: created.number, url: created.htmlUrl });
           await options.onFiled?.({
@@ -1207,7 +1337,7 @@ export function createChatRequests(options: ChatRequestsOptions): ChatRequests {
               : ` ${issueList(numbers)} ${numbers.length === 1 ? "is" : "are"} filed: say "/goal work issues ${[...existing, ...numbers].join(", ")}" to start ${numbers.length === 1 && existing.length === 0 ? "it" : "them"}.`
           }`,
         );
-        return;
+        return undefined;
       }
       if (filed.length > 0) {
         await say(
@@ -1314,11 +1444,17 @@ export function createChatRequests(options: ChatRequestsOptions): ChatRequests {
       };
       const numbers = filed.map(({ number }) => number);
       let described: string;
+      let batchId: number;
       try {
         const outcome = await options.batches.create(
           floor.id,
           [...existing, ...numbers],
-          { messageId: message.id, plan, filed: numbers },
+          {
+            messageId: message.id,
+            plan,
+            filed: numbers,
+            ...(recurring === undefined ? {} : { awaitsOwner: true }),
+          },
           { onePullRequest },
         );
         if (outcome.batch === undefined) {
@@ -1328,7 +1464,7 @@ export function createChatRequests(options: ChatRequestsOptions): ChatRequests {
               "error",
               await options.batches.describe(floor.id, outcome),
             );
-            return;
+            return undefined;
           }
           throw new Error(
             outcome.leftOut
@@ -1336,7 +1472,7 @@ export function createChatRequests(options: ChatRequestsOptions): ChatRequests {
               .join(" "),
           );
         }
-        const batchId = outcome.batch.id;
+        batchId = outcome.batch.id;
         for (const contractor of hired) {
           await options.agentStore.setContractor(floor.id, contractor.id, {
             kind: "work",
@@ -1361,9 +1497,10 @@ export function createChatRequests(options: ChatRequestsOptions): ChatRequests {
               : ` ${issueList(numbers)} ${numbers.length === 1 ? "is" : "are"} filed: say "/goal work issues ${[...existing, ...numbers].join(", ")}" to try again.`
           }`,
         );
-        return;
+        return { filed: numbers };
       }
       await say("progress", described);
+      return { batchId, filed: numbers };
     },
 
     async research(input) {
@@ -1490,7 +1627,13 @@ export function createChatRequests(options: ChatRequestsOptions): ChatRequests {
         finish();
       }
       await say("progress", findingsText(researcher.name, found));
-      if (contractor !== undefined) {
+      if (
+        contractor !== undefined &&
+        input.recurring?.onResearcher !== undefined
+      ) {
+        // A Recurring Goal's run lets it go once it has filed (FR-138).
+        input.recurring.onResearcher(contractor);
+      } else if (contractor !== undefined) {
         await agents.release(floor.id, contractor.id).catch(() => undefined);
         await say("progress", `${contractor.name} left: its research is done.`);
       }

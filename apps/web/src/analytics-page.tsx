@@ -1174,6 +1174,7 @@ export function AnalyticsPage({
           ...scorecardWidgets({
             from,
             to,
+            // Its own "by", or the page's when the Scorecard has it.
             by: scorecard,
             agentId: agent,
             onByChange: (next) => {

@@ -274,6 +274,30 @@ async function configure(source: Office): Promise<void> {
       createdAt: at,
     },
   ]);
+  // The Owner's Recurring Goals (Scorecards PRD, FR-136): one weekly, one
+  // daily and off. Their runs are no part of the configuration.
+  for (const goal of [
+    {
+      name: "Weekly test gaps",
+      words: "Find modules without tests and file an issue for each.",
+      schedule: { frequency: "weekly" as const, days: [1, 4], time: "09:00" },
+      tokenCap: 200_000,
+      enabled: true,
+      nextRunAt: new Date("2026-10-12T08:00:00.000Z"),
+    },
+    {
+      name: "Daily dependency check",
+      words: "Look for outdated dependencies and file an issue for each.",
+      schedule: { frequency: "daily" as const, days: [], time: "07:30" },
+      tokenCap: null,
+      enabled: false,
+      nextRunAt: null,
+    },
+  ]) {
+    expect(
+      await stores.recurringGoals.create("web-shop", goal, at),
+    ).toMatchObject({ name: goal.name });
+  }
   // The Owner's Hooks (FR-121): one any reviewer runs, one the coder
   // runs, turned off. Their runs are no part of the configuration.
   const migrationCheck = await stores.hooks.create(
@@ -601,6 +625,24 @@ const cases: Case[] = [
         "migrations/**",
       ]);
       expect(floor("web-shop")?.changedLinesLimit).toBe(500);
+      // Recurring Goals (FR-136), without their runs or next run.
+      expect(floor("web-shop")?.recurringGoals).toEqual([
+        {
+          name: "Weekly test gaps",
+          words: "Find modules without tests and file an issue for each.",
+          schedule: { frequency: "weekly", days: [1, 4], time: "09:00" },
+          tokenCap: 200_000,
+          enabled: true,
+        },
+        {
+          name: "Daily dependency check",
+          words: "Look for outdated dependencies and file an issue for each.",
+          schedule: { frequency: "daily", days: [], time: "07:30" },
+          tokenCap: null,
+          enabled: false,
+        },
+      ]);
+      expect(floor("blog")?.recurringGoals).toEqual([]);
       expect(floor("blog")?.ownerOnlyPaths).toEqual([]);
       expect(floor("blog")?.changedLinesLimit).toBeNull();
       expect(

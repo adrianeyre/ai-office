@@ -204,6 +204,12 @@ export interface ChatBatchRequest {
    * likely files, Agents and work Roles, checked as any draft is.
    */
   readonly plan: PlanDraft;
+  /**
+   * A Recurring Goal's run (Scorecards PRD, FR-137; ADR 0018): its words
+   * do not stand as the Plan's approval, which waits for the Owner on the
+   * whiteboard, with an action Notice, whatever the Floor's plan approval.
+   */
+  readonly awaitsOwner?: boolean;
 }
 
 /**
@@ -2114,13 +2120,16 @@ export function createBatches(options: BatchesOptions): Batches {
     // The chat request stands as the Plan's approval (ADR 0004), as do a
     // Spec's confirmed tasks, unless the Owner edited its drafts since
     // (FR-115).
-    const approvedAlready = request !== undefined || spec?.approved === true;
+    // A Recurring Goal's never does (ADR 0018).
+    const awaitsOwner = request?.awaitsOwner === true;
+    const approvedAlready =
+      (request !== undefined && !awaitsOwner) || spec?.approved === true;
     const { batch, plan } = await store.create(
       {
         floorId: floor.id,
         issues: issues.map(({ number }) => number),
         status:
-          floor.planApproval && !approvedAlready
+          awaitsOwner || (floor.planApproval && !approvedAlready)
             ? "awaiting_approval"
             : "in_progress",
         agentId: manager.id,
@@ -2144,8 +2153,8 @@ export function createBatches(options: BatchesOptions): Batches {
       ...(spec === undefined ? {} : { specSessionId: spec.sessionId }),
     });
     // The chat request is the Plan's approval, recorded as the Owner's
-    // (ADR 0012), as the whiteboard's is.
-    if (request !== undefined) {
+    // (ADR 0012), as the whiteboard's is; a Recurring Goal's is not.
+    if (request !== undefined && !awaitsOwner) {
       await events.publish({
         type: "batch.approved",
         version: 1,

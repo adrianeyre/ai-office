@@ -7,6 +7,8 @@ import {
   hookFailuresToTurnOff,
   hookTriggerText,
   issuePriorityLabels,
+  recurringGoalFailuresToTurnOff,
+  recurringGoalSkipText,
   reviewVerdictLabels,
   roleName,
   type RouteJudge,
@@ -76,6 +78,13 @@ export const eventTypeLabels: Record<EventType, string> = {
   "hook.run_started": "Hook run started",
   "hook.run_finished": "Hook run finished",
   "hook.run_skipped": "Hook run skipped",
+  "recurring_goal.added": "Recurring Goal added",
+  "recurring_goal.changed": "Recurring Goal changed",
+  "recurring_goal.removed": "Recurring Goal deleted",
+  "recurring_goal.run_started": "Recurring Goal run started",
+  "recurring_goal.run_skipped": "Recurring Goal run skipped",
+  "recurring_goal.run_finished": "Recurring Goal run finished",
+  "recurring_goal.run_failed": "Recurring Goal run failed",
   "sandbox.started": "Sandbox started",
   "sandbox.stopped": "Sandbox stopped",
   "sandbox.text": "Agent output",
@@ -224,6 +233,18 @@ export const eventTypeGroups: readonly {
       "hook.run_started",
       "hook.run_finished",
       "hook.run_skipped",
+    ],
+  },
+  {
+    label: "Recurring Goals",
+    types: [
+      "recurring_goal.added",
+      "recurring_goal.changed",
+      "recurring_goal.removed",
+      "recurring_goal.run_started",
+      "recurring_goal.run_skipped",
+      "recurring_goal.run_finished",
+      "recurring_goal.run_failed",
     ],
   },
   {
@@ -653,6 +674,28 @@ export function describeEvent(
         event.issue === undefined ? "" : ` of #${String(event.issue)}`
       } left out Guideline${event.leftOut.length === 1 ? "" : "s"} ${list}: the Guidelines it was to follow have ${event.characters.toLocaleString("en-GB")} characters, over the ${event.budget.toLocaleString("en-GB")} a prompt carries.`;
     }
+    case "recurring_goal.added":
+      return `The Owner added the Recurring Goal "${event.name}", which comes round ${event.frequency}.`;
+    case "recurring_goal.changed":
+      return event.by === "failures"
+        ? `The Recurring Goal "${event.name}" turned itself off after ${String(recurringGoalFailuresToTurnOff)} failed runs in a row: the Owner can turn it on again in the Floor admin.`
+        : `The Owner changed the Recurring Goal "${event.name}" (${event.fields.join(", ")})${
+            event.fields.includes("enabled")
+              ? event.enabled
+                ? ": it is on."
+                : ": it is off."
+              : "."
+          }`;
+    case "recurring_goal.removed":
+      return `The Owner deleted the Recurring Goal "${event.name}".`;
+    case "recurring_goal.run_started":
+      return `The Recurring Goal "${event.name}" started a run${event.by === "owner" ? ", as the Owner asked" : ", on its schedule"}.`;
+    case "recurring_goal.run_skipped":
+      return `The Recurring Goal "${event.name}" skipped a run: ${recurringGoalSkipText[event.reason]}.`;
+    case "recurring_goal.run_finished":
+      return `The Recurring Goal "${event.name}" filed ${event.issues.length === 0 ? "no new issues" : event.issues.map((number) => `#${String(number)}`).join(", ")} and proposed Batch ${String(event.batchId)}'s Plan, which waits for the Owner's approval.`;
+    case "recurring_goal.run_failed":
+      return `The Recurring Goal "${event.name}" failed: ${event.reason}.${event.turnedOff ? " It turned itself off." : ""}`;
     case "hook.added":
       return `The Owner added the Hook "${event.name}": ${hookTriggerText({
         trigger: event.trigger,

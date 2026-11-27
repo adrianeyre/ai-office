@@ -68,6 +68,8 @@ interface Office {
   readonly communications: CommunicationsStore;
   readonly settings: OfficeSettings;
   readonly retention: Retention;
+  /** The Scorecard's records (Scorecards PRD, FR-127). */
+  readonly scorecards: OfficeStores["scorecards"];
   /** Events, Notices and sign-ins still kept. */
   readonly kept: () => Promise<{
     events: string[];
@@ -133,10 +135,12 @@ async function office(stores: Stores): Promise<Office> {
       notices: stores.office.notices,
       auth: stores.auth,
       communications: stores.communications,
+      scorecards: stores.office.scorecards,
     }),
     now: clock.now,
   });
   return {
+    scorecards: stores.office.scorecards,
     clock,
     bus,
     requests,
@@ -442,6 +446,57 @@ const cases: Case[] = [
       expect(
         await office.communications.due(new Date(start + 401 * day), 10),
       ).toHaveLength(1);
+    },
+  ],
+  [
+    "keeps the Scorecard's records a year by default, after the requests they were built from have gone (Scorecards PRD, FR-127)",
+    async (office) => {
+      const entry = (issue: number, endedAt: Date) => ({
+        floorId: "web-shop",
+        issue,
+        agentId: "ada",
+        agentName: "Ada",
+        role: "coder",
+        stage: "work" as const,
+        contractor: false,
+        model: "claude-opus-5-5",
+        size: "small" as const,
+        outcome: "merged" as const,
+        roundsToApproval: 1,
+        qaRoundsFailed: 0,
+        stalls: 0,
+        failures: 0,
+        roundsReviewed: 0,
+        blockingComments: 0,
+        inputTokens: 1_000,
+        outputTokens: 100,
+        estimatedCostUsd: 0.5,
+        endedAt,
+      });
+      await office.scorecards.record("web-shop", 1, [
+        entry(1, new Date(start)),
+      ]);
+      await office.scorecards.record("web-shop", 2, [
+        entry(2, new Date(start + 200 * day)),
+      ]);
+      const issues = async () =>
+        (
+          await office.scorecards.list(
+            new Date(0),
+            new Date("2100-01-01T00:00:00Z"),
+          )
+        ).map(({ issue }) => issue);
+      // After 100 days, past requests' 90: both records stay.
+      office.clock.at(100 * day);
+      await office.retention.run();
+      expect(await issues()).toEqual([1, 2]);
+      // After a year, the first goes.
+      office.clock.at(366 * day);
+      const report = await office.retention.run();
+      expect(await issues()).toEqual([2]);
+      expect(report.deleted).toContainEqual(
+        expect.objectContaining({ rule: "scorecardDays", count: 1 }),
+      );
     },
   ],
   [

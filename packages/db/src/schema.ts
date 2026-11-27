@@ -3219,3 +3219,97 @@ export const scorecardRecords = pgTable(
     ),
   ],
 );
+
+// Each Floor's Recurring Goals (Scorecards PRD, FR-136 to FR-141; ADR
+// 0018): a Goal the Owner saved with a schedule, daily or weekly on chosen
+// days (`days`, 0 for Sunday) at a time (`time`, HH:MM) in the Office's
+// time zone, which the Floor's Manager works each time it comes round
+// (`next_run_at`, null while it is off), proposing a Plan that waits for
+// the Owner. Each run may use at most `token_cap` tokens, the Manager's and
+// its research Contractor's together; null for the office's daily Token
+// Cap. Three failed runs in a row (`failures`) turn it off. Only the Owner
+// makes, changes, runs and deletes them.
+export const recurringGoals = pgTable(
+  "recurring_goals",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
+    floorId: text("floor_id")
+      .notNull()
+      .references(() => floors.id),
+    name: text("name").notNull(),
+    words: text("words").notNull(),
+    frequency: text("frequency").notNull(),
+    days: integer("days").array().notNull(),
+    time: text("time").notNull(),
+    tokenCap: bigint("token_cap", { mode: "number" }),
+    enabled: boolean("enabled").notNull(),
+    failures: integer("failures").notNull().default(0),
+    nextRunAt: timestamp("next_run_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("recurring_goals_name_unique").on(
+      table.floorId,
+      sql`lower(${table.name})`,
+    ),
+    check(
+      "recurring_goals_name",
+      sql`length(${table.name}) BETWEEN 1 AND 100 AND ${table.name} = btrim(${table.name})`,
+    ),
+    check(
+      "recurring_goals_words",
+      sql`length(${table.words}) BETWEEN 1 AND 2000`,
+    ),
+    check(
+      "recurring_goals_schedule",
+      sql`((${table.frequency} = 'daily' AND cardinality(${table.days}) = 0) OR (${table.frequency} = 'weekly' AND cardinality(${table.days}) BETWEEN 1 AND 7 AND ${table.days} <@ ARRAY[0, 1, 2, 3, 4, 5, 6])) AND ${table.time} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'`,
+    ),
+    check(
+      "recurring_goals_token_cap",
+      sql`${table.tokenCap} IS NULL OR ${table.tokenCap} > 0`,
+    ),
+    check("recurring_goals_failures", sql`${table.failures} >= 0`),
+  ],
+);
+
+// Each run of a Recurring Goal (FR-140, FR-141): `running` until it ends,
+// then `planned` (it filed issues and proposed its Batch's Plan, which
+// waits for the Owner), `skipped` or `failed`, with why (`reason`); the
+// issues it filed, which later runs never file again while they are
+// open (FR-139); its Manager chat message; and the tokens it used.
+// Deleting a Recurring Goal deletes its runs.
+export const recurringGoalRuns = pgTable(
+  "recurring_goal_runs",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
+    goalId: bigint("goal_id", { mode: "number" })
+      .notNull()
+      .references(() => recurringGoals.id, { onDelete: "cascade" }),
+    floorId: text("floor_id").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    outcome: text("outcome").notNull(),
+    reason: text("reason").notNull().default(""),
+    batchId: bigint("batch_id", { mode: "number" }).references(
+      (): AnyPgColumn => batches.id,
+    ),
+    issues: integer("issues")
+      .array()
+      .notNull()
+      .default(sql`'{}'`),
+    tokens: bigint("tokens", { mode: "number" }).notNull().default(0),
+  },
+  (table) => [
+    index("recurring_goal_runs_goal_idx").on(table.goalId, table.id),
+    check(
+      "recurring_goal_runs_outcome",
+      sql`${table.outcome} IN ('running', 'planned', 'skipped', 'failed') AND (${table.outcome} = 'running') = (${table.finishedAt} IS NULL)`,
+    ),
+    check("recurring_goal_runs_tokens", sql`${table.tokens} >= 0`),
+  ],
+);

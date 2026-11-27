@@ -56,6 +56,7 @@ import {
   createGuidelineApprovals,
   createHookRunner,
   createScorecardRecorder,
+  createRecurringGoals,
   createGuidelineProposals,
   createTaskGuidelines,
   plannedFiles,
@@ -1367,6 +1368,50 @@ export async function startOffice(
     () => false,
   );
   const setupToken = passwordSet ? undefined : await writeSetupToken();
+  // Each Floor's Recurring Goals (Scorecards PRD, FR-136 to FR-141; ADR
+  // 0018): on their schedules, the Manager works each one's words by the
+  // chat request's path, and its Plan waits for the Owner.
+  const recurringGoals = createRecurringGoals({
+    store: stores.recurringGoals,
+    floors: stores.floors,
+    agents: stores.agents,
+    batches: stores.batches,
+    requests: chatRequests,
+    release: (floorId, agentId) => agents.release(floorId, agentId),
+    models,
+    defaultModels: () => aiProviders.defaultModels(),
+    github,
+    chat: {
+      // The Goal's words, kept as the Owner's `/goal`, which they are.
+      keep: (floorId, text) =>
+        stores.managerChat.append({
+          floorId,
+          kind: "owner",
+          text,
+          command: null,
+          replyTo: null,
+          agentId: null,
+          model: null,
+          createdAt: new Date(),
+        }),
+      say: async (floorId, _kind, text, replyTo) => {
+        await managerChat.postProgress(floorId, text, replyTo);
+      },
+    },
+    notices,
+    events,
+    timeZone: async () => (await officeSettings.ownerProfile()).timeZone,
+    officeTokenCap: async () => (await tokenCaps.officeCaps()).daily,
+    // What the run's Manager and research Contractor used, as the AI
+    // Gateway counted it, from the run's start.
+    tokensUsed: async (agentIds, since) =>
+      (await requestHistory.tokenUsage(since, new Date()))
+        .filter(({ agentId }) => agentId !== null && agentIds.includes(agentId))
+        .reduce((sum, { totals }) => sum + totals.tokens, 0),
+    onError: (error) => {
+      logger.warn({ err: error }, "A Recurring Goal's run went wrong.");
+    },
+  });
   const app = await buildApp({
     floorStops,
     logger,
@@ -1384,6 +1429,7 @@ export async function startOffice(
     guidelineApprovals,
     guidelineProposals,
     hookRunner,
+    recurringGoals,
     aiAccounts,
     combos,
     modelMappings,
@@ -2221,6 +2267,7 @@ export async function startOffice(
     taskGuidelines.stop();
     stopHooks();
     await scorecard.stop();
+    await recurringGoals.stop();
     capEnforcement.stop();
     workingAgents.stop();
     await intake.stop();
@@ -2306,6 +2353,7 @@ export async function startOffice(
   roleMemoryReview.start();
   retention.start();
   scorecard.start();
+  recurringGoals.start();
   await communications
     .start()
     .then(async () =>
